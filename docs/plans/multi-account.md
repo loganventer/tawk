@@ -55,8 +55,8 @@ These were chosen by the owner before planning and are not open in this plan.
 | 1. The account and the database | Done: migration 17, every store bound to an account, the account and per-contact stores, the label rules, the roster manager, and the tests |
 | 2. Several sessions in the backend | Done: the Go bridge keeps its sessions by handle and marks every event with one; the C gateway routes them. Two sessions were run side by side in one tawk, each with its own login store and log, without a linked number |
 | 3. One runtime per account | Done: `composition/account_runtime` and `account_host`, the account directory the clients are given, and every account started and served each frame. The clients still show the primary account only |
-| 4. The terminal client | Not started |
-| 5. Merged chats and a contact's own settings | The table and the store are in (step 1). The rules and the screens are not started |
+| 4. The terminal client | Mostly done: every account's chats in one list with account badges, the header's account filter, bringing an account into view, and Settings, Account, Accounts (add, rename, primary, agent access, log out, remove), with adding an account opening its linking wizard. Still to do: the unread total and the tab title across accounts, and the blink marking the right account's row |
+| 5. Merged chats and a contact's own settings | The store, the two rules and the merged rows of the chat list are in. Still to do: the merged conversation, "send as" in the input, the contact card's section and the list of contacts with a sending number of their own |
 | 6. The control socket and the shell commands | Not started |
 | 7. tawk-mcp | Not started |
 | 8. Encryption, backup, doctor and logs | Not started |

@@ -80,6 +80,7 @@ static void handle_paste(TuiApp *app, const char *text) {
     if (app->agents.open) { agents_panel_paste(&app->agents, text); app->dirty = 1; return; }
     if (profile_dialogs_is_open(&app->profile)) { profile_dialogs_paste(&app->profile, text); return; }
     if (status_feed_dialogs_replying(&app->feed)) { status_feed_dialogs_paste(&app->feed, text); return; }
+    if (app->accounts_dialog.open) { accounts_dialog_paste(&app->accounts_dialog, text); app->dirty = 1; return; }
     if (app->self_chats.open) { chat_toggle_dialog_paste(&app->self_chats, text); return; }
     if (app->forward_picker.open) { chat_picker_paste(&app->forward_picker, text); return; }
     if (app->scheduled_list.open) {
@@ -210,6 +211,10 @@ static int handle_overlays_key(TuiApp *app, int is_key, int ch) {
         if (message_menu_key(&app->message_menu, is_key, ch) == POPUP_CHOSEN) tui_app_apply_message_action(app);
         return 1;
     }
+    if (app->accounts_dialog.open) {
+        tui_app_accounts_request(app, accounts_dialog_key(&app->accounts_dialog, is_key, ch));
+        return 1;
+    }
     if (app->self_chats.open) {
         tui_app_self_chats_request(app, chat_toggle_dialog_key(&app->self_chats, is_key, ch));
         return 1;
@@ -331,6 +336,11 @@ static int handle_overlays_mouse(TuiApp *app, const MEVENT *ev, int wheel, int p
     }
     if (app->scheduled_list.open) {
         if (press) tui_app_scheduled_request(app, scheduled_list_dialog_click(&app->scheduled_list, y, x));
+        app->dirty = 1;
+        return 1;
+    }
+    if (app->accounts_dialog.open) {
+        if (press) tui_app_accounts_request(app, accounts_dialog_click(&app->accounts_dialog, y, x));
         app->dirty = 1;
         return 1;
     }

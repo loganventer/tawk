@@ -12,7 +12,9 @@ typedef enum ConfirmPurpose {
     CONFIRM_REMOVE_PHOTO,        /* your own profile photo */
     CONFIRM_USE_WHATSMEOW,       /* switch backends to post a status */
     CONFIRM_ENABLE_AGENTS,       /* turn on the control socket */
-    CONFIRM_CLEAR_INPUT          /* throw away what is typed in the message input */
+    CONFIRM_CLEAR_INPUT,         /* throw away what is typed in the message input */
+    CONFIRM_REMOVE_ACCOUNT,      /* take an account and everything kept for it away; the subject is its id */
+    CONFIRM_LOGOUT_ACCOUNT       /* unlink an account from WhatsApp; the subject is its id */
 } ConfirmPurpose;
 
 #endif

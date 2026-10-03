@@ -6,7 +6,9 @@
 #include "utilities/str_util.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /* Every running account other than the one whose managers are in app->deps. */
 static const AccountServices *other(TuiApp *app, int index) {
@@ -161,4 +163,203 @@ void tui_app_account_chip(TuiApp *app, char *out, size_t size) {
     if (app->account_filter == ACCOUNT_ID_NONE) { str_copy(out, size, "All"); return; }
     const AccountServices *sv = dir->find(dir, app->account_filter);
     str_copy(out, size, sv && sv->label ? sv->label : "All");
+}
+
+/* ---- the accounts dialog -------------------------------------------------- */
+
+void tui_app_open_accounts(TuiApp *app) {
+    settings_panel_close(&app->settings_panel);
+    accounts_dialog_open(&app->accounts_dialog);
+    app->accounts_dialog.selected = -1;                      /* the render picks the account in view */
+    app->dirty = 1;
+}
+
+static int unread_chats(MessagingManager *messaging) {
+    int count = 0, unread = 0;
+    const Chat *chats = messaging_manager_chats(messaging, &count);
+    for (int i = 0; i < count; i++) unread += chats[i].unread > 0 && !chats[i].is_archived && chats[i].is_locked != 1;
+    return unread;
+}
+
+/* The roster's accounts with how each stands now. */
+static int dialog_rows(TuiApp *app, AccountsDialogRow *rows) {
+    Account all[ACCOUNT_MAX];
+    int n = app->deps.roster ? account_roster_manager_list(app->deps.roster, all, ACCOUNT_MAX) : 0;
+    IAccountDirectory *dir = app->deps.directory;
+    for (int i = 0; i < n; i++) {
+        const AccountServices *sv = dir ? dir->find(dir, all[i].id) : NULL;
+        rows[i].account = all[i];
+        rows[i].auth = sv ? messaging_manager_auth_state(sv->messaging) : AUTH_STATE_FAILED;
+        rows[i].in_view = all[i].id == app->deps.active_account;
+        rows[i].unread = sv ? unread_chats(sv->messaging) : 0;
+    }
+    return n;
+}
+
+void tui_app_accounts_render(TuiApp *app, UiRect area) {
+    AccountsDialogRow rows[ACCOUNT_MAX];
+    int n = dialog_rows(app, rows);
+    AccountsDialog *d = &app->accounts_dialog;
+    if (d->selected < 0) {
+        d->count = n;
+        for (int i = 0; i < n; i++) d->ids[i] = rows[i].account.id;
+        d->selected = 0;
+        accounts_dialog_select(d, app->deps.active_account);
+    }
+    accounts_dialog_render(d, area, rows, n);
+}
+
+/* What agents may do, one step on: a new account goes from nothing to reading. */
+static AccountAgentAccess next_access(AccountAgentAccess now) {
+    switch (now) {
+        case ACCOUNT_AGENT_OFF:    return ACCOUNT_AGENT_READ;
+        case ACCOUNT_AGENT_FOLLOW: return ACCOUNT_AGENT_OFF;
+        case ACCOUNT_AGENT_READ:   return ACCOUNT_AGENT_SEND;
+        case ACCOUNT_AGENT_SEND:   return ACCOUNT_AGENT_MANAGE;
+        case ACCOUNT_AGENT_MANAGE: return ACCOUNT_AGENT_ADMIN;
+        default:                   return ACCOUNT_AGENT_OFF;
+    }
+}
+
+static void add_account(TuiApp *app) {
+    AccountsDialog *d = &app->accounts_dialog;
+    AccountRosterManager *roster = app->deps.roster;
+    IAccountDirectory *dir = app->deps.directory;
+    char *label = accounts_dialog_label(d);
+    AccountId id = ACCOUNT_ID_NONE;
+    int added = label && account_roster_manager_add(roster, label, (int64_t)time(NULL), &id) == 0;
+    free(label);
+    if (!added) { accounts_dialog_error(d, account_roster_manager_error(roster)); return; }
+    const AccountServices *sv = dir->start(dir, id);
+    if (!sv) {
+        account_roster_manager_remove(roster, id);
+        accounts_dialog_error(d, "The account could not be started; see the log.");
+        return;
+    }
+    messaging_manager_start(sv->messaging);
+    accounts_dialog_done(d);
+    d->open = 0;
+    /* In view, its linking wizard shows; the other accounts carry on behind it. */
+    tui_app_use_account(app, id);
+    char msg[ACCOUNT_LABEL_SIZE + 64];
+    snprintf(msg, sizeof(msg), "Link %s with the phone that has that number", sv->label);
+    tui_app_toast(app, msg, 0);
+}
+
+void tui_app_accounts_request(TuiApp *app, AccountsDialogRequest request) {
+    AccountsDialog *d = &app->accounts_dialog;
+    AccountRosterManager *roster = app->deps.roster;
+    IAccountDirectory *dir = app->deps.directory;
+    AccountId id = accounts_dialog_selected(d);
+    Account account;
+    int have = roster && id != ACCOUNT_ID_NONE && account_roster_manager_get(roster, id, &account) == 0;
+    app->dirty = 1;
+    if (!roster || !dir) return;
+    switch (request) {
+        case ACCOUNTS_REQUEST_VIEW:
+            if (have && tui_app_use_account(app, id) == 0) {
+                d->open = 0;
+                app->account_filter = ACCOUNT_ID_NONE;
+                char msg[ACCOUNT_LABEL_SIZE + 32];
+                snprintf(msg, sizeof(msg), "%s is in view", account.label);
+                tui_app_toast(app, msg, 0);
+            }
+            break;
+        case ACCOUNTS_REQUEST_ADD:
+            add_account(app);
+            break;
+        case ACCOUNTS_REQUEST_RENAME: {
+            char *label = accounts_dialog_label(d);
+            if (label && account_roster_manager_rename(roster, id, label) == 0) {
+                dir->relabel(dir, id);
+                accounts_dialog_done(d);
+            } else {
+                accounts_dialog_error(d, account_roster_manager_error(roster));
+            }
+            free(label);
+            break;
+        }
+        case ACCOUNTS_REQUEST_PRIMARY:
+            if (have && account_roster_manager_set_primary(roster, id) != 0) accounts_dialog_error(d, account_roster_manager_error(roster));
+            break;
+        case ACCOUNTS_REQUEST_ACCESS:
+            if (have && account_roster_manager_set_agent_access(roster, id, next_access(account.agent_access)) != 0) {
+                accounts_dialog_error(d, account_roster_manager_error(roster));
+            }
+            break;
+        case ACCOUNTS_REQUEST_LOGOUT: {
+            if (!have) break;
+            char subject[16], question[ACCOUNT_LABEL_SIZE + 64];
+            snprintf(subject, sizeof(subject), "%d", id);
+            snprintf(question, sizeof(question), "Unlink %s from WhatsApp?", account.label);
+            confirm_dialog_open(&app->confirm, CONFIRM_LOGOUT_ACCOUNT, subject, "Log out", question,
+                                "Its chats stay on this computer. To use it again you link it with the phone once more.", "Log out", 0);
+            break;
+        }
+        case ACCOUNTS_REQUEST_REMOVE: {
+            if (!have) break;
+            const AccountServices *sv = dir->find(dir, id);
+            if (dir->count(dir) <= 1) {
+                accounts_dialog_error(d, "The last account cannot be removed. Log it out instead.");
+            } else if (sv && messaging_manager_auth_state(sv->messaging) != AUTH_STATE_NEEDS_LOGIN) {
+                accounts_dialog_error(d, "Log this account out first (l), so it is unlinked on the phone too.");
+            } else {
+                char subject[16], question[ACCOUNT_LABEL_SIZE + 64];
+                snprintf(subject, sizeof(subject), "%d", id);
+                snprintf(question, sizeof(question), "Remove %s from tawk?", account.label);
+                confirm_dialog_open(&app->confirm, CONFIRM_REMOVE_ACCOUNT, subject, "Remove account", question,
+                                    "Every chat, message and contact kept for it on this computer is deleted. This cannot be undone.",
+                                    "Remove", 1);
+            }
+            break;
+        }
+        case ACCOUNTS_REQUEST_SENDING:
+            tui_app_open_send_accounts(app);
+            break;
+        default:
+            break;
+    }
+    app->chat_rows_stale = 1;
+}
+
+void tui_app_logout_account(TuiApp *app, AccountId account) {
+    IAccountDirectory *dir = app->deps.directory;
+    const AccountServices *sv = dir ? dir->find(dir, account) : NULL;
+    if (!sv) return;
+    messaging_manager_logout(sv->messaging);
+    char msg[ACCOUNT_LABEL_SIZE + 64];
+    snprintf(msg, sizeof(msg), "%s is logged out; link it again with a QR code or phone number", sv->label);
+    tui_app_toast(app, msg, 0);
+    app->dirty = 1;
+}
+
+void tui_app_remove_account(TuiApp *app, AccountId account) {
+    IAccountDirectory *dir = app->deps.directory;
+    AccountRosterManager *roster = app->deps.roster;
+    if (!dir || !roster || dir->count(dir) <= 1) return;
+    if (account == app->deps.active_account) {                /* another account takes its place in view */
+        AccountId next = ACCOUNT_ID_NONE;
+        for (int i = 0; next == ACCOUNT_ID_NONE; i++) {
+            const AccountServices *sv = dir->at(dir, i);
+            if (!sv) break;
+            if (sv->id != account) next = sv->id;
+        }
+        if (next == ACCOUNT_ID_NONE || tui_app_use_account(app, next) != 0) return;
+    }
+    if (app->account_filter == account) app->account_filter = ACCOUNT_ID_NONE;
+    dir->forget(dir, account);
+    if (account_roster_manager_remove(roster, account) != 0) tui_app_toast(app, account_roster_manager_error(roster), 1);
+    else tui_app_toast(app, "\xF0\x9F\x97\x91 Account removed", 0);
+    app->accounts_dialog.selected = -1;
+    app->chat_rows_stale = 1;
+    app->dirty = 1;
+}
+
+void tui_app_open_send_accounts(TuiApp *app) {
+    ChatPrefs own[64];
+    int n = app->deps.roster ? account_roster_manager_send_accounts(app->deps.roster, own, 64) : 0;
+    char msg[96];
+    if (n == 0) snprintf(msg, sizeof(msg), "Every contact sends from your primary account");
+    else snprintf(msg, sizeof(msg), "%d contact%s with a sending number of their own", n, n == 1 ? "" : "s");
+    tui_app_toast(app, msg, 0);
 }

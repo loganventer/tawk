@@ -1,8 +1,10 @@
 #include "composition/account_host.h"
 #include "composition/account_runtime.h"
 #include "utilities/log.h"
+#include "utilities/tree_copy.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 struct AccountHost {
     AccountRuntimeParams params;
@@ -70,6 +72,17 @@ static int dir_stop(IAccountDirectory *self, AccountId id) {
     return 0;
 }
 
+static int dir_forget(IAccountDirectory *self, AccountId id) {
+    AccountHost *h = host_of(self);
+    if (dir_stop(self, id) != 0) return -1;
+    if (id <= ACCOUNT_ID_FIRST) return 0;
+    char auth[700];
+    account_runtime_auth_dir(h->params.settings, id, auth, sizeof(auth));
+    char *slash = strrchr(auth, '/');                       /* .../accounts/<id>/auth -> .../accounts/<id> */
+    if (slash) *slash = '\0';
+    return tree_remove(auth);
+}
+
 static void dir_relabel(IAccountDirectory *self, AccountId id) {
     AccountHost *h = host_of(self);
     int at = index_of(h, id);
@@ -82,7 +95,7 @@ AccountHost *account_host_create(const AccountRuntimeParams *params, IAccountSto
     if (!h) return NULL;
     h->params = *params;
     h->accounts = accounts;
-    h->directory = (IAccountDirectory){ h, dir_count, dir_at, dir_find, dir_start, dir_stop, dir_relabel };
+    h->directory = (IAccountDirectory){ h, dir_count, dir_at, dir_find, dir_start, dir_stop, dir_forget, dir_relabel };
     Account all[ACCOUNT_MAX];
     int n = accounts->list(accounts, all, ACCOUNT_MAX);
     for (int i = 0; i < n; i++) {

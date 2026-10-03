@@ -8,6 +8,7 @@
 
 #include "clients/tui/chat_list_view.h"
 #include "clients/tui/unified_chat_list.h"
+#include "clients/tui/accounts_dialog.h"
 #include "clients/tui/chat_picker.h"
 #include "clients/tui/chat_toggle_dialog.h"
 #include "clients/tui/agents_panel.h"
@@ -92,6 +93,7 @@ struct TuiApp {
     SplashView          splash;               /* the start-up animation */
     ChatPicker          forward_picker;       /* choosing chats to forward a message to */
     ChatToggleDialog    self_chats;           /* the chats an admin agent may answer its own requests in */
+    AccountsDialog      accounts_dialog;      /* your accounts: add, name, link and remove them */
     UnifiedChatList     chat_rows;            /* every running account's chats as one list, when there is more than one */
     int                 chat_rows_stale;      /* an account's chats changed: build the list again */
     int64_t             chat_rows_built_ms;
@@ -284,6 +286,15 @@ void tui_app_set_account_filter(TuiApp *app, AccountId account);
 void tui_app_cycle_account_filter(TuiApp *app);
 /* The label for the header: "All", or the account the list shows. Empty with one account. */
 void tui_app_account_chip(TuiApp *app, char *out, size_t size);
+/* The accounts dialog: opening it, what it asks for, and drawing it. */
+void tui_app_open_accounts(TuiApp *app);
+void tui_app_accounts_request(TuiApp *app, AccountsDialogRequest request);
+void tui_app_accounts_render(TuiApp *app, UiRect area);
+/* After a yes to removing or logging out the account a confirmation named. */
+void tui_app_remove_account(TuiApp *app, AccountId account);
+void tui_app_logout_account(TuiApp *app, AccountId account);
+/* The contacts with a sending account of their own. */
+void tui_app_open_send_accounts(TuiApp *app);
 void tui_app_self_chats_request(TuiApp *app, PopupResult result);
 /* "no chat", "3 chats" or "every chat agents may use". */
 void tui_app_self_chats_summary(TuiApp *app, char *out, size_t size);

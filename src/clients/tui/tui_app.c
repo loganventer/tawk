@@ -1122,6 +1122,9 @@ static void host_action(void *ctx, MenuAction action) {
         case MENU_ACTION_SELF_APPROVAL_CHATS:
             tui_app_open_self_chats(app);
             break;
+        case MENU_ACTION_ACCOUNTS:
+            tui_app_open_accounts(app);
+            break;
         case MENU_ACTION_LOGOUT:
             messaging_manager_logout(app->deps.messaging);
             settings_panel_close(&app->settings_panel);
@@ -1323,6 +1326,12 @@ void tui_app_confirmed(TuiApp *app) {
             break;
         case CONFIRM_USE_WHATSMEOW:
             tui_app_switch_to_whatsmeow(app);
+            break;
+        case CONFIRM_REMOVE_ACCOUNT:
+            tui_app_remove_account(app, atoi(app->confirm.subject));
+            break;
+        case CONFIRM_LOGOUT_ACCOUNT:
+            tui_app_logout_account(app, atoi(app->confirm.subject));
             break;
         case CONFIRM_ENABLE_AGENTS:
             apply_settings_now(app, &app->pending_settings);

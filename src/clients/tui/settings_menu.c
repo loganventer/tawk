@@ -10,6 +10,7 @@
 #define SUB(icon, title, subtitle, kids) { MENU_NODE_SUBMENU, icon, title, subtitle, 0, NULL, MENU_ACTION_NONE, MENU_INFO_STATIC, kids, COUNT(kids) }
 
 static const MenuNode ACCOUNT[] = {
+    ACTION("\xF0\x9F\x91\xA5", "Accounts\xE2\x80\xA6", MENU_ACTION_ACCOUNTS),
     INFO("Name", MENU_INFO_NAME),
     INFO("Number", MENU_INFO_NUMBER),
     INFO("Connection", MENU_INFO_CONNECTION),

@@ -17,6 +17,9 @@ typedef struct IAccountDirectory {
     const AccountServices *(*start)(struct IAccountDirectory *self, AccountId id);
     /* Stops the account and takes it down. Its rows are not touched. */
     int  (*stop)(struct IAccountDirectory *self, AccountId id);
+    /* Stops it and removes the folder its login was kept in. The first
+     * account's folder stays, as it is also where a new login would go. */
+    int  (*forget)(struct IAccountDirectory *self, AccountId id);
     /* The label of `id` changed in the roster: what `label` points at follows. */
     void (*relabel)(struct IAccountDirectory *self, AccountId id);
 } IAccountDirectory;
