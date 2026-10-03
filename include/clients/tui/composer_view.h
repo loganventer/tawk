@@ -13,6 +13,7 @@
 /* The message input: a wide-character editor that word-wraps, grows up to
  * COMPOSER_MAX_ROWS lines and then scrolls, keeping the caret in view. */
 typedef struct ComposerView {
+    char      sending_as[96];   /* "as <account>": which of your numbers a message goes out from; "" shows nothing */
     wchar_t text[COMPOSER_MAX_CHARS + 1];
     int     length;
     int     cursor;

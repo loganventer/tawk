@@ -148,7 +148,7 @@ void tui_render_frame(TuiApp *app, int64_t now) {
                       tui_palette_attr(app->dragging_divider ? THEME_SLOT_ACCENT : THEME_SLOT_BORDER));
         }
         const Chat *chat = messaging_manager_open_chat_info(mm);
-        msgs = messaging_manager_messages(mm, &n_msgs);
+        msgs = tui_app_messages(app, &n_msgs);
         char title[192] = "";
         if (chat) snprintf(title, sizeof(title), "%s%s%s", chat->soft_locked ? "\xF0\x9F\x99\x88 " : "", chat->name,
                            chat->is_muted ? "  \xF0\x9F\x94\x95" : "");
@@ -180,12 +180,16 @@ void tui_render_frame(TuiApp *app, int64_t now) {
         ctx.scheduled = scheduled;
         ctx.scheduled_count = n_scheduled;
         app->message_view.has_newer = messaging_manager_has_newer(mm);
+        ctx.owners = app->peer_count ? app->merged.owners : NULL;
+        ctx.badges = app->chat_list.badges;
+        ctx.badge_count = app->peer_count ? app->chat_list.badge_count : 0;
         message_view_render(&app->message_view, l->chat, msgs, n_msgs, &ctx);
         scheduled_message_array_free(scheduled, n_scheduled);
 
         char chip[400];
         composer_chip(app, chip, sizeof(chip));
         int recording = media_manager_is_recording(app->deps.media) ? media_manager_recording_seconds(app->deps.media) : -1;
+        tui_app_send_label(app, app->composer.sending_as, sizeof(app->composer.sending_as));
         composer_view_render(&app->composer, l->composer, app->focus == TUI_FOCUS_COMPOSER,
                              chat != NULL, recording, s->enter_sends, chip);
 

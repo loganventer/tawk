@@ -204,6 +204,11 @@ void composer_view_render(ComposerView *v, UiRect r, int focused, int has_chat,
     tui_fill(r, attr);
     if (r.h < 2) return;
     render_status(r, has_chat, recording_seconds, enter_sends, chip);
+    if (has_chat && recording_seconds < 0 && v->sending_as[0]) {       /* drawn apart from the chip, at the right */
+        char label[104];
+        snprintf(label, sizeof(label), "%s ", v->sending_as);
+        tui_text_right(r.y, r.x + r.w, r.w / 2, label, tui_palette_attr(THEME_SLOT_ACCENT) | ATTR_BOLD);
+    }
     if (recording_seconds >= 0) return;
 
     int rows = r.h - 1;

@@ -9,6 +9,7 @@
 #include "clients/tui/chat_list_view.h"
 #include "clients/tui/unified_chat_list.h"
 #include "clients/tui/accounts_dialog.h"
+#include "clients/tui/merged_message_window.h"
 #include "clients/tui/chat_picker.h"
 #include "clients/tui/chat_toggle_dialog.h"
 #include "clients/tui/agents_panel.h"
@@ -94,6 +95,9 @@ struct TuiApp {
     ChatPicker          forward_picker;       /* choosing chats to forward a message to */
     ChatToggleDialog    self_chats;           /* the chats an admin agent may answer its own requests in */
     AccountsDialog      accounts_dialog;      /* your accounts: add, name, link and remove them */
+    MergedMessageWindow merged;               /* the open chat across the accounts that share it */
+    AccountId           peers[ACCOUNT_MAX];   /* the other accounts the open chat is merged with */
+    int                 peer_count;
     UnifiedChatList     chat_rows;            /* every running account's chats as one list, when there is more than one */
     int                 chat_rows_stale;      /* an account's chats changed: build the list again */
     int64_t             chat_rows_built_ms;
@@ -293,6 +297,28 @@ void tui_app_accounts_render(TuiApp *app, UiRect area);
 /* After a yes to removing or logging out the account a confirmation named. */
 void tui_app_remove_account(TuiApp *app, AccountId account);
 void tui_app_logout_account(TuiApp *app, AccountId account);
+/* The open conversation: the account in view's messages, or, for a contact
+ * merged across accounts, everyone's in the order they happened. */
+const Message *tui_app_messages(TuiApp *app, int *count);
+/* The account message `index` of that conversation belongs to. */
+AccountId tui_app_message_account(TuiApp *app, int index);
+/* Opens the chat of `row` in the other accounts it is merged with, and closes it there again. */
+void tui_app_open_peers(TuiApp *app, const Chat *row);
+void tui_app_close_peers(TuiApp *app);
+/* Makes the managers of `services` the ones in view, changing nothing else. */
+void tui_app_take_services(TuiApp *app, const AccountServices *services);
+/* Within a merged conversation, makes another of its accounts the one that
+ * acts and sends, keeping the conversation as it is. Any other account is
+ * brought into view the ordinary way. */
+int  tui_app_turn_to(TuiApp *app, AccountId account);
+/* Acts through the account message `index` belongs to, saying so when that changes who sends. */
+void tui_app_follow_message(TuiApp *app, int index);
+/* Alt+A: the next account that has this chat sends. */
+void tui_app_cycle_send_account(TuiApp *app);
+/* "as <label>" for the input; empty with one account or no chat open. */
+void tui_app_send_label(TuiApp *app, char *out, size_t size);
+/* Loads older messages of the open chat in every account it is merged with; 1 when any had more. */
+int  tui_app_peers_load_older(TuiApp *app);
 /* The contacts with a sending account of their own. */
 void tui_app_open_send_accounts(TuiApp *app);
 void tui_app_self_chats_request(TuiApp *app, PopupResult result);

@@ -184,7 +184,7 @@ static int handle_overlays_key(TuiApp *app, int is_key, int ch) {
     if (app->agents.open) { tui_app_agents_key(app, is_key, ch); return 1; }
     if (app->viewer.open) {
         int count = 0;
-        const Message *msgs = messaging_manager_messages(app->deps.messaging, &count);
+        const Message *msgs = tui_app_messages(app, &count);
         tui_app_viewer_action(app, image_viewer_key(&app->viewer, msgs, count, is_key, ch));
         return 1;
     }
@@ -309,7 +309,7 @@ static int handle_overlays_mouse(TuiApp *app, const MEVENT *ev, int wheel, int p
     }
     if (app->viewer.open) {
         int count = 0;
-        const Message *msgs = messaging_manager_messages(app->deps.messaging, &count);
+        const Message *msgs = tui_app_messages(app, &count);
         if (wheel) tui_app_viewer_action(app, image_viewer_wheel(&app->viewer, msgs, count, wheel));
         else if (press) tui_app_viewer_action(app, image_viewer_click(&app->viewer, msgs, count, y, x));
         return 1;
@@ -623,10 +623,15 @@ static void handle_chats(TuiApp *app, int is_key, int ch, int alt) {
 
 static void handle_messages(TuiApp *app, int is_key, int ch, int alt) {
     int count = 0;
-    const Message *msgs = messaging_manager_messages(app->deps.messaging, &count);
+    const Message *msgs = tui_app_messages(app, &count);
     MessageView *v = &app->message_view;
     /* Focus can arrive without a selection (Tab): act on the newest message. */
     if (v->selected < 0 && count > 0 && (alt || is_key || is_enter(is_key, ch))) message_view_select(v, count, 0);
+    /* What is done to a message goes through the account it belongs to. */
+    if (v->selected >= 0 && (alt || is_enter(is_key, ch) || (is_key && ch == KEY_DC))) {
+        tui_app_follow_message(app, v->selected);
+        msgs = tui_app_messages(app, &count);
+    }
     if (is_key && ch == KEY_UP) {
         if (v->selected == 0) tui_app_load_older(app);
         else message_view_select(v, count, -1);
@@ -715,7 +720,7 @@ static int handle_emoji_suggestions(TuiApp *app, int is_key, int ch) {
 static int edit_last_message(TuiApp *app) {
     if (!composer_view_is_empty(&app->composer) || app->editing_id[0] || app->attachment[0]) return 0;
     int count = 0;
-    const Message *msgs = messaging_manager_messages(app->deps.messaging, &count);
+    const Message *msgs = tui_app_messages(app, &count);
     if (count <= 0 || !msgs[count - 1].from_me || !messaging_manager_can_edit(app->deps.messaging, &msgs[count - 1])) return 0;
     tui_app_start_edit(app, count - 1);
     return 1;
@@ -797,7 +802,7 @@ static void handle_composer(TuiApp *app, int is_key, int ch, int alt) {
     }
     if (is_key && ch == KEY_UP) {                      /* first line: go up to the messages */
         int count = 0;
-        messaging_manager_messages(app->deps.messaging, &count);
+        tui_app_messages(app, &count);
         app->focus = TUI_FOCUS_MESSAGES;
         message_view_select(&app->message_view, count, -1);
     }
@@ -870,6 +875,10 @@ void tui_input_dispatch(TuiApp *app, int is_key, int ch) {
     }
     if (alt && !is_key && (ch == 'v' || ch == 'V') && !tui_app_show_login(app)) { tui_app_paste_image(app); return; }
     if (alt && !is_key && (ch == 'l' || ch == 'L') && !tui_app_show_login(app)) { tui_app_toggle_soft_lock_here(app); return; }
+    if (alt && !is_key && (ch == 'a' || ch == 'A') && app->focus != TUI_FOCUS_CHATS && !tui_app_show_login(app)) {
+        tui_app_cycle_send_account(app);
+        return;
+    }
     if (alt && !is_key && (ch == 'i' || ch == 'I') && !tui_app_show_login(app)) {
         const char *jid = messaging_manager_open_jid(app->deps.messaging);
         if (app->focus == TUI_FOCUS_CHATS) {

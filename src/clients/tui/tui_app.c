@@ -152,6 +152,7 @@ void tui_app_save_folding(TuiApp *app) {
 /* Opens a chat; with unfold set, a folded group holding it opens so it can be seen. */
 static void open_chat(TuiApp *app, const char *jid, int unfold) {
     if (!jid) return;
+    tui_app_close_peers(app);                              /* whoever opens it across accounts says so afterwards */
     const char *current = messaging_manager_open_jid(app->deps.messaging);
     if (strcmp(current, jid) != 0) {
         if (app->editing_id[0]) { app->editing_id[0] = '\0'; composer_view_clear(&app->composer); }
@@ -211,15 +212,8 @@ int tui_app_use_account(TuiApp *app, AccountId account) {
     /* An account out of view has no chat open: its unread counts run again. */
     messaging_manager_open_chat(app->deps.messaging, "");
 
-    app->deps.messaging = sv->messaging;
-    app->deps.profiles = sv->profiles;
-    app->deps.calls = sv->calls;
-    app->deps.accounts = sv->accounts;
-    app->deps.statuses = sv->statuses;
-    app->deps.feed = sv->feed;
-    app->deps.scheduling = sv->scheduling;
-    app->deps.backend_name = sv->backend_name;
-    app->deps.active_account = account;
+    tui_app_close_peers(app);
+    tui_app_take_services(app, sv);
 
     app->chat_list.open_jid[0] = '\0';
     app->chat_list.open_account = account;
@@ -237,8 +231,10 @@ void tui_app_open_row(TuiApp *app, const Chat *row) {
     if (!row) return;
     char jid[128];
     str_copy(jid, sizeof(jid), row->jid);                  /* the row may be rebuilt while the account changes */
-    if (tui_app_use_account(app, row->account) != 0) return;
+    Chat copy = *row;
+    if (tui_app_use_account(app, copy.account) != 0) return;
     open_chat(app, jid, 1);
+    tui_app_open_peers(app, &copy);                        /* a merged row is the same chat on other accounts too */
 }
 
 void tui_app_open_chat(TuiApp *app, const char *jid) { open_chat(app, jid, 1); }
@@ -312,7 +308,7 @@ void tui_app_toggle_dnd(TuiApp *app) {
 
 static const Message *message_at(TuiApp *app, int index) {
     int count = 0;
-    const Message *msgs = messaging_manager_messages(app->deps.messaging, &count);
+    const Message *msgs = tui_app_messages(app, &count);
     return (index >= 0 && index < count) ? &msgs[index] : NULL;
 }
 
@@ -371,7 +367,7 @@ void tui_app_viewer_action(TuiApp *app, ImageViewerAction action) {
     app->dirty = 1;
     if (action != IMAGE_VIEWER_OPEN_OUTSIDE) return;
     int count = 0;
-    const Message *msgs = messaging_manager_messages(app->deps.messaging, &count);
+    const Message *msgs = tui_app_messages(app, &count);
     const Message *m = image_viewer_current(&app->viewer, msgs, count, NULL);
     if (!m) return;
     if (m->media_path[0] && access(m->media_path, R_OK) == 0) {
@@ -422,6 +418,7 @@ void tui_app_start_edit(TuiApp *app, int index) {
 }
 
 void tui_app_open_message_menu(TuiApp *app, int index, int y, int x) {
+    tui_app_follow_message(app, index);
     const Message *m = message_at(app, index);
     if (!m) return;
     int enabled[MESSAGE_ACTION_COUNT] = { 0 };
@@ -1008,9 +1005,11 @@ void tui_app_show_latest(TuiApp *app) {
 
 int tui_app_load_older(TuiApp *app) {
     int count = 0;
-    const Message *msgs = messaging_manager_messages(app->deps.messaging, &count);
+    const Message *msgs = tui_app_messages(app, &count);
     message_view_hold(&app->message_view, msgs, count);
-    if (messaging_manager_load_older(app->deps.messaging)) { app->dirty = 1; return 1; }
+    int older = messaging_manager_load_older(app->deps.messaging);
+    if (tui_app_peers_load_older(app)) older = 1;
+    if (older) { app->dirty = 1; return 1; }
     message_view_release(&app->message_view);
     return 0;
 }
@@ -1024,7 +1023,7 @@ static void keep_message_window(TuiApp *app) {
     if (!v->drawn) return;
     v->drawn = 0;
     if (!message_view_visible_range(v, &first, &last)) return;
-    const Message *msgs = messaging_manager_messages(app->deps.messaging, &count);
+    const Message *msgs = tui_app_messages(app, &count);
     message_view_hold(v, msgs, count);
     if (messaging_manager_focus_window(app->deps.messaging, first, last)) app->dirty = 1;
     else message_view_release(v);
@@ -1036,7 +1035,7 @@ int tui_app_show_message(TuiApp *app, const char *id) {
     message_view_release(&app->message_view);
     for (int attempt = 0; attempt < 80; attempt++) {
         int count = 0;
-        const Message *msgs = messaging_manager_messages(app->deps.messaging, &count);
+        const Message *msgs = tui_app_messages(app, &count);
         for (int i = 0; i < count; i++) {
             if (strcmp(msgs[i].id, id) != 0) continue;
             app->message_view.selected = i;
@@ -1644,6 +1643,7 @@ TuiApp *tui_app_create(const TuiAppDeps *deps) {
 void tui_app_destroy(TuiApp *app) {
     if (!app) return;
     unified_chat_list_free(&app->chat_rows);
+    merged_message_window_free(&app->merged);
     message_view_dispose(&app->message_view);
     file_picker_dispose(&app->file_picker);
     search_overlay_close(&app->search);

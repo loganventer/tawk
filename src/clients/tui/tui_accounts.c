@@ -363,3 +363,135 @@ void tui_app_open_send_accounts(TuiApp *app) {
     else snprintf(msg, sizeof(msg), "%d contact%s with a sending number of their own", n, n == 1 ? "" : "s");
     tui_app_toast(app, msg, 0);
 }
+
+/* ---- a conversation merged across accounts -------------------------------- */
+
+void tui_app_take_services(TuiApp *app, const AccountServices *sv) {
+    app->deps.messaging = sv->messaging;
+    app->deps.profiles = sv->profiles;
+    app->deps.calls = sv->calls;
+    app->deps.accounts = sv->accounts;
+    app->deps.statuses = sv->statuses;
+    app->deps.feed = sv->feed;
+    app->deps.scheduling = sv->scheduling;
+    app->deps.backend_name = sv->backend_name;
+    app->deps.active_account = sv->id;
+}
+
+static const AccountServices *peer(TuiApp *app, int index) {
+    IAccountDirectory *dir = app->deps.directory;
+    return dir && index >= 0 && index < app->peer_count ? dir->find(dir, app->peers[index]) : NULL;
+}
+
+void tui_app_close_peers(TuiApp *app) {
+    for (int i = 0; i < app->peer_count; i++) {
+        const AccountServices *sv = peer(app, i);
+        if (sv) messaging_manager_open_chat(sv->messaging, "");   /* out of view: its unread counts run again */
+    }
+    app->peer_count = 0;
+}
+
+void tui_app_open_peers(TuiApp *app, const Chat *row) {
+    IAccountDirectory *dir = app->deps.directory;
+    tui_app_close_peers(app);
+    if (!dir || !(row->accounts & (row->accounts - 1))) return;     /* on one account only */
+    for (int i = 0; i < ACCOUNT_MAX; i++) {
+        if (!(row->accounts & (1u << i))) continue;
+        const AccountServices *sv = dir->at(dir, i);
+        if (!sv || sv->id == app->deps.active_account) continue;
+        messaging_manager_open_chat(sv->messaging, row->jid);
+        app->peers[app->peer_count++] = sv->id;
+    }
+    app->chat_rows_stale = 1;
+    app->dirty = 1;
+}
+
+const Message *tui_app_messages(TuiApp *app, int *count) {
+    if (app->peer_count == 0) return messaging_manager_messages(app->deps.messaging, count);
+    MessageSource sources[ACCOUNT_MAX];
+    int n = 0;
+    sources[n].account = app->deps.active_account;
+    sources[n].messages = messaging_manager_messages(app->deps.messaging, &sources[n].count);
+    n++;
+    for (int i = 0; i < app->peer_count && n < ACCOUNT_MAX; i++) {
+        const AccountServices *sv = peer(app, i);
+        if (!sv) continue;
+        sources[n].account = sv->id;
+        sources[n].messages = messaging_manager_messages(sv->messaging, &sources[n].count);
+        n++;
+    }
+    merged_message_window_build(&app->merged, sources, n, app->deps.active_account);
+    *count = app->merged.count;
+    return app->merged.items;
+}
+
+AccountId tui_app_message_account(TuiApp *app, int index) {
+    if (app->peer_count == 0) return app->deps.active_account;
+    int count = 0;
+    tui_app_messages(app, &count);
+    return index >= 0 && index < count ? app->merged.owners[index] : app->deps.active_account;
+}
+
+int tui_app_turn_to(TuiApp *app, AccountId account) {
+    if (account == ACCOUNT_ID_NONE || account == app->deps.active_account) return 0;
+    for (int i = 0; i < app->peer_count; i++) {
+        if (app->peers[i] != account) continue;
+        const AccountServices *sv = peer(app, i);
+        if (!sv) return -1;
+        app->peers[i] = app->deps.active_account;           /* the two change places; the chat stays open in both */
+        tui_app_take_services(app, sv);
+        app->chat_list.open_account = account;
+        app->conversation_theme_valid = 0;
+        app->chat_rows_stale = 1;
+        app->dirty = 1;
+        return 0;
+    }
+    return tui_app_use_account(app, account);
+}
+
+static void say_sending_as(TuiApp *app) {
+    IAccountDirectory *dir = app->deps.directory;
+    const AccountServices *sv = dir ? dir->find(dir, app->deps.active_account) : NULL;
+    char msg[ACCOUNT_LABEL_SIZE + 32];
+    snprintf(msg, sizeof(msg), "Sending as %s", sv && sv->label ? sv->label : "this account");
+    tui_app_toast(app, msg, 0);
+}
+
+void tui_app_follow_message(TuiApp *app, int index) {
+    if (app->peer_count == 0) return;
+    AccountId owner = tui_app_message_account(app, index);
+    if (owner == app->deps.active_account) return;
+    if (tui_app_turn_to(app, owner) == 0) say_sending_as(app);
+}
+
+void tui_app_cycle_send_account(TuiApp *app) {
+    if (app->peer_count == 0) {
+        tui_app_toast(app, tui_app_account_count(app) > 1 ? "This chat is on one of your accounts only" : "There is one account", 0);
+        return;
+    }
+    /* The next id up among the accounts that share the chat, then round again. */
+    AccountId now = app->deps.active_account, next = ACCOUNT_ID_NONE, lowest = now;
+    for (int i = 0; i < app->peer_count; i++) {
+        AccountId id = app->peers[i];
+        if (id < lowest) lowest = id;
+        if (id > now && (next == ACCOUNT_ID_NONE || id < next)) next = id;
+    }
+    if (tui_app_turn_to(app, next != ACCOUNT_ID_NONE ? next : lowest) == 0) say_sending_as(app);
+}
+
+void tui_app_send_label(TuiApp *app, char *out, size_t size) {
+    if (size) out[0] = '\0';
+    IAccountDirectory *dir = app->deps.directory;
+    if (!dir || tui_app_account_count(app) <= 1 || !messaging_manager_open_jid(app->deps.messaging)[0]) return;
+    const AccountServices *sv = dir->find(dir, app->deps.active_account);
+    if (sv && sv->label) snprintf(out, size, "as %s%s", sv->label, app->peer_count ? " (Alt+A changes)" : "");
+}
+
+int tui_app_peers_load_older(TuiApp *app) {
+    int older = 0;
+    for (int i = 0; i < app->peer_count; i++) {
+        const AccountServices *sv = peer(app, i);
+        if (sv && messaging_manager_load_older(sv->messaging)) older = 1;
+    }
+    return older;
+}

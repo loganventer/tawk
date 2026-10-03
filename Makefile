@@ -258,7 +258,7 @@ TESTS := $(BUILD)/tests/pty_idle_action_test $(BUILD)/tests/ncurses_mouse_queue_
          $(BUILD)/tests/status_auto_advance_test $(BUILD)/tests/message_window_test \
          $(BUILD)/tests/chat_toggle_test $(BUILD)/tests/account_store_test \
          $(BUILD)/tests/whatsmeow_sessions_test $(BUILD)/tests/unified_chat_list_test \
-         $(BUILD)/tests/accounts_dialog_test
+         $(BUILD)/tests/accounts_dialog_test $(BUILD)/tests/merged_message_window_test
 
 test: $(TESTS)
 	$(call say,Running tests)
@@ -346,6 +346,10 @@ $(BUILD)/tests/control_transport_test: $(BUILD)/tests/control_transport_test.o $
 	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
 
 $(BUILD)/tests/control_protocol_test: $(BUILD)/tests/control_protocol_test.o $(filter-out $(BUILD)/src/main.o,$(OBJ)) $(LINK_WM)
+	$(call step,LD,$@)
+	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
+
+$(BUILD)/tests/merged_message_window_test: $(BUILD)/tests/merged_message_window_test.o $(filter-out $(BUILD)/src/main.o,$(OBJ)) $(LINK_WM)
 	$(call step,LD,$@)
 	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
 

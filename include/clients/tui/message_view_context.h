@@ -1,6 +1,7 @@
 #ifndef APP_CLIENTS_TUI_MESSAGE_VIEW_CONTEXT_H
 #define APP_CLIENTS_TUI_MESSAGE_VIEW_CONTEXT_H
 
+#include "clients/tui/account_badge.h"
 #include "clients/tui/name_resolver.h"
 #include "core/scheduled_message.h"
 #include "clients/tui/thumbnail_cache.h"
@@ -36,6 +37,10 @@ typedef struct MessageViewContext {
     int                 scheduled_count;
     /* The statuses replies answer (a reply to a status shows it); NULL shows only the quoted words. */
     const StatusSource *statuses;
+    /* A chat merged across accounts: the account each message belongs to, and the badge of each account. NULL otherwise. */
+    const AccountId    *owners;
+    const AccountBadge *badges;
+    int                 badge_count;
 } MessageViewContext;
 
 #endif

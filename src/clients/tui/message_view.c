@@ -147,14 +147,28 @@ static void media_label(const Message *m, const char *playing, int64_t playing_m
 
 /* "14:05", "edited 14:05 ✓✓", "14:05 ✗"; videos shown as a picture add
  * "▶ 0:12" in front, since they have no label row. */
-static void meta_label(const Message *m, int use_24h, char *out, size_t size) {
-    char when[48], clock[16];
+/* In a chat merged across accounts: " · W", the mark of the account message
+ * `index` belongs to. Empty anywhere else. */
+static void owner_mark(const MessageViewContext *ctx, int index, char *out, size_t size) {
+    out[0] = '\0';
+    if (!ctx->owners || !ctx->badges) return;
+    for (int i = 0; i < ctx->badge_count; i++) {
+        if (ctx->badges[i].account != ctx->owners[index]) continue;
+        snprintf(out, size, " \xC2\xB7 %s", ctx->badges[i].mark);
+        return;
+    }
+}
+
+static void meta_label(const Message *m, const MessageViewContext *ctx, int index, char *out, size_t size) {
+    int use_24h = ctx->use_24h;
+    char when[64], clock[16], mark[16];
     clock_format_time(m->timestamp, use_24h, clock, sizeof(clock));
+    owner_mark(ctx, index, mark, sizeof(mark));
     if (m->type == MESSAGE_TYPE_VIDEO && !m->deleted) {
-        if (m->duration_s > 0) snprintf(when, sizeof(when), "\xE2\x96\xB6 %d:%02d  %s", m->duration_s / 60, m->duration_s % 60, clock);
-        else snprintf(when, sizeof(when), "\xE2\x96\xB6  %s", clock);
+        if (m->duration_s > 0) snprintf(when, sizeof(when), "\xE2\x96\xB6 %d:%02d  %s%s", m->duration_s / 60, m->duration_s % 60, clock, mark);
+        else snprintf(when, sizeof(when), "\xE2\x96\xB6  %s%s", clock, mark);
     } else {
-        snprintf(when, sizeof(when), "%s", clock);
+        snprintf(when, sizeof(when), "%s%s", clock, mark);
     }
     const char *edited = m->edited && !m->deleted ? "edited " : "";
     if (!m->from_me) snprintf(out, size, "%s%s", edited, when);
@@ -319,9 +333,9 @@ static void layout(MessageView *v, UiRect r, const Message *msgs, int count, con
         }
         int group_start = starts_group(msgs, i, new_day);
 
-        char media[96], meta[48], quote[320];
+        char media[96], meta[80], quote[320];
         media_label(m, ctx->playing_path, ctx->playing_ms, media, sizeof(media));
-        meta_label(m, ctx->use_24h, meta, sizeof(meta));
+        meta_label(m, ctx, i, meta, sizeof(meta));
         int has_quote = m->quoted_id[0] || (m->quoted_text && m->quoted_text[0]);
         const QuotedStatus *qs = quoted_of(v, i);
         if (has_quote) quote_label(m, ctx->names, qs, max_inner, quote, sizeof(quote));
@@ -524,7 +538,7 @@ static void draw_row(const MessageView *v, const MessageRow *row, int y, UiRect 
         case MESSAGE_ROW_META: {
             /* The line between messages: reactions on the left, then time and
              * ticks right-aligned to the bubble's right edge. */
-            meta_label(m, ctx->use_24h, buf, sizeof(buf));
+            meta_label(m, ctx, row->message, buf, sizeof(buf));
             if (ctx->veiled) {
                 int cols = utf8_columns(buf);
                 text_veil_draw(y, x + row->width - cols, cols, conv(THEME_SLOT_DIM));

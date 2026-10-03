@@ -21,7 +21,7 @@ static const char *open_chat_or_warn(TuiApp *app) {
 
 static int last_message(TuiApp *app, int incoming_only) {
     int count = 0;
-    const Message *msgs = messaging_manager_messages(app->deps.messaging, &count);
+    const Message *msgs = tui_app_messages(app, &count);
     for (int i = count - 1; i >= 0; i--) if (!incoming_only || !msgs[i].from_me) return i;
     return -1;
 }
@@ -146,7 +146,7 @@ static void cmd_react(TuiApp *app, const char *args) {
     if (i < 0) { tui_app_toast(app, "No message to react to", 1); return; }
     if (!args[0]) { tui_app_open_reactions(app, i); return; }
     int count = 0;
-    const Message *msgs = messaging_manager_messages(app->deps.messaging, &count);
+    const Message *msgs = tui_app_messages(app, &count);
     messaging_manager_react(app->deps.messaging, msgs[i].id, args);
 }
 

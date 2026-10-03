@@ -7,7 +7,7 @@
 
 void tui_app_open_forward(TuiApp *app, int index) {
     int count = 0;
-    const Message *msgs = messaging_manager_messages(app->deps.messaging, &count);
+    const Message *msgs = tui_app_messages(app, &count);
     if (index < 0 || index >= count) return;
     str_copy(app->forward_id, sizeof(app->forward_id), msgs[index].id);
     chat_picker_open(&app->forward_picker, "Forward to");
