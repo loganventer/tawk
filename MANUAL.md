@@ -36,6 +36,13 @@ The screenshots in this manual were taken from tawk running on a demo account wi
 - [Screensaver](#screensaver)
 - [When WhatsApp is unavailable](#when-whatsapp-is-unavailable)
 - [Linking and unlinking](#linking-and-unlinking)
+- [Several accounts](#several-accounts)
+  - [Adding and managing accounts](#adding-and-managing-accounts)
+  - [One chat list](#one-chat-list)
+  - [The same person on two numbers](#the-same-person-on-two-numbers)
+  - [Which number a message is sent from](#which-number-a-message-is-sent-from)
+  - [Agents and accounts](#agents-and-accounts)
+  - [What happens when you update](#what-happens-when-you-update)
 - [Encrypting your chats](#encrypting-your-chats)
 - [Backups](#backups)
 - [Automation and MCP](#automation-and-mcp)
@@ -901,6 +908,73 @@ tawk appears on your phone under Linked devices (the name shown depends on the b
 
 WhatsApp sometimes addresses a person by a hidden id (a LID) instead of their phone number. tawk learns which LID belongs to which number from both backends and merges the two, so each person appears as one chat with one name. Chats that were split before a mapping was known join up on the next connect.
 
+## Several accounts
+
+tawk can hold more than one WhatsApp number at once. Every account is connected at the same time, in the one window, and they share one database. The number you linked first is the account called `main`.
+
+### Adding and managing accounts
+
+Settings, Account, Accounts… opens the list. Each row shows the account's label, its number once linked, whether it is connected, and what agents may do with it.
+
+| Key | What it does |
+|---|---|
+| a | Add an account. Type a label (`work`, `personal`), then link the number with the usual wizard |
+| Enter | Bring the account into view, so the header, your profile and the settings that belong to one number show that one |
+| r | Rename it |
+| p | Make it the primary account: the one new chats start from and agents use when they name none |
+| g | Step through what agents may do with it (see [Agents and accounts](#agents-and-accounts)) |
+| l | Log the account out. Its chats stay on this computer |
+| x or Delete | Remove the account and everything tawk holds for it, after a warning |
+| s | The sending numbers list (see below) |
+
+There can be up to eight accounts. A label is yours to choose and can be changed at any time.
+
+A second number carries the same risk as the first. tawk is an unofficial client, and WhatsApp can restrict or ban any number linked to one. Read the notice at the top of the [README](README.md) before you link another.
+
+### One chat list
+
+The chat list shows the chats of every account together, newest first. A chat that belongs to an account other than the first carries a small coloured badge with that account's label. The chip in the header shows which accounts are listed: click it to step through all accounts and each one alone.
+
+Opening a chat brings its account into view.
+
+### The same person on two numbers
+
+Someone who writes to two of your numbers has a chat in each. With `merge_accounts` on (Settings, Chats, the default), tawk shows them as one chat: one row in the list, and one conversation with the messages of both in order. Each message from an account other than the one you are answering from is marked with its account's label. Nothing changes on WhatsApp: the two chats stay separate there, and the other person sees whichever number each message came from. A group that two of your numbers are both in shows once, with each message once.
+
+You can decide for one contact as well. Open the contact card (click the name, Alt+I or `/info`) and step **Merge across my numbers** through *follow the setting*, *always* and *never*.
+
+### Which number a message is sent from
+
+In a merged chat the input shows `as <label>` beside it: the account your next message goes out from. tawk picks, in this order, the number you chose for this contact, the account the last message in the conversation arrived on, and the primary account.
+
+- **Alt+A** switches to the next of your numbers for the message you are writing.
+- **Alt+Shift+A** keeps the number now shown as this contact's sending number from now on.
+- On the contact card, **Send from** steps through your numbers and *choose each time*.
+- Settings, Account, Accounts…, then s, lists every contact with a sending number of its own. Enter or Space steps a contact to the next number, and x or Delete clears its choice.
+
+A reply to a message always goes out from the account that message is in, since WhatsApp can only quote a message in its own chat.
+
+### Agents and accounts
+
+Each account has its own level for agents, set with g in the accounts list:
+
+| Level | An agent may |
+|---|---|
+| off | Nothing. The account is not listed to agents and cannot be named by them. Every account you add starts here |
+| read | Read that account's chats. Nothing is marked as read |
+| send | Also propose messages from that account, each approved by you |
+| manage | Also make changes there, each approved by you |
+| admin | As manage, and an agent holding the admin token may answer its own sends in the chats you switched on for that account |
+| follow | Whatever Settings, Automation, What they may do says. Only the first account starts here, so a tawk that had one account behaves as it did |
+
+On the contact card, **Agents answer by themselves here** switches a chat on or off for the account it belongs to. It takes effect only while that account's level is admin. A chat switched on for one account stays off for your others.
+
+When an agent asks to send something, the question in the Agentic tab names the account in square brackets before the chat, so you can see which number it would go out from.
+
+### What happens when you update
+
+The first time a tawk with accounts opens your database it upgrades it in place. A copy of the database as it was is kept beside it first. Your existing number becomes the account `main`, with all its chats, and nothing else changes until you add a second account.
+
 ## Encrypting your chats
 
 Your chats, messages, contacts and statuses live in one database file, `~/.local/share/tawk/tawk.db`. Only you can read it (it is created with owner-only permissions), but anyone who gets hold of the disk, a stolen laptop or a copied home folder, can. Encrypting it with a passphrase stops that:
@@ -1081,7 +1155,7 @@ The safest way for an agent to help you write is a draft: it puts the text in th
 
 ### Shell commands
 
-With agent access on, these talk to the tawk that is running:
+With agent access on, these talk to the tawk that is running. With several accounts, add `--account NAME` (a label or an id) to pick one. Without it, `send` uses the default account, `tail` shows every account open to agents and names each, and `unread` and `status-line` count across all of them.
 
 ```
 tawk send CHAT TEXT...          send a message (or: tawk send CHAT - < file)

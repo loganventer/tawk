@@ -29,6 +29,7 @@
 - [Screensaver](#screensaver)
 - [Encrypted chats](#encrypted-chats)
 - [Backups](#backups)
+- [Several accounts](#several-accounts)
 - [Agents and the control socket](#agents-and-the-control-socket)
 - [The setup check](#the-setup-check)
 
@@ -766,6 +767,22 @@ flowchart TD
 ```
 
 The media and login folders are copied into the working folder with hard links where the filesystem allows, so a large media folder costs no extra space while it is packed.
+
+## Several accounts
+
+**Start-up.** `main.c` opens the database, reads the roster of accounts and asks the `AccountHost` to start each one. Starting an account creates its gateway, its event queue, its stores bound to its id, and its managers. The first account logs in from `auth/`, every other from `accounts/<id>/auth/`. All of them connect at once.
+
+**The upgrade.** A database from before accounts is at schema 16 or lower. Migration 17 copies the file aside, then, in one transaction, rebuilds each per-account table with `account_id` in its key and moves every row across as account 1, creates the `accounts` table with the row `main`, and creates `chat_prefs`. The search index is rebuilt to match. If any step fails the transaction is rolled back and the database is as it was.
+
+**One loop.** The event loop drains every account's queue on each pass. A message event is handled by the managers of the account it arrived on and stored under that account's id, so two accounts never see each other's rows.
+
+**The chat list.** `UnifiedChatList` takes each account's chats and produces one list. With merging on, chats of different accounts that are with the same person become one row that remembers which accounts it stands for. `ChatMergePolicy` decides this from the `merge_accounts` setting and the contact's own choice. A group that two of your numbers are both in is one chat on WhatsApp, and merges the same way.
+
+**A merged conversation.** Opening such a row loads the conversation from each account and `MergedMessageWindow` interleaves them by time, dropping a message that is the same in both. Each row remembers its account, which is how a reply, a reaction or a delete reaches the right one. Scrolling up loads older messages from whichever account has them.
+
+**Sending.** `ReplyAccountPolicy` picks the account: the one chosen for this contact, else the one the last message arrived on, else the primary. Alt+A overrides it for one message. The message is then sent by that account's `MessagingManager`, as it would be with one account.
+
+**Agents.** The control client resolves the account of each request before the operation runs, swaps in that account's managers, and tells the `AutomationManager` which level and which self-approval chats apply. A request that waits for your answer keeps its account and is carried out by it.
 
 ## Agents and the control socket
 

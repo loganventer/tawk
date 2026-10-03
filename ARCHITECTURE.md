@@ -7,6 +7,7 @@
 - [Component map](#component-map)
 - [Contracts](#contracts)
 - [Composition root](#composition-root)
+- [Accounts](#accounts)
 - [Threads](#threads)
 - [Backends](#backends)
 - [Storage](#storage)
@@ -21,6 +22,7 @@ tawk is one C11 program arranged in [iDesign](https://www.idesign.net/) layers. 
 
 | Layer | Folder | Responsibility | May call |
 |---|---|---|---|
+| Composition | `composition` | Builds one account's components and owns the set of running accounts. Part of the composition root | Everything, as `main.c` does |
 | Client | `clients/tui`, `clients/control`, `clients/cli` | `tui`: the ncurses UI (widgets, input, slash commands, layout, the settings panel, the Chats and Agentic tabs). `control`: the control socket client that serves tawk-mcp and the shell commands ([CONTROL.md](CONTROL.md)). `cli`: the `--doctor` setup check, the `--update` installer, `--encrypt`, `--decrypt` and `--change-passphrase`, `--backup` and `--restore`, the start-up passphrase prompt, and `tawk send`, `tail`, `unread` and `status-line` | Managers, and the contracts the composition root hands it |
 | Managers | `managers` | Use cases: messaging and connection supervision, profiles and profile pictures, your own profile, posting statuses, the status feed, messages scheduled for later, incoming calls, media, settings, encrypting the database, encrypted backups, the rules and log for agents (automation), plus the composite event observer that hands backend events to the managers that listen for them | Engines, contracts |
 | Engines | `engines` | Business rules with no I/O: backoff, circuit breaker, notification policy, chat visibility, idle tracking, message ids, media type detection, emoticon conversion, network fingerprints and change detection, profile field and status post validation, finding a URL in text, the status background palette, matching chats against a search, reading when a scheduled message should go, the backup manifest and which archive members a restore accepts, and for agents: the automation policy (who sees which chats, which writes are asked about, which settings stay out of reach, risk, and which of its own requests a client may answer with access admin), the hourly quota for those, resolving a chat named by an agent, the rate limiter and confirmation tokens | Core, utilities |
@@ -388,6 +390,40 @@ Switching to whatsmeow from the client (offered when posting a status on Baileys
 Before the database opens, `main.c` takes the instance lock (`instance_lock`, an `flock` on `tawk.lock` in the data folder) and builds `DatabaseCryptManager` over `sqlite_database_cipher_create()` (`IDatabaseCipher`) together with `terminal_passphrase_prompt_create()` (`IPassphrasePrompt`). `--encrypt`, `--decrypt` and `--change-passphrase` go to `database_crypt_command_run` at this point and exit, and `--backup` and `--restore` go to `run_backup_or_restore`, which builds `BackupManager` over `sqlite_file_snapshot`, `tar_archive` and `openssl_file_cipher` for that one command; otherwise `database_unlock` asks for the passphrase of an encrypted database, which `sqlite_database_open(path, key)` receives and `main.c` wipes straight after. The lock is released last, after everything else is destroyed; restarting for a backend switch closes it with the rest of the process (the descriptor is close-on-exec).
 
 With `--doctor`, `main.c` reads the settings through a read-only store (no folders or files are created), stops after the settings, themes and emoji catalog, creates an audio backend, and hands them to `doctor_run` in a `DoctorInputs` record; the database, gateway and client are never built. Teardown closes the event queue before destroying the gateway, so a backend waiting on back-pressure can return.
+
+## Accounts
+
+tawk holds several WhatsApp accounts in one process. The rule that keeps this simple is that an account is decided where a component is created, and never passed along with each call.
+
+| Piece | Where | What it is |
+|---|---|---|
+| `AccountId`, `Account`, `AccountAgentAccess`, `ChatPrefs`, `ChatMergeChoice` | `core` | The account, what agents may do with it, and a contact's own choices across accounts |
+| `SqliteAccountScope` | `resource_access` | Binds a store to one account when it is created. Every per-account table has `account_id` in its key, and the store's statements name it once, so no store method takes an account |
+| `IAccountStore`, `IChatPrefsStore` | `contracts` | The roster of accounts, and what is kept per contact whichever account it is on |
+| `AccountRosterManager` | `managers` | Adding, renaming, removing and ordering accounts, the primary account, agent access and self-approval chats |
+| `AccountRuntime` | `composition` | Everything one account needs to run: its gateway, event queue, bound stores and its seven managers |
+| `AccountHost` | `composition` | Owns the runtimes and starts and stops them. It implements `IAccountDirectory` |
+| `IAccountDirectory`, `AccountServices` | `clients` | What a client is given: the accounts that are running, and the managers of each |
+| `AccountLabelValidator`, `ChatMergePolicy`, `ReplyAccountPolicy`, `AccountAgentPolicy` | `engines` | The rules: which labels are allowed, when two chats show as one, which number a message goes out from, and what agents may do with an account |
+
+```mermaid
+flowchart TD
+    MAIN["src/main.c"] --> HOST["AccountHost<br/>IAccountDirectory"]
+    HOST --> R1["AccountRuntime 1<br/>gateway, queue, stores, managers"]
+    HOST --> R2["AccountRuntime 2<br/>gateway, queue, stores, managers"]
+    R1 --> DB[("tawk.db<br/>account_id in every key")]
+    R2 --> DB
+    TUI["clients/tui"] --> HOST
+    CTL["clients/control"] --> HOST
+    TUI --> ROSTER["AccountRosterManager"]
+    CTL --> ROSTER
+```
+
+`src/composition/` is part of the composition root: it is the only other place that names concrete stores and gateways, and nothing outside `main.c` includes it. The managers are unchanged by accounts. A `MessagingManager` still knows one gateway and one set of stores; there are simply several of them.
+
+The clients compose across accounts. The terminal client keeps one account in view and swaps the managers it talks to when you open a chat of another (`tui_accounts.c`), builds the one chat list from every account's chats (`UnifiedChatList`), and builds a merged conversation from the chats of one person (`MergedMessageWindow`). The control client serves each request from the account it names (`control_accounts.c`), and `AutomationManager` is told which account it is serving so the existing rules in `automation_policy` are applied with that account's level.
+
+The whatsmeow bridge keeps a session per account, keyed by a handle the gateway passes with every call, so one linked library carries all of them.
 
 ## Threads
 

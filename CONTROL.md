@@ -295,6 +295,34 @@ Chats that are locked, hidden or outside `chats` never produce notifications.
 ← {"id":"3","ok":true,"result":{"id":"3EB0D41C22"}}
 ```
 
+## Accounts
+
+A tawk with accounts says so in `hello`, and serves each request from the account it names. Nothing here changes the meaning of an existing field, so the protocol version stays 1.
+
+**`hello`** gains three fields:
+
+| Field | Meaning |
+|---|---|
+| `multi_account` | `true`. A tawk from before accounts has no such field, and ignores `account` in a request: a client must not name an account to it |
+| `accounts` | The accounts this client may use: `[{id, label, jid, name, connected, primary, access}]`. `access` is `read`, `send`, `manage` or `admin` |
+| `default_account` | The id of the account that serves a request naming none: the primary account if agents may use it, else the lowest id they may use. `0` when no account is open to agents |
+
+The single `account` object and the top-level `access` stay, and describe the default account. With no account open to agents the `accounts` list is empty and `account.jid` is `""`.
+
+**Every operation** accepts `account` in its arguments: an account's id, as a number or a string, or its label in any case. A chat reference is resolved inside that account, so the same person on two accounts is two chats. What an operation may do is decided by that account's own level.
+
+```json
+{"id":"7","op":"send_message","args":{"account":"work","chat":"Mom","text":"On my way"}}
+```
+
+An account whose level is *off* is not listed and cannot be named. Naming it answers `not_found` with `No such account`, exactly as a name no account has, so a client learns nothing about it. A request naming no account while none is open answers `not_allowed`.
+
+**`list_accounts`** is a read operation with no arguments. It answers `{"accounts":[...],"default":id}` with the same objects as `hello`, read afresh, since you can open or close an account while a client stays connected.
+
+**Notifications** `message`, `read`, `reaction`, `edit`, `delete`, `scheduled_sent` and `chat` carry `"account":{"id":2,"label":"work"}`. A message that reaches an account closed to agents is not pushed.
+
+**A request that waits for an answer** belongs to the account it was asked of. It is carried out by that account whatever was served meanwhile, `approve` is judged by that account's rules, and it is refused with `not_allowed` if the account was closed to agents while it waited. The automation log records the account of every entry.
+
 ## Versions
 
 The protocol version is 1. Fields may be added to results and notifications without a new version, so clients must ignore fields they do not know. Removing or changing a field, or changing an operation's meaning, raises the version.

@@ -29,7 +29,8 @@ Your files (created with owner-only permissions, folders 0700 and files 0600):
 | `~/.local/share/tawk/tawk.lock` | Held while tawk runs, so only one tawk uses the data folder at a time (and `--encrypt`, `--decrypt` and `--change-passphrase` wait for it to quit) | Yes, when no tawk is running |
 | `*.before-restore-<date>-<time>` beside the database, config, themes, media and login | What `tawk --restore` replaced, kept in case you want it back | Yes, once the restored data is fine |
 | `~/.local/share/tawk/.backup-*`, `.restore-*` | Working folders of a backup or restore, removed when it ends (one is left only if tawk was killed halfway) | Yes, when no backup or restore is running |
-| `~/.local/share/tawk/auth/` | The WhatsApp login for this device | Deleting it unlinks tawk |
+| `~/.local/share/tawk/auth/` | The WhatsApp login of the first account | Deleting it unlinks that number |
+| `~/.local/share/tawk/accounts/<N>/auth/` | The login of each further account, by its id | Deleting one unlinks that number; its chats stay in the database |
 | `~/.cache/tawk/media/` | Downloaded photos, videos, voice notes and documents, with the frames taken from videos (`<video>.poster.jpg`) and the rendered pages of PDFs (`<pdf>.p<N>.png`) beside them, profile pictures (`pic-<hash>-<id>.jpg`, `-full` for the full size), and the photos and videos of statuses (removed with the status once it is older than `status_keep_days`) | Yes, profile pictures are fetched again |
 | `~/.local/state/tawk/` | `tawk.log`, `sidecar.log`, `whatsmeow.log` | Yes, or empty them with Settings, Advanced, Clear logs |
 | `$XDG_RUNTIME_DIR/tawk/` | `control.sock`, the control socket, while tawk runs with agent access on (0600, in a 0700 folder) | Removed when tawk quits |
@@ -186,6 +187,15 @@ None of these can be changed over the socket, nor can settings that run a progra
 | `log_level` | `info` | debug, info, warn or error (restart required) |
 
 Settings, Advanced also has a Clear logs action. It empties `tawk.log` and every other `*.log` file in the same folder (the backend's log included) in place, so the programs writing them carry on, and reports how much space it freed.
+
+### Settings and accounts
+
+The config file holds one set of settings for tawk as a whole. What belongs to one account is kept in the database, in the `accounts` table, and is changed under Settings, Account, Accounts…: its label, whether it is the primary account, what agents may do with it, and the chats an agent may answer by itself in.
+
+- `merge_accounts` (`[chats]`, default `true`): someone who writes to several of your numbers shows as one chat. A contact can be set apart, or always merged, on its contact card.
+- `[automation] access` is the level an account uses while its own level is *follow*. Only the first account starts at *follow*; every account you add starts at *off*.
+- `[automation] self_approval_chats` is still read for an account at *follow* that has no list of its own, so an existing setup keeps working. A chat switched on or off from a contact card is stored with its account.
+- `[automation] chats`, the rate limits and the AI disclaimer apply to every account.
 
 ## Themes
 
