@@ -13,6 +13,7 @@ int  header_bar_hit_gear(UiRect rect, int y, int x);
 /* The + that posts a status, and your name that opens your profile. */
 int  header_bar_hit_post(const HeaderHits *hits, int y, int x);
 int  header_bar_hit_profile(const HeaderHits *hits, int y, int x);
+int header_bar_hit_account(const HeaderHits *hits, int y, int x);
 /* The ⭕ that shows statuses. */
 int  header_bar_hit_statuses(const HeaderHits *hits, int y, int x);
 /* The 💬 Chats and 🤖 Agentic tabs. */

@@ -21,6 +21,7 @@ static const MenuNode CHATS[] = {
     FIELD(SETTING_CATEGORY_CHATS, "enter_sends"),
     FIELD(SETTING_CATEGORY_CHATS, "convert_emoticons"),
     FIELD(SETTING_CATEGORY_CHATS, "reopen_last_chat"),
+    FIELD(SETTING_CATEGORY_CHATS, "merge_accounts"),
     FIELD(SETTING_CATEGORY_CHATS, "send_read_receipts"),
     FIELD(SETTING_CATEGORY_CHATS, "format_text"),
     FIELD(SETTING_CATEGORY_CHATS, "link_previews"),

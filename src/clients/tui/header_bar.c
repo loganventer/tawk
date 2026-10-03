@@ -42,6 +42,15 @@ void header_bar_render(UiRect r, const HeaderModel *m, HeaderHits *hits) {
     x += tui_text(r.y, x, r.w - x, APP_NAME, attr | ATTR_BOLD);
     hits->chats_tab = hits->agents = (UiRect){ r.y, 0, 0, 0 };
     if (m->show_tabs) x = draw_tabs(r, x, m, hits, attr);
+    hits->account = (UiRect){ r.y, 0, 0, 0 };
+    if (m->show_tabs && m->account && *m->account) {
+        char chip[96];
+        snprintf(chip, sizeof(chip), " \xF0\x9F\x91\xA4 %s \xE2\x96\xBE ", m->account);       /* 👤 label ▾ */
+        x += tui_text(r.y, x, r.w - x, "  ", attr);
+        int used = tui_text(r.y, x, r.w - x, chip, tui_palette_attr(THEME_SLOT_SIDEBAR_SELECTED) | ATTR_BOLD);
+        hits->account = (UiRect){ r.y, x, 1, used };
+        x += used;
+    }
     if (m->dnd) x += tui_text(r.y, x, r.w - x, "  \xF0\x9F\x94\x95 DND", tui_palette_attr(THEME_SLOT_WARN));
 
     int right = r.x + r.w;
@@ -93,4 +102,5 @@ int header_bar_hit_post(const HeaderHits *h, int y, int x) { return h->post.w > 
 int header_bar_hit_statuses(const HeaderHits *h, int y, int x) { return h->statuses.w > 0 && ui_rect_contains(h->statuses, y, x); }
 int header_bar_hit_chats_tab(const HeaderHits *h, int y, int x) { return h->chats_tab.w > 0 && ui_rect_contains(h->chats_tab, y, x); }
 int header_bar_hit_agents(const HeaderHits *h, int y, int x) { return h->agents.w > 0 && ui_rect_contains(h->agents, y, x); }
+int header_bar_hit_account(const HeaderHits *h, int y, int x) { return h->account.w > 0 && ui_rect_contains(h->account, y, x); }
 int header_bar_hit_profile(const HeaderHits *h, int y, int x) { return h->profile.w > 0 && ui_rect_contains(h->profile, y, x); }

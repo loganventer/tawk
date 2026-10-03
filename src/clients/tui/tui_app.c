@@ -162,8 +162,10 @@ static void open_chat(TuiApp *app, const char *jid, int unfold) {
         tui_app_cancel_reply(app);
     }
     messaging_manager_open_chat(app->deps.messaging, jid);
+    app->chat_list.open_account = app->deps.active_account;
+    app->chat_rows_stale = 1;                              /* its unread count just went */
     int count = 0;
-    const Chat *chats = messaging_manager_chats(app->deps.messaging, &count);
+    const Chat *chats = tui_app_chat_rows(app, &count);
     chat_list_view_reveal(&app->chat_list, chats, count, jid, unfold);
     tui_app_save_folding(app);
     str_copy(app->chat_list.open_jid, sizeof(app->chat_list.open_jid), jid);
@@ -179,11 +181,64 @@ static void open_chat(TuiApp *app, const char *jid, int unfold) {
     sync_conversation_theme(app);
     app->focus = TUI_FOCUS_COMPOSER;
     app->restore_pending = 0;                              /* a chat is open; nothing left to restore */
-    if (strcmp(settings(app)->last_chat, jid) != 0) {      /* remembered for the next start */
-        Settings s = *settings(app);
+    if (app->deps.roster) account_roster_manager_set_last_chat(app->deps.roster, app->deps.active_account, jid);
+    if (app->deps.active_account <= ACCOUNT_ID_FIRST && strcmp(settings(app)->last_chat, jid) != 0) {
+        Settings s = *settings(app);                       /* the first account's is also kept where it always was */
         str_copy(s.last_chat, sizeof(s.last_chat), jid);
         settings_manager_apply(app->deps.settings, &s);
     }
+}
+
+int tui_app_use_account(TuiApp *app, AccountId account) {
+    if (account == ACCOUNT_ID_NONE || account == app->deps.active_account) return 0;
+    IAccountDirectory *dir = app->deps.directory;
+    const AccountServices *sv = dir ? dir->find(dir, account) : NULL;
+    if (!sv) return -1;
+    /* What was being written stays with the chat it was for. */
+    if (app->editing_id[0]) { app->editing_id[0] = '\0'; composer_view_clear(&app->composer); }
+    save_draft(app);
+    composer_view_clear(&app->composer);
+    tui_app_forget_mentions(app);
+    app->attachment[0] = '\0';
+    tui_app_cancel_reply(app);
+    /* Dialogs that show the old account's things close with it. */
+    profile_dialogs_close(&app->profile);
+    status_feed_dialogs_close(&app->feed);
+    app->scheduled_list.open = 0;
+    app->forward_picker.open = 0;
+    app->self_chats.open = 0;
+    app->contact.open = 0;
+    /* An account out of view has no chat open: its unread counts run again. */
+    messaging_manager_open_chat(app->deps.messaging, "");
+
+    app->deps.messaging = sv->messaging;
+    app->deps.profiles = sv->profiles;
+    app->deps.calls = sv->calls;
+    app->deps.accounts = sv->accounts;
+    app->deps.statuses = sv->statuses;
+    app->deps.feed = sv->feed;
+    app->deps.scheduling = sv->scheduling;
+    app->deps.backend_name = sv->backend_name;
+    app->deps.active_account = account;
+
+    app->chat_list.open_jid[0] = '\0';
+    app->chat_list.open_account = account;
+    message_view_release(&app->message_view);
+    app->conversation_theme_valid = 0;
+    app->last_auth = (AuthState)-1;                         /* follow_auth looks at the new account afresh */
+    app->linked_until_ms = 0;
+    app->restore_pending = 0;
+    app->chat_rows_stale = 1;
+    app->dirty = 1;
+    return 0;
+}
+
+void tui_app_open_row(TuiApp *app, const Chat *row) {
+    if (!row) return;
+    char jid[128];
+    str_copy(jid, sizeof(jid), row->jid);                  /* the row may be rebuilt while the account changes */
+    if (tui_app_use_account(app, row->account) != 0) return;
+    open_chat(app, jid, 1);
 }
 
 void tui_app_open_chat(TuiApp *app, const char *jid) { open_chat(app, jid, 1); }
@@ -198,10 +253,12 @@ static void restore_last_chat(TuiApp *app) {
     if (count == 0) return;                                 /* not loaded yet */
     app->restore_pending = 0;
     if (messaging_manager_open_jid(app->deps.messaging)[0]) return;
-    const char *jid = settings(app)->last_chat;
+    char last[128] = "";
+    if (app->deps.roster) account_roster_manager_last_chat(app->deps.roster, app->deps.active_account, last, sizeof(last));
+    if (!last[0] && app->deps.active_account <= ACCOUNT_ID_FIRST) str_copy(last, sizeof(last), settings(app)->last_chat);
     for (int i = 0; i < count; i++) {
-        if (strcmp(chats[i].jid, jid) != 0) continue;
-        if (chats[i].is_locked != 1) open_chat(app, jid, 0);       /* the groups stay folded as they were left */
+        if (strcmp(chats[i].jid, last) != 0) continue;
+        if (chats[i].is_locked != 1) open_chat(app, last, 0);      /* the groups stay folded as they were left */
         app->dirty = 1;
         return;
     }
@@ -839,9 +896,7 @@ void tui_app_toggle_soft_lock(TuiApp *app, const char *jid) {
 void tui_app_toggle_soft_lock_here(TuiApp *app) {
     const char *jid = messaging_manager_open_jid(app->deps.messaging);
     if (app->focus == TUI_FOCUS_CHATS) {
-        int count = 0;
-        const Chat *chats = messaging_manager_chats(app->deps.messaging, &count);
-        const char *selected = chat_list_view_selected_jid(&app->chat_list, chats);
+        const char *selected = tui_app_take_selected(app);
         if (selected) jid = selected;
     }
     tui_app_toggle_soft_lock(app, jid);
@@ -1579,6 +1634,7 @@ TuiApp *tui_app_create(const TuiAppDeps *deps) {
 
 void tui_app_destroy(TuiApp *app) {
     if (!app) return;
+    unified_chat_list_free(&app->chat_rows);
     message_view_dispose(&app->message_view);
     file_picker_dispose(&app->file_picker);
     search_overlay_close(&app->search);
@@ -1650,6 +1706,7 @@ int tui_app_run(TuiApp *app) {
         tui_app_scheduling_tick(app);
         tui_app_agents_tick(app);
         tui_app_accounts_tick(app);
+        if (ch.chats || ch.messages) app->chat_rows_stale = 1;
         ring(app, now);
         apply_changes(app, &ch);
         follow_auth(app, now);

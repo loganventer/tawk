@@ -23,6 +23,7 @@ void settings_set_defaults(Settings *s) {
     s->chat_spacing = 1;
     s->convert_emoticons = 1;
     s->reopen_last_chat = 1;
+    s->merge_accounts = 1;
     s->use_24h_clock = 1;
     s->splash = 1;
     s->format_text = 1;

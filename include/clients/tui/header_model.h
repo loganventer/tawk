@@ -17,6 +17,7 @@ typedef struct HeaderModel {
     int         agents_waiting;   /* requests waiting for you */
     int         agents_high;      /* of which HIGH risk */
     int         agents_connected; /* programs connected now */
+    const char *account;          /* which account's chats the list shows: "All" or a label; empty with one account */
 } HeaderModel;
 
 #endif

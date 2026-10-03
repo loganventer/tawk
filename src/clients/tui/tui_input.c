@@ -50,7 +50,7 @@ static int typing_text(TuiApp *app) {
 }
 
 static const Chat *chat_list(TuiApp *app, int *count) {
-    return messaging_manager_chats(app->deps.messaging, count);
+    return tui_app_chat_rows(app, count);
 }
 
 /* ---- bracketed paste (file drops) ---------------------------------------- */
@@ -163,11 +163,7 @@ static void select_chat_entry(TuiApp *app) {
     const Chat *chats = chat_list(app, &count);
     const char *jid = chat_list_view_activate(&app->chat_list, chats, count);
     tui_app_save_folding(app);
-    if (jid) {
-        char copy[128];
-        str_copy(copy, sizeof(copy), jid);
-        tui_app_open_chat(app, copy);
-    }
+    if (jid) tui_app_open_row(app, chat_list_view_selected_chat(&app->chat_list, chats));
 }
 
 /* ---- overlays ----------------------------------------------------------- */
@@ -438,8 +434,9 @@ static void handle_mouse_event(TuiApp *app, MEVENT ev) {
         const Chat *chats = chat_list(app, &count);
         if (ev.bstate & BUTTON1_RELEASED) {
             char jid[128];
+            AccountId dragged = app->chat_list.drag_account;
             int pin = chat_list_view_drag_end(&app->chat_list, chats, count, l->sidebar, ev.y, jid, sizeof(jid));
-            if (pin >= 0) {
+            if (pin >= 0 && tui_app_use_account(app, dragged) == 0) {
                 messaging_manager_toggle_pin(app->deps.messaging, jid);
                 tui_app_toast(app, pin ? "\xF0\x9F\x93\x8C Pinned" : "Unpinned", 0);
             }
@@ -463,6 +460,7 @@ static void handle_mouse_event(TuiApp *app, MEVENT ev) {
     if (press && !tui_app_show_login(app) && header_bar_hit_statuses(&app->header_hits, ev.y, ev.x)) { tui_app_open_statuses(app); return; }
     if (press && header_bar_hit_agents(&app->header_hits, ev.y, ev.x)) { if (!app->agents.open) tui_app_open_agents(app); return; }
     if (press && header_bar_hit_chats_tab(&app->header_hits, ev.y, ev.x)) { app->agents.open = 0; app->dirty = 1; return; }
+    if (press && !tui_app_show_login(app) && header_bar_hit_account(&app->header_hits, ev.y, ev.x)) { tui_app_cycle_account_filter(app); return; }
     if (press && !tui_app_show_login(app) && header_bar_hit_profile(&app->header_hits, ev.y, ev.x)) { tui_app_open_profile(app); return; }
     if (press && header_bar_hit_menu(l->header, ev.y, ev.x)) { toggle_sidebar(app); return; }
     if (tui_app_show_login(app)) {
@@ -486,9 +484,7 @@ static void handle_mouse_event(TuiApp *app, MEVENT ev) {
 
     if (right && !tui_app_show_login(app)) {                /* right-click: context menus */
         if (l->sidebar.w && ui_rect_contains(l->sidebar, ev.y, ev.x) && chat_list_view_hit(&app->chat_list, l->sidebar, ev.y)) {
-            int count = 0;
-            const Chat *chats = chat_list(app, &count);
-            const char *jid = chat_list_view_selected_jid(&app->chat_list, chats);
+            const char *jid = tui_app_take_selected(app);
             if (jid) { char copy[128]; str_copy(copy, sizeof(copy), jid); tui_app_open_chat_options(app, copy); }
         } else if (ui_rect_contains(l->chat, ev.y, ev.x)) {
             int idx = message_view_hit(&app->message_view, ev.y, ev.x);
@@ -587,6 +583,8 @@ static void handle_chats(TuiApp *app, int is_key, int ch, int alt) {
     const char *jid = chat_list_view_selected_jid(v, chats);
     char copy[128] = "";
     if (jid) str_copy(copy, sizeof(copy), jid);
+    /* What these keys do goes through the selected chat's own account. */
+    if (alt && !is_key && copy[0] && (ch == 'o' || ch == 'm' || ch == 'p' || ch == 'a')) tui_app_take_selected(app);
     if (is_key && ch == KEY_UP) chat_list_view_move(v, -1);
     else if (is_key && ch == KEY_DOWN) chat_list_view_move(v, 1);
     else if (is_key && ch == KEY_HOME) chat_list_view_move(v, -v->entry_count);
@@ -865,9 +863,7 @@ void tui_input_dispatch(TuiApp *app, int is_key, int ch) {
     if (alt && !is_key && (ch == 'i' || ch == 'I') && !tui_app_show_login(app)) {
         const char *jid = messaging_manager_open_jid(app->deps.messaging);
         if (app->focus == TUI_FOCUS_CHATS) {
-            int count = 0;
-            const Chat *chats = chat_list(app, &count);
-            const char *sel = chat_list_view_selected_jid(&app->chat_list, chats);
+            const char *sel = tui_app_take_selected(app);
             if (sel) jid = sel;
         }
         char copy[128];

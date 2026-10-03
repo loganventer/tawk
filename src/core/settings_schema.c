@@ -37,6 +37,7 @@ static const SettingField FIELDS[] = {
     B(SETTING_CATEGORY_CHATS, "share_typing", "Share typing", "Show \"typing\u2026\" to the other person while you type", share_typing),
     B(SETTING_CATEGORY_CHATS, "appear_online", "Appear online", "Show as online while tawk is in use (needed to see others typing)", appear_online),
     B(SETTING_CATEGORY_CHATS, "reopen_last_chat", "Reopen last chat", "Open the chat you had open when tawk last quit", reopen_last_chat),
+    B(SETTING_CATEGORY_CHATS, "merge_accounts", "Merge the same contact across my numbers", "Someone who writes to several of your accounts shows as one chat; a contact can be set apart on its contact card", merge_accounts),
     S(SETTING_CATEGORY_CHATS, "last_chat", "Last chat", "Kept up to date as you open chats", last_chat, 0),
     S(SETTING_CATEGORY_CHATS, "recent_emoji", "Recent emoji", "Kept up to date by the emoji picker", recent_emoji, 0),
     I(SETTING_CATEGORY_CHATS, "status_keep_days", "Keep statuses (days)", "WhatsApp shows a status for a day; tawk keeps it this long in the Status archive (1 keeps none)", status_keep_days, 1, 365, 1, 0),

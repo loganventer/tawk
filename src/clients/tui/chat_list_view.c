@@ -93,10 +93,30 @@ void chat_list_view_move(ChatListView *v, int delta) {
     if (v->selected < 0) v->selected = 0;
 }
 
-const char *chat_list_view_selected_jid(const ChatListView *v, const Chat *chats) {
+const Chat *chat_list_view_selected_chat(const ChatListView *v, const Chat *chats) {
     if (v->selected < 0 || v->selected >= v->entry_count) return NULL;
     const ChatListEntry *e = &v->entries[v->selected];
-    return e->kind == CHAT_LIST_ENTRY_CHAT ? chats[e->chat].jid : NULL;
+    return e->kind == CHAT_LIST_ENTRY_CHAT ? &chats[e->chat] : NULL;
+}
+
+const char *chat_list_view_selected_jid(const ChatListView *v, const Chat *chats) {
+    const Chat *c = chat_list_view_selected_chat(v, chats);
+    return c ? c->jid : NULL;
+}
+
+/* Whether two rows are the same chat. Where one account is listed the rows
+ * name no account and the JID says it all; where several are, a contact can
+ * have a row for each. */
+static int same_row(const char *jid, AccountId account, const Chat *c) {
+    if (strcmp(c->jid, jid) != 0) return 0;
+    return account == ACCOUNT_ID_NONE || c->account == ACCOUNT_ID_NONE || c->account == account;
+}
+
+/* The open chat's row. A merged row is open whichever of its accounts the conversation is on. */
+static int is_open_row(const ChatListView *v, const Chat *c) {
+    if (strcmp(c->jid, v->open_jid) != 0) return 0;
+    int merged = c->accounts & (c->accounts - 1);
+    return merged || same_row(v->open_jid, v->open_account, c);
 }
 
 static void enter_folder(ChatListView *v, ChatFolder folder, const Chat *chats, int count) {
@@ -170,7 +190,7 @@ static int drop_target(const ChatListView *v, const Chat *chats, UiRect r, int y
 }
 
 static const Chat *dragged_chat(const ChatListView *v, const Chat *chats, int count) {
-    for (int i = 0; i < count; i++) if (strcmp(chats[i].jid, v->drag_jid) == 0) return &chats[i];
+    for (int i = 0; i < count; i++) if (same_row(v->drag_jid, v->drag_account, &chats[i])) return &chats[i];
     return NULL;
 }
 
@@ -182,9 +202,10 @@ static void drag_reset(ChatListView *v) {
 
 int chat_list_view_drag_begin(ChatListView *v, const Chat *chats) {
     drag_reset(v);
-    const char *jid = drag_allowed(v) ? chat_list_view_selected_jid(v, chats) : NULL;
-    if (!jid) return 0;
-    snprintf(v->drag_jid, sizeof(v->drag_jid), "%s", jid);
+    const Chat *c = drag_allowed(v) ? chat_list_view_selected_chat(v, chats) : NULL;
+    if (!c) return 0;
+    snprintf(v->drag_jid, sizeof(v->drag_jid), "%s", c->jid);
+    v->drag_account = c->account;
     v->drag_from = v->selected;
     return 1;
 }
@@ -197,7 +218,7 @@ void chat_list_view_drag_move(ChatListView *v, const Chat *chats, int count, UiR
         chat_list_view_sync(v, chats, count);                  /* may add the empty Pinned group */
         for (int n = 0; n < v->entry_count; n++) {             /* keep the dragged chat selected */
             const ChatListEntry *e = &v->entries[n];
-            if (e->kind == CHAT_LIST_ENTRY_CHAT && strcmp(chats[e->chat].jid, v->drag_jid) == 0) { v->selected = n; break; }
+            if (e->kind == CHAT_LIST_ENTRY_CHAT && same_row(v->drag_jid, v->drag_account, &chats[e->chat])) { v->selected = n; break; }
         }
     }
     v->drop_pinned = drop_target(v, chats, r, y);
@@ -253,6 +274,8 @@ const char *chat_list_view_next_unread(ChatListView *v, const Chat *chats) {
 void chat_list_view_reveal(ChatListView *v, const Chat *chats, int count, const char *jid, int unfold) {
     for (int i = 0; i < count; i++) {
         if (strcmp(chats[i].jid, jid) != 0) continue;
+        int merged = chats[i].accounts & (chats[i].accounts - 1);
+        if (!merged && !same_row(jid, v->open_account, &chats[i])) continue;      /* another account's chat with them */
         if (folder_of(&chats[i]) != v->folder || v->filter[0]) {
             v->filter[0] = '\0';
             v->folder = folder_of(&chats[i]);
@@ -321,7 +344,7 @@ static void render_folder(const ChatListView *v, const ChatListEntry *e, int y, 
 }
 
 static void render_chat(const ChatListView *v, const Chat *c, int y, UiRect r, int attr, int use_24h) {
-    int unread = c->unread > 0 && strcmp(c->jid, v->open_jid) != 0;
+    int unread = c->unread > 0 && !is_open_row(v, c);
     int typing = c->typing[0] != '\0';
     char badge[16] = "", when[32];
     if (c->unread > 0) snprintf(badge, sizeof(badge), c->unread_mention ? " @ %d " : " %d ", c->unread > 999 ? 999 : c->unread);
@@ -331,6 +354,11 @@ static void render_chat(const ChatListView *v, const Chat *c, int y, UiRect r, i
     if (v->compact) clock_format_short(c->last_ts, use_24h, when, sizeof(when));
     else clock_format_relative(c->last_ts, use_24h, when, sizeof(when));
     int right = tui_text_right(y, r.x + r.w - 1, r.w / 2, when, c->unread ? (attr | ATTR_BOLD) : attr);
+    /* Which accounts the chat is on, when more than one is listed. */
+    for (int i = v->badge_count - 1; v->badge_count > 1 && i >= 0; i--) {
+        if (!(c->accounts & (1u << i))) continue;
+        right += account_badge_draw_right(&v->badges[i], y, r.x + r.w - 1 - right, r.w / 2);
+    }
 
     char title[192];
     const char *margin = shows_portraits(v) ? PORTRAIT_MARGIN : MARGIN;
@@ -361,7 +389,7 @@ static void render_chat(const ChatListView *v, const Chat *c, int y, UiRect r, i
     }
     /* Drawn last: bars on the left edge. The open chat gets the accent colour,
      * unread chats the badge colour. */
-    int is_open = strcmp(c->jid, v->open_jid) == 0;
+    int is_open = is_open_row(v, c);
     if (unread || is_open) {
         int bar = is_open ? tui_palette_attr(THEME_SLOT_ACCENT) | ATTR_BOLD : tui_palette_attr(THEME_SLOT_BADGE) | ATTR_REVERSE;
         for (int row = 0; row < content_rows(v); row++) tui_text(y + row, r.x, 1, is_open ? "\xE2\x96\x88" : "\xE2\x96\x8C", bar);
@@ -400,7 +428,7 @@ void chat_list_view_render(ChatListView *v, UiRect r, const Chat *chats, int cou
         int y = top + k * per;
         int selected = n == v->selected;
         const Chat *c = e->kind == CHAT_LIST_ENTRY_CHAT ? &chats[e->chat] : NULL;
-        int is_open = c && strcmp(c->jid, v->open_jid) == 0;
+        int is_open = c && is_open_row(v, c);
         int unread = c && c->unread > 0 && !is_open;
         int attr = base;
         if (c && blink_state_on(blink, c->jid, now_ms)) attr = tui_palette_attr(THEME_SLOT_BLINK);

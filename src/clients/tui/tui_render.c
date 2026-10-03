@@ -100,6 +100,8 @@ void tui_render_frame(TuiApp *app, int64_t now) {
 
     char tally[160];
     unread_tally_format(messaging_manager_tally(mm), tally, sizeof(tally));
+    char account_chip[ACCOUNT_LABEL_SIZE + 8];
+    tui_app_account_chip(app, account_chip, sizeof(account_chip));
     AuthState auth = messaging_manager_auth_state(mm);
     HeaderModel header = {
         .user_name = tui_app_user_name(app),
@@ -116,6 +118,7 @@ void tui_render_frame(TuiApp *app, int64_t now) {
         .agents_waiting = approval_queue_count(app->deps.approvals),
         .agents_high = approval_queue_high_count(app->deps.approvals),
         .agents_connected = app->deps.automation ? automation_manager_status(app->deps.automation)->session_count : 0,
+        .account = account_chip,
     };
     header_bar_render(l->header, &header, &app->header_hits);
 
@@ -132,7 +135,7 @@ void tui_render_frame(TuiApp *app, int64_t now) {
                           messaging_manager_user_name(mm), app->toast_error ? app->toast : "");
     } else {
         int count = 0;
-        const Chat *chats = messaging_manager_chats(mm, &count);
+        const Chat *chats = tui_app_chat_rows(app, &count);
         if (l->sidebar.w) {
             app->chat_list.compact = strcmp(s->chat_list_style, "compact") == 0;
             app->chat_list.spacing = s->chat_spacing;

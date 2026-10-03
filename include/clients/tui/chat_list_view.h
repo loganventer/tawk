@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "clients/tui/account_badge.h"
 #include "clients/tui/blink_state.h"
 #include "clients/tui/chat_folder.h"
 #include "clients/tui/chat_list_entry.h"
@@ -27,6 +28,7 @@ typedef struct ChatListView {
     char          filter[64];
     TextCaret     caret;          /* the blinking cursor while typing here */
     char          open_jid[128];
+    AccountId     open_account;   /* whose chat that is, where several accounts are listed; ACCOUNT_ID_NONE: any */
     int           compact;        /* one row per chat instead of two */
     int           spacing;        /* blank lines between chats, 0 to 2 */
     /* Portraits (detailed style): where pictures come from and how to draw them. */
@@ -39,9 +41,13 @@ typedef struct ChatListView {
     int           others_collapsed;   /* the other chats are folded away */
     /* Dragging a chat into or out of the Pinned group. */
     char          drag_jid[128];      /* the chat under the pressed button; empty when none */
+    AccountId     drag_account;       /* and the account its row acts through */
     int           drag_from;          /* the entry the press started on */
     int           dragging;           /* moved off that entry: a drag, not a click */
     int           drop_pinned;        /* where it would land: 1 Pinned, 0 Chats, -1 nowhere */
+    /* With several accounts listed, the mark of each, in the order of a row's `accounts` bits. */
+    AccountBadge  badges[ACCOUNT_MAX];
+    int           badge_count;        /* 0 or 1: rows carry no badge */
     ChatListEntry entries[CHAT_LIST_MAX_ENTRIES];
     int           entry_count;
 } ChatListView;
@@ -52,6 +58,8 @@ void        chat_list_view_sync(ChatListView *view, const Chat *chats, int count
 void        chat_list_view_render(ChatListView *view, UiRect rect, const Chat *chats, int count,
                                   int focused, int use_24h, const BlinkState *blink, int64_t now_ms);
 void        chat_list_view_move(ChatListView *view, int delta);
+/* The selected entry when it is a chat, else NULL. */
+const Chat *chat_list_view_selected_chat(const ChatListView *view, const Chat *chats);
 /* JID of the selected entry when it is a chat, else NULL. */
 const char *chat_list_view_selected_jid(const ChatListView *view, const Chat *chats);
 /* Enter or click: opens a folder or folds a group (returns NULL), or returns the chat's JID. */

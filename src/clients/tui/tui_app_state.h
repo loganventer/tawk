@@ -7,6 +7,7 @@
 #include <stdint.h>
 
 #include "clients/tui/chat_list_view.h"
+#include "clients/tui/unified_chat_list.h"
 #include "clients/tui/chat_picker.h"
 #include "clients/tui/chat_toggle_dialog.h"
 #include "clients/tui/agents_panel.h"
@@ -91,6 +92,10 @@ struct TuiApp {
     SplashView          splash;               /* the start-up animation */
     ChatPicker          forward_picker;       /* choosing chats to forward a message to */
     ChatToggleDialog    self_chats;           /* the chats an admin agent may answer its own requests in */
+    UnifiedChatList     chat_rows;            /* every running account's chats as one list, when there is more than one */
+    int                 chat_rows_stale;      /* an account's chats changed: build the list again */
+    int64_t             chat_rows_built_ms;
+    AccountId           account_filter;       /* the one account the chat list shows; ACCOUNT_ID_NONE: all of them */
     int                 self_chats_from_agents; /* opened from the Agents tab, so close back to it */
     char                forward_id[64];       /* the message being forwarded */
     ScheduledListDialog scheduled_list;       /* messages waiting to be sent later */
@@ -261,6 +266,24 @@ void tui_app_scheduling_report(TuiApp *app, int sent, int late);
 void tui_app_accounts_start(TuiApp *app);
 void tui_app_accounts_tick(TuiApp *app);
 void tui_app_accounts_set_active(TuiApp *app, int active);
+/* The chat list: the account in view alone when it is the only one running,
+ * else every account's chats together, or those of the one the filter names. */
+const Chat *tui_app_chat_rows(TuiApp *app, int *count);
+/* How many accounts are running. */
+int  tui_app_account_count(TuiApp *app);
+/* Brings another account into view: its conversation, profile, statuses and
+ * dialogs replace those of the one that was. Returns 0 when it is there. */
+int  tui_app_use_account(TuiApp *app, AccountId account);
+/* Opens the chat of a row of the list, through the account the row acts through. */
+void tui_app_open_row(TuiApp *app, const Chat *row);
+/* The selected row's chat, with its account brought into view so that what
+ * is done next acts on the right one. NULL when no chat is selected. */
+const char *tui_app_take_selected(TuiApp *app);
+/* Shows one account's chats, or all (ACCOUNT_ID_NONE), and steps to the next choice. */
+void tui_app_set_account_filter(TuiApp *app, AccountId account);
+void tui_app_cycle_account_filter(TuiApp *app);
+/* The label for the header: "All", or the account the list shows. Empty with one account. */
+void tui_app_account_chip(TuiApp *app, char *out, size_t size);
 void tui_app_self_chats_request(TuiApp *app, PopupResult result);
 /* "no chat", "3 chats" or "every chat agents may use". */
 void tui_app_self_chats_summary(TuiApp *app, char *out, size_t size);

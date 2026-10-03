@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "core/account_id.h"
+
 typedef struct Chat {
     char    jid[128];
     char    name[128];
@@ -21,6 +23,9 @@ typedef struct Chat {
     int     soft_locked;    /* conversation hidden behind a blur until shown again; local only */
     char    typing[64];     /* "typing…", "Jan is typing…", filled by the manager */
     int     unread_mention; /* an unread message mentions you */
+    /* Filled only where several accounts' chats are listed together; a store leaves them 0. */
+    AccountId account;      /* the account this row acts through: the only one that has the chat, or the one that sends */
+    unsigned  accounts;     /* which running accounts have the chat, one bit each, in the order they are listed */
 } Chat;
 
 void chat_init(Chat *chat, const char *jid);

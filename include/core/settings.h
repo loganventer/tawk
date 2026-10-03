@@ -12,6 +12,7 @@ typedef struct Settings {
     int  sidebar_collapsed;
     int  convert_emoticons;     /* ":)" becomes 🙂 as you type */
     int  reopen_last_chat;      /* open last_chat again when tawk starts */
+    int  merge_accounts;        /* one contact on several of your accounts shows as one chat */
     char last_chat[128];        /* the chat open when tawk last ran (kept up to date) */
     int  chat_spacing;          /* blank lines between chats in the list, 0 to 2 */
     int  pinned_folded;         /* the Pinned group of the chat list is folded away */
