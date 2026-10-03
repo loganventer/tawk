@@ -7,6 +7,8 @@
 
 # tawk
 
+> **Disclaimer.** tawk is an independent project and is not affiliated with, endorsed by or connected to WhatsApp or Meta. It uses unofficial protocol libraries; use it at your own risk and in line with WhatsApp's terms of service.
+
 **T**erminal **A**ccess to **W**hatsApp **K**onnector: WhatsApp in your terminal. tawk is a fast, native terminal client written in C with ncurses. It links to your phone the same way WhatsApp Web does, keeps your chats in a local SQLite database, and gives you notifications, voice notes, media, statuses, themes and a screensaver without leaving the terminal.
 
 ![tawk showing a group chat with a photo, reactions and an edited message](docs/images/main.png)
