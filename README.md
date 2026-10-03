@@ -150,6 +150,7 @@ tawk/
 |---|---|
 | [INTENT.md](INTENT.md) | Purpose, scope and boundaries |
 | [QUICKSTART.md](QUICKSTART.md) | Install and first run |
+| [AGENT_SETUP.md](AGENT_SETUP.md) | Instructions for an AI agent installing tawk for you, on Windows, Linux and macOS |
 | [MANUAL.md](MANUAL.md) | Everyday use and every shortcut |
 | [CONFIGURATION.md](CONFIGURATION.md) | Every setting, file locations, themes |
 | [HOW_IT_WORKS.md](HOW_IT_WORKS.md) | Runtime flow, login, reconnects, media |

@@ -1,5 +1,7 @@
 # Quickstart
 
+Having an AI agent install tawk for you? Point it at [AGENT_SETUP.md](AGENT_SETUP.md), which covers Windows, Linux and macOS step by step.
+
 ## Install with one command
 
 ```bash
