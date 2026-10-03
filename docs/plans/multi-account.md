@@ -1,11 +1,12 @@
 # Plan: several WhatsApp accounts in one tawk
 
-Status: plan, not started. Branch: `feature/multi-account` in `tawk` and in `tawk-mcp`, both cut from `main`.
+Status: in progress, step 1 done (see [Progress](#progress)). Branch: `feature/multi-account` in `tawk` and in `tawk-mcp`, both cut from `main`.
 
 ## Table of Contents
 
 - [Why](#why)
 - [What was decided](#what-was-decided)
+- [Progress](#progress)
 - [What it looks like when done](#what-it-looks-like-when-done)
 - [The shape of the change](#the-shape-of-the-change)
 - [Work, in order](#work-in-order)
@@ -13,7 +14,7 @@ Status: plan, not started. Branch: `feature/multi-account` in `tawk` and in `taw
   - [2. Several sessions in the backend](#2-several-sessions-in-the-backend)
   - [3. One runtime per account](#3-one-runtime-per-account)
   - [4. The terminal client](#4-the-terminal-client)
-  - [5. Merged chats](#5-merged-chats)
+  - [5. Merged chats and a contact's own settings](#5-merged-chats-and-a-contacts-own-settings)
   - [6. The control socket and the shell commands](#6-the-control-socket-and-the-shell-commands)
   - [7. tawk-mcp](#7-tawk-mcp)
   - [8. Encryption, backup, doctor and logs](#8-encryption-backup-doctor-and-logs)
@@ -42,10 +43,26 @@ These were chosen by the owner before planning and are not open in this plan.
 | The same contact on two numbers | A setting keeps that contact as one merged chat or as separate chats, with a default for all chats and a choice per chat |
 | Which number sends | A primary account you choose, and a sending account you can set for any one contact. The input shows the sending account and one key changes it for that message |
 | A contact's own settings | Set from the contact card: the sending account, merging, and whether agents may answer that chat by themselves |
-| Agents | Access is set per account. A new account is invisible to agents until it is switched on. The self-approval chats are per account |
+| Agents | Each account has its own access level: off, read, send, manage or admin. A new account is off, so agents neither see nor reach it until it is switched on. The self-approval chats are per account |
 | Chat list | Every account's chats together, each row with an account badge. The header filters to one account |
 | Delivery | One pass on the feature branch, reviewed at the end |
 | Branches | `feature/multi-account` from `main`, no `develop` |
+
+## Progress
+
+| Step | State |
+|---|---|
+| 1. The account and the database | Done: migration 17, every store bound to an account, the account and per-contact stores, the label rules, the roster manager, and the tests |
+| 2. Several sessions in the backend | Not started |
+| 3. One runtime per account | Not started |
+| 4. The terminal client | Not started |
+| 5. Merged chats and a contact's own settings | The table and the store are in (step 1). The rules and the screens are not started |
+| 6. The control socket and the shell commands | Not started |
+| 7. tawk-mcp | Not started |
+| 8. Encryption, backup, doctor and logs | Not started |
+| 9. Documentation | Not started |
+
+Added to the plan after it was first written, at the owner's request: a sending account for each contact, a contact's settings on the contact card (including agents answering by themselves), and the access levels spelled out per account.
 
 ## What it looks like when done
 
@@ -96,47 +113,48 @@ The order is the order of dependency. tawk builds with no warnings and passes it
 
 ### 1. The account and the database
 
-**Core**
-- `core/account.h`: `Account { id, label, jid, name, colour, is_primary, agent_access, created_at }`. `id` is a small integer that never changes and is never reused; the label is the person's and can be renamed.
-- `core/account_id.h`: the `AccountId` type and `ACCOUNT_ID_FIRST` (1).
-- `core/chat_merge_choice.h`: `CHAT_MERGE_FOLLOW`, `CHAT_MERGE_ON`, `CHAT_MERGE_OFF` for the per-chat choice.
+Done. What follows is what was built.
 
-**Migration 17**, in `src/resource_access/sqlite_database.c`. SQLite cannot change a primary key, so the tables are rebuilt in one transaction: create the new table, copy, drop, rename.
+**Core**
+- `core/account_id.h`: the `AccountId` type, `ACCOUNT_ID_NONE` (0) and `ACCOUNT_ID_FIRST` (1).
+- `core/account.h`: `Account { id, label, jid, name, colour, is_primary, agent_access, created_at }`, with `ACCOUNT_MAX` (8). The id is given once, never changes and is never used again; the label is the person's and can be renamed.
+- `core/account_agent_access.h`: the access levels, in [Agent access for each account](#6-the-control-socket-and-the-shell-commands).
+- `core/chat_prefs.h` and `core/chat_merge_choice.h`: what you chose for one contact.
+
+**Migration 17**, in `src/resource_access/sqlite_database.c`. SQLite cannot change a primary key, so each table is set aside (`CREATE TABLE x_v16 AS SELECT ...`), dropped, made again and filled from the copy. No table is renamed, which keeps the migration clear of SQLite builds without FTS5. The whole version runs in one transaction; it is long enough to be written as several entries with the same version number, which `migrate` now runs together.
 
 | Table | New key | Notes |
 |---|---|---|
-| `accounts` | `id` | New. One row is inserted for what is already there: id 1, label `main`, primary |
+| `accounts` | `id` | New. One row is inserted for what is already there: id 1, label `main`, primary, agent access `follow` |
 | `messages` | `(account_id, id)` | `rowid` is copied as it is, because the search index is tied to it |
 | `chats` | `(account_id, jid)` | |
 | `contacts` | `(account_id, jid)` | |
-| `profiles` | `(account_id, jid)` | |
+| `profiles` | `(account_id, jid)` | The block list is per account |
 | `jid_aliases` | `(account_id, alias)` | |
 | `reactions` | `(account_id, message_id, sender_jid)` | |
 | `message_receipts` | `(account_id, message_id, jid)` | |
 | `statuses` | `(account_id, id)` | |
 | `scheduled_messages` | `id`, plus `account_id` | Ids are made locally and stay unique |
 | `automation_log` | `id`, plus `account_id` | Added with `ALTER TABLE` |
-| `chat_prefs` | `jid` | New. What you chose for a person or group, whichever account they are on: the sending account and the merge choice. It has no account column because it spans them |
+| `chat_prefs` | `jid` | New. What you chose for a person or group: the sending account and the merge choice. It has no account column because it spans them |
 
 Existing rows get `account_id = 1`. The same message reaches two accounts in one group with the same id and chat, which is why the id alone can no longer be the key.
 
-Details that the migration has to get right:
-- The base schema runs on every open with `IF NOT EXISTS`. It is changed to run only on a database at version 0, so it cannot bring back an old index.
-- The three search triggers go with the old `messages` table. `ensure_search_index` already rebuilds the index when the insert trigger is missing; it is changed to do that after any migration that rebuilt `messages`, and the search query gains a join on `account_id`.
-- `keep_copy_before_upgrade` writes `tawk.db.pre-v17` first, as it does for every upgrade, with the same key when the database is encrypted.
+- The base schema now runs only on a new file, so it cannot bring back an old index on a database that has been reshaped.
+- The search triggers go with the old `messages` table; `ensure_search_index` sees the insert trigger missing and rebuilds the index, as it already did for a database saved without one.
+- `keep_copy_before_upgrade` writes `tawk.db.pre-v17` first, with the same key when the database is encrypted.
 
-**Stores.** Every `sqlite_*_store_create` gains an `AccountId`. Each statement gains `account_id = ?`, and each `ON CONFLICT` target becomes the composite key (`sqlite_message_store.c`, `sqlite_chat_store.c`, `sqlite_contact_store.c`, `sqlite_reaction_store.c`, `sqlite_receipt_store.c`, `sqlite_status_store.c`, `sqlite_jid_alias_store.c`, `sqlite_profile_store.c`, `sqlite_scheduled_message_store.c`, `sqlite_automation_log.c`). Whole-table operations become account-wide: `chats.get_all`, `set_blocklist`, `statuses.authors` and `prune`, `scheduled.due`, the `reassign_*` and `merge` calls, and the alias table loaded at create.
+**Stores.** `resource_access/sqlite_account_scope.c` holds the database and the one account a store works for. A store's statements write `{acct}` where the account goes, and `sqlite_account_scope_prepare` puts the id there before preparing. The id is a number of ours and never text from outside, so it is safe in the statement, and the statement's own parameters keep their positions. Every `sqlite_*_store_create` takes an `AccountId`; the store contracts are unchanged. Whole-table operations became account-wide: `chats.get_all`, `set_blocklist`, `statuses.authors` and `prune`, `scheduled.due`, the `reassign_*` and `merge` calls, and the alias table loaded at create. The automation log stays one log for all accounts; its rows gain the account in step 6.
 
 **New**
-- `contracts/i_chat_prefs_store.h` and `resource_access/sqlite_chat_prefs_store.c`: get and set a contact's sending account and merge choice, list every contact with a sending account of its own, and clear the ones that point at an account being removed.
-- `contracts/i_account_store.h` and `resource_access/sqlite_account_store.c`: list, get, add, rename, set primary, set agent access, set jid and name, set last chat, remove (which deletes that account's rows from every table in one transaction).
-- `engines/account_label_validator.c`: a label is 1 to 24 characters, letters, digits, space, dash; unique without regard to case.
-- `managers/account_roster_manager.c`: the use cases over `IAccountStore` and the validator. Exactly one account is primary; removing the primary passes it to the lowest id left; the last account cannot be removed.
+- `contracts/i_account_store.h`, `resource_access/sqlite_account_store.c`: list, get, add, rename, set primary, set agent access, who the account linked as, the last chat, the self-approval chats, and remove, which takes the account's rows out of every table in one transaction.
+- `contracts/i_chat_prefs_store.h`, `resource_access/sqlite_chat_prefs_store.c`: a contact's sending account and merge choice, the list of contacts with a sending account of their own, putting them back when an account goes, and following a contact to another address.
+- `engines/account_label_validator.c`: a label is 1 to 24 characters with no comma or line break, and two labels are the same without regard to case.
+- `managers/account_roster_manager.c`: the use cases over both stores and the validator. Exactly one account is primary; removing the primary hands that to the oldest account left; the last account cannot be removed; an id is never used twice.
 
 **Tests**
-- `migration_test.c` is rewritten to build its old database from a literal schema (today it makes one by dropping columns from a current database, which would no longer be an old database), and checks that every row lands in account 1, that the search index answers after the rebuild, and that a failed migration leaves version 16 untouched.
-- New `account_store_test.c`: two stores over one database do not see each other's rows; the same message id in two accounts is two rows; removing an account leaves the other whole.
-- New `account_roster_test.c`: labels, primary, removal.
+- `migration_test.c` builds its old databases from literal schemas (it used to make one by dropping columns from a current database, which is no longer an old database). It upgrades a v9 and a v16 database, checks every table lands in account 1 with nothing left set aside, that search answers after the tables were made again, that a new database starts with its first account, and that a failed upgrade changes nothing.
+- `account_store_test.c`: labels; the roster (add, rename, primary, access, removal, the most accounts); two accounts' stores over one database not seeing each other's messages, chats, contacts, reactions, receipts, block lists, statuses, scheduled messages and aliases; one message id held once for each account; a contact's choices; and removing an account leaving the other whole.
 
 ### 2. Several sessions in the backend
 
@@ -182,19 +200,54 @@ The Go bridge keeps one global session, starting a second silently drives the fi
 
 **Tests.** New `unified_chat_list_test.c` (order, filter, badges). `account_dialogs_test.c` gains the accounts dialog. `chat_list_fold_test.c` and `chat_list_drag_test.c` run against two accounts.
 
-### 5. Merged chats
+### 5. Merged chats and a contact's own settings
 
-- **Setting**: `[chats] merge_accounts`, on or off, default on, in `settings_schema.c`. **Per contact**: follow the setting, always merge, never merge, kept in `chat_prefs.merge` and set from the contact card.
-- `engines/chat_merge_policy.c`, no I/O: two chats in different accounts are one when they have the same canonical JID (a person's JID is the same whichever of your numbers they write to; a group is the same group), and the setting with both chats' choices allows it. An explicit "never" on either side wins.
-- `engines/reply_account_policy.c`, no I/O. The sending account is, in this order: the one chosen for the message being written; the contact's own sending account, when that account has the chat; the primary account, when it has the chat; else the account with the newest message.
-- `clients/tui/merged_message_window.c`: joins the message windows of the accounts in time order. In a group that two of your numbers belong to, each message arrives twice with the same id and is shown once, marked with both accounts.
-- Read marks, typing, and unread counts in a merged chat act on every account that has it. Mute, pin, archive and lock are set on all of them together so the row has one state.
-- **In the conversation.** The input shows `as <label>`. Alt+A moves to the next account that has the chat, for this message only. Clicking the label, or Alt+Shift+A, opens a short menu: "Send this message as", listing the accounts, and "Always send to <name> from", which saves the contact's sending account. The conversation header carries the badges of the accounts the chat is on.
-- **On the contact card.** `clients/tui/chat_prefs_section.c` adds a "This chat" section to the profile view: **Send from** (the primary account, or one named account), **Merge across my numbers** (follow the setting, always, never), and **Agents may answer by themselves**, one switch for each account whose agent access is `admin`, which adds or removes the chat in that account's self-approval list. The card's existing mute, tone and theme stay where they are.
-- **In the settings.** Settings, Accounts shows the primary account and opens "Contacts with their own sending number", a list of every contact with a sending account of its own (`clients/tui/send_account_dialog.c`), where each can be changed or put back to the primary. Settings, Chats holds "Merge the same contact across my numbers".
-- Removing an account puts every contact that sent from it back to the primary.
+A person's WhatsApp id is the same whichever of your numbers they write to, and a group is the same group, so the same id in two accounts is the same contact. Two things follow: their chats can show as one, and something has to say which of your numbers answers them.
 
-**Tests.** New `chat_merge_test.c`: the setting and the three per-contact choices; a group seen twice; unread counts across accounts. New `reply_account_test.c`: each rung of the order above, a contact whose sending account no longer has the chat, and an account removed. New `chat_prefs_store_test.c`.
+**Which chats merge**
+- **Setting**: `[chats] merge_accounts`, on or off, default on, in `settings_schema.c`.
+- **Per contact**: follow the setting, always merge, never merge, kept in `chat_prefs.merge`.
+- `engines/chat_merge_policy.c`, no I/O: two chats in different accounts are one when they have the same id and the setting with the contact's choice allows it. The contact's own choice wins over the setting.
+- `clients/tui/merged_message_window.c` joins the message windows of the accounts in time order. In a group that two of your numbers belong to, each message arrives twice with the same id and is shown once, marked with both accounts.
+- Read marks, typing and unread counts in a merged chat act on every account that has it. Mute, pin, archive and lock are set on all of them together, so the row has one state.
+
+**Which number sends**
+
+`engines/reply_account_policy.c`, no I/O, picks the sending account in this order and stops at the first that applies:
+
+| Order | Rule |
+|---|---|
+| 1 | The account chosen for the message being written |
+| 2 | The contact's own sending account (`chat_prefs.send_account`), when that account has the chat and is connected |
+| 3 | The primary account, when it has the chat |
+| 4 | The account that has the chat's newest message |
+
+A contact whose sending account has been removed is put back on the primary. A contact whose sending account no longer has the chat falls through to the next rule, and the input says so.
+
+**In the conversation**
+- The input always shows `as <label>`, in that account's colour, so the number is visible before Enter is pressed.
+- **Alt+A** moves to the next account that has the chat, for this message only. The label returns to the rule's answer after the message goes.
+- Clicking the label, or **Alt+Shift+A**, opens a short menu (`clients/tui/send_as_menu.c`): "Send this message as", listing the accounts that have the chat, and "Always send to <name> from", which saves the contact's sending account.
+- The conversation header carries the badges of the accounts the chat is on. In a merged chat each message carries the badge of the account it arrived on or was sent from.
+
+**On the contact card**
+
+`clients/tui/chat_prefs_section.c` adds a "This chat" section to the profile view, so everything about one contact is set where you look at them:
+
+| Row | Choices |
+|---|---|
+| Send from | Primary account, or one named account. Only accounts that have the chat are offered |
+| Merge across my numbers | Follow the setting, always, never. Shown when the contact is on more than one account |
+| Agents may answer by themselves | One switch for each account whose agent access is `admin`. It adds the chat to that account's self-approval list or takes it out. Shown greyed, with the reason, for an account at a lower level |
+| Agents may see this chat | Follows the global `chats` list; shown so the card says plainly whether an agent can read this chat at all |
+
+The card's existing mute, tone and theme rows stay where they are. This replaces finding a chat in the list under Settings, Automation, Answering for itself, which stays as the place to see every such chat at once.
+
+**In the settings**
+- Settings, Accounts shows which account is primary and opens "Contacts with their own sending number" (`clients/tui/send_account_dialog.c`): every contact with a sending account of its own, each of which can be changed or put back to the primary.
+- Settings, Chats holds "Merge the same contact across my numbers".
+
+**Tests.** New `chat_merge_test.c`: the setting and the three per-contact choices; a group seen twice; unread counts across accounts. New `reply_account_test.c`: each rule in the order above, a contact whose sending account no longer has the chat, and an account removed. The store behind both is covered by `account_store_test.c`.
 
 ### 6. The control socket and the shell commands
 
@@ -204,7 +257,18 @@ The protocol stays at version 1: fields are added and none change meaning.
 - **Every operation** accepts `account` (an id or a label). Without it the operation uses the default account: the primary one if agents may use it, else the lowest id they may use. A chat reference is resolved inside that account. `ambiguous` candidates carry the account.
 - **`list_accounts`** is a new read operation.
 - **Events** (`message`, `read`, `reaction`, `edit`, `delete`, `scheduled_sent`, `chat`) carry `account`. The live cursor is kept per account.
-- **Access per account.** `engines/automation_policy.c` takes the account's access. The existing `[automation] access` is copied to account 1 by the migration and stops being read; a new account starts at `off`. `self_approval_chats` moves to the account. `chats`, the rate limits and the disclaimer stay global.
+- **Agent access for each account.** `engines/automation_policy.c` takes the account's level in place of the one global setting:
+
+  | Level | An agent may |
+  |---|---|
+  | `off` | Nothing. The account is not listed and cannot be named. Every new account starts here |
+  | `read` | Read that account's chats. Nothing is marked as read |
+  | `send` | Also propose messages from that account, each approved by you |
+  | `manage` | Also make changes there (edits, reactions, downloads), each approved |
+  | `admin` | As `manage`, and an agent holding the admin token may answer its own sends in the chats switched on for that account |
+  | `follow` | Whatever `[automation] access` says. Only the first account starts here, so an existing install behaves exactly as it did until a level is chosen for it |
+
+  The level is set per account in Settings, Accounts and shown beside each account. `self_approval_chats` is kept per account; the first account's list is moved there from the settings the first time the new build starts. `chats` (which chats agents may use at all), the rate limits and the disclaimer stay global.
 - **Approvals and the log.** `ApprovalRequest`, `AutomationEntry`, `ControlPending`, `ControlSession` subscriptions and `ControlWatch` carry the account. The Agentic tab shows it in the queue, the log and the detail.
 - **Shell commands** (`clients/cli/control_command.c`, `control_options.h`): `--account NAME`. `tail` and `unread` print the account; `status-line` sums over accounts.
 
