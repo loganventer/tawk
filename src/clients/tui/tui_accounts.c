@@ -2,6 +2,7 @@
  * managers, and every one is served every frame: an account nobody looks at
  * still receives, notifies and sends what is due. */
 #include "tui_app_state.h"
+#include "engines/jid_list.h"
 #include "utilities/clock_util.h"
 #include "utilities/str_util.h"
 
@@ -356,12 +357,48 @@ void tui_app_remove_account(TuiApp *app, AccountId account) {
 }
 
 void tui_app_open_send_accounts(TuiApp *app) {
-    ChatPrefs own[64];
-    int n = app->deps.roster ? account_roster_manager_send_accounts(app->deps.roster, own, 64) : 0;
-    char msg[96];
-    if (n == 0) snprintf(msg, sizeof(msg), "Every contact sends from your primary account");
-    else snprintf(msg, sizeof(msg), "%d contact%s with a sending number of their own", n, n == 1 ? "" : "s");
-    tui_app_toast(app, msg, 0);
+    app->accounts_dialog.open = 0;
+    send_account_dialog_open(&app->send_accounts);
+    app->dirty = 1;
+}
+
+void tui_app_send_accounts_render(TuiApp *app, UiRect area) {
+    AccountRosterManager *roster = app->deps.roster;
+    ChatPrefs own[SEND_ACCOUNT_ROWS];
+    SendAccountRow rows[SEND_ACCOUNT_ROWS];
+    int n = roster ? account_roster_manager_send_accounts(roster, own, SEND_ACCOUNT_ROWS) : 0;
+    int count = 0;
+    const Chat *chats = tui_app_chat_rows(app, &count);
+    for (int i = 0; i < n; i++) {
+        Account account;
+        memset(&rows[i], 0, sizeof(rows[i]));
+        str_copy(rows[i].jid, sizeof(rows[i].jid), own[i].jid);
+        for (int k = 0; k < count; k++) {
+            if (strcmp(chats[k].jid, own[i].jid) == 0) { str_copy(rows[i].name, sizeof(rows[i].name), chats[k].name); break; }
+        }
+        if (account_roster_manager_get(roster, own[i].send_account, &account) == 0) {
+            str_copy(rows[i].account, sizeof(rows[i].account), account.label);
+        }
+    }
+    Account primary;
+    memset(&primary, 0, sizeof(primary));
+    if (roster) account_roster_manager_get(roster, account_roster_manager_primary(roster), &primary);
+    send_account_dialog_render(&app->send_accounts, area, rows, n, primary.label);
+}
+
+void tui_app_send_accounts_request(TuiApp *app, SendAccountRequest request) {
+    AccountRosterManager *roster = app->deps.roster;
+    const char *selected = send_account_dialog_selected(&app->send_accounts);
+    app->dirty = 1;
+    if (!roster || !selected) return;
+    char jid[128];
+    str_copy(jid, sizeof(jid), selected);
+    if (request == SEND_ACCOUNT_REQUEST_STEP) {
+        tui_app_step_send_from(app, jid);
+    } else if (request == SEND_ACCOUNT_REQUEST_RESET) {
+        account_roster_manager_set_send_account(roster, jid, ACCOUNT_ID_NONE);
+        app->chat_rows_stale = 1;
+    }
 }
 
 /* ---- a conversation merged across accounts -------------------------------- */
@@ -494,4 +531,146 @@ int tui_app_peers_load_older(TuiApp *app) {
         if (sv && messaging_manager_load_older(sv->messaging)) older = 1;
     }
     return older;
+}
+
+/* ---- a contact's own settings, on the contact card ------------------------- */
+
+static const Settings *current_settings(TuiApp *app) { return settings_manager_current(app->deps.settings); }
+
+/* What agents may do with an account, following the setting where it says to. */
+static AccountAgentAccess effective_access(TuiApp *app, const Account *account) {
+    if (account->agent_access != ACCOUNT_AGENT_FOLLOW) return account->agent_access;
+    return account_agent_access_parse(current_settings(app)->automation_access);
+}
+
+/* The chats an agent may answer by itself in for an account. An account
+ * that follows the setting and has no list of its own still uses the one
+ * the settings held before accounts had their own. */
+static void self_approval_chats(TuiApp *app, const Account *account, char *out, size_t size) {
+    out[0] = '\0';
+    account_roster_manager_self_approval_chats(app->deps.roster, account->id, out, size);
+    if (!out[0] && account->agent_access == ACCOUNT_AGENT_FOLLOW) str_copy(out, size, current_settings(app)->automation_self_chats);
+}
+
+static const char *label_of(TuiApp *app, AccountId id, Account *scratch) {
+    if (id != ACCOUNT_ID_NONE && account_roster_manager_get(app->deps.roster, id, scratch) == 0) return scratch->label;
+    return "";
+}
+
+void tui_app_refresh_contact_prefs(TuiApp *app) {
+    ContactPanel *panel = &app->contact;
+    AccountRosterManager *roster = app->deps.roster;
+    if (!panel->open || !roster) return;
+    ChatPrefs prefs;
+    account_roster_manager_chat_prefs(roster, panel->jid, &prefs);
+    Account scratch, in_view;
+    char send_from[96] = "", merge[48] = "", agent[120] = "";
+    if (tui_app_account_count(app) > 1) {
+        const char *own = label_of(app, prefs.send_account, &scratch);
+        if (own[0]) snprintf(send_from, sizeof(send_from), "%s", own);
+        else snprintf(send_from, sizeof(send_from), "primary account (%s)", label_of(app, account_roster_manager_primary(roster), &scratch));
+        str_copy(merge, sizeof(merge), prefs.merge == CHAT_MERGE_ALWAYS ? "always" : prefs.merge == CHAT_MERGE_NEVER ? "never"
+                                     : current_settings(app)->merge_accounts ? "as the setting says (on)" : "as the setting says (off)");
+    }
+    if (account_roster_manager_get(roster, app->deps.active_account, &in_view) == 0) {
+        char chats[1024];
+        self_approval_chats(app, &in_view, chats, sizeof(chats));
+        int on = jid_list_contains(chats, panel->jid);
+        const char *who = tui_app_account_count(app) > 1 ? in_view.label : "";
+        if (effective_access(app, &in_view) != ACCOUNT_AGENT_ADMIN) {
+            snprintf(agent, sizeof(agent), "%s%s%s (needs agent access admin)", on ? "on" : "off", who[0] ? " for " : "", who);
+        } else {
+            snprintf(agent, sizeof(agent), "%s%s%s", on ? "\xE2\x9C\x93 on" : "off", who[0] ? " for " : "", who);
+        }
+    }
+    contact_panel_set_prefs(panel, send_from, merge, agent);
+    app->dirty = 1;
+}
+
+/* Primary, then each running account in turn, then primary again. */
+void tui_app_step_send_from(TuiApp *app, const char *jid) {
+    AccountRosterManager *roster = app->deps.roster;
+    IAccountDirectory *dir = app->deps.directory;
+    if (!roster || !dir) return;
+    ChatPrefs prefs;
+    account_roster_manager_chat_prefs(roster, jid, &prefs);
+    int n = dir->count(dir), next = 0;
+    for (int i = 0; prefs.send_account != ACCOUNT_ID_NONE && i < n; i++) {
+        const AccountServices *sv = dir->at(dir, i);
+        if (sv && sv->id == prefs.send_account) { next = i + 1; break; }
+    }
+    const AccountServices *sv = next < n ? dir->at(dir, next) : NULL;
+    if (account_roster_manager_set_send_account(roster, jid, sv ? sv->id : ACCOUNT_ID_NONE) != 0) {
+        tui_app_toast(app, account_roster_manager_error(roster), 1);
+    }
+    app->chat_rows_stale = 1;
+    tui_app_refresh_contact_prefs(app);
+}
+
+void tui_app_step_merge(TuiApp *app, const char *jid) {
+    AccountRosterManager *roster = app->deps.roster;
+    if (!roster) return;
+    ChatPrefs prefs;
+    account_roster_manager_chat_prefs(roster, jid, &prefs);
+    ChatMergeChoice next = prefs.merge == CHAT_MERGE_FOLLOW ? CHAT_MERGE_ALWAYS : prefs.merge == CHAT_MERGE_ALWAYS ? CHAT_MERGE_NEVER : CHAT_MERGE_FOLLOW;
+    if (account_roster_manager_set_merge(roster, jid, next) != 0) tui_app_toast(app, account_roster_manager_error(roster), 1);
+    app->chat_rows_stale = 1;
+    tui_app_refresh_contact_prefs(app);
+}
+
+void tui_app_toggle_agent_answers(TuiApp *app, const char *jid) {
+    AccountRosterManager *roster = app->deps.roster;
+    Account in_view;
+    if (!roster || account_roster_manager_get(roster, app->deps.active_account, &in_view) != 0) return;
+    char chats[1024], changed[1024];
+    self_approval_chats(app, &in_view, chats, sizeof(chats));
+    if (jid_list_contains(chats, "*") && jid_list_contains(chats, jid)) {
+        /* Every chat is switched on at once; one cannot be taken out of that from here. */
+        tui_app_toast(app, "Agents answer in every chat of this account. Change that under Settings, Automation, Answering for itself.", 1);
+        return;
+    }
+    int on = !jid_list_contains(chats, jid);
+    if (jid_list_set(chats, jid, on, changed, sizeof(changed)) != 0) {
+        tui_app_toast(app, "That is too many chats to keep; switch some off first", 1);
+        return;
+    }
+    if (account_roster_manager_set_self_approval_chats(roster, in_view.id, changed) != 0) {
+        tui_app_toast(app, account_roster_manager_error(roster), 1);
+        return;
+    }
+    if (on && effective_access(app, &in_view) != ACCOUNT_AGENT_ADMIN) {
+        tui_app_toast(app, "Switched on, but it only takes effect once this account's agent access is admin", 0);
+    } else {
+        tui_app_toast(app, on ? "\xF0\x9F\xA4\x96 An agent may answer here by itself" : "An agent now waits for you here", 0);
+    }
+    tui_app_refresh_contact_prefs(app);
+}
+
+const UnreadTally *tui_app_tally(TuiApp *app) {
+    IAccountDirectory *dir = app->deps.directory;
+    if (!dir || tui_app_account_count(app) <= 1) return messaging_manager_tally(app->deps.messaging);
+    memset(&app->total_tally, 0, sizeof(app->total_tally));
+    for (int i = 0; ; i++) {
+        const AccountServices *sv = dir->at(dir, i);
+        if (!sv) break;
+        const UnreadTally *one = messaging_manager_tally(sv->messaging);
+        for (int t = 0; t < MESSAGE_TYPE_COUNT; t++) app->total_tally.counts[t] += one->counts[t];
+    }
+    return &app->total_tally;
+}
+
+void tui_app_keep_send_account(TuiApp *app) {
+    AccountRosterManager *roster = app->deps.roster;
+    const char *jid = messaging_manager_open_jid(app->deps.messaging);
+    if (!roster || !jid[0] || tui_app_account_count(app) <= 1) return;
+    if (account_roster_manager_set_send_account(roster, jid, app->deps.active_account) != 0) {
+        tui_app_toast(app, account_roster_manager_error(roster), 1);
+        return;
+    }
+    Account account;
+    char msg[ACCOUNT_LABEL_SIZE + 64];
+    snprintf(msg, sizeof(msg), "This contact is always sent to from %s now",
+             account_roster_manager_get(roster, app->deps.active_account, &account) == 0 ? account.label : "this account");
+    tui_app_toast(app, msg, 0);
+    app->chat_rows_stale = 1;
 }

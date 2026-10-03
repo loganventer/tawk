@@ -211,6 +211,10 @@ static int handle_overlays_key(TuiApp *app, int is_key, int ch) {
         if (message_menu_key(&app->message_menu, is_key, ch) == POPUP_CHOSEN) tui_app_apply_message_action(app);
         return 1;
     }
+    if (app->send_accounts.open) {
+        tui_app_send_accounts_request(app, send_account_dialog_key(&app->send_accounts, is_key, ch));
+        return 1;
+    }
     if (app->accounts_dialog.open) {
         tui_app_accounts_request(app, accounts_dialog_key(&app->accounts_dialog, is_key, ch));
         return 1;
@@ -336,6 +340,11 @@ static int handle_overlays_mouse(TuiApp *app, const MEVENT *ev, int wheel, int p
     }
     if (app->scheduled_list.open) {
         if (press) tui_app_scheduled_request(app, scheduled_list_dialog_click(&app->scheduled_list, y, x));
+        app->dirty = 1;
+        return 1;
+    }
+    if (app->send_accounts.open) {
+        if (press) tui_app_send_accounts_request(app, send_account_dialog_click(&app->send_accounts, y, x));
         app->dirty = 1;
         return 1;
     }
@@ -876,7 +885,8 @@ void tui_input_dispatch(TuiApp *app, int is_key, int ch) {
     if (alt && !is_key && (ch == 'v' || ch == 'V') && !tui_app_show_login(app)) { tui_app_paste_image(app); return; }
     if (alt && !is_key && (ch == 'l' || ch == 'L') && !tui_app_show_login(app)) { tui_app_toggle_soft_lock_here(app); return; }
     if (alt && !is_key && (ch == 'a' || ch == 'A') && app->focus != TUI_FOCUS_CHATS && !tui_app_show_login(app)) {
-        tui_app_cycle_send_account(app);
+        if (ch == 'A') tui_app_keep_send_account(app);      /* with Shift: for this contact from now on */
+        else tui_app_cycle_send_account(app);
         return;
     }
     if (alt && !is_key && (ch == 'i' || ch == 'I') && !tui_app_show_login(app)) {

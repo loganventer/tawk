@@ -3,6 +3,7 @@
  * roster names and orders the accounts, a contact's own choices span them,
  * and removing an account takes its rows and leaves the others whole. */
 #include "engines/account_label_validator.h"
+#include "engines/jid_list.h"
 #include "managers/account_roster_manager.h"
 #include "resource_access/sqlite_account_store.h"
 #include "resource_access/sqlite_chat_prefs_store.h"
@@ -84,6 +85,16 @@ static void test_labels(void) {
                                  "\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9",
                                  why, sizeof(why)) == 0, "characters are counted, not bytes");
     CHECK(account_label_same("Work", " work ") && !account_label_same("work", "works"), "labels compare without case or outer spaces");
+
+    char list[64];
+    CHECK(!jid_list_contains("", MOM) && jid_list_contains(MOM "," FAM, FAM) && jid_list_contains(" " MOM " , " FAM, MOM),
+          "a chat is found in a list of chats, whatever the spaces");
+    CHECK(jid_list_contains("*", MOM) && !jid_list_contains(MOM, "2782000000"), "a star names every chat, and part of an address names none");
+    CHECK(jid_list_set("", MOM, 1, list, sizeof(list)) == 0 && strcmp(list, MOM) == 0, "a chat is added to an empty list");
+    CHECK(jid_list_set(MOM, MOM, 1, list, sizeof(list)) == 0 && strcmp(list, MOM) == 0, "adding it again keeps it once");
+    CHECK(jid_list_set(MOM, MOM, 0, list, sizeof(list)) == 0 && list[0] == '\0', "and it is taken out again");
+    char tight[8];
+    CHECK(jid_list_set("", MOM, 1, tight, sizeof(tight)) != 0, "a list that would not fit is refused");
 }
 
 static void test_roster(sqlite3 *db) {

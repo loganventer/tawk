@@ -26,9 +26,15 @@ typedef struct ContactPanel {
     UiRect        last_rect;
     UiRect        portrait_rect;
     UiRect        action_rect;         /* where the actions were drawn, one per row */
+    /* This chat's own settings, as they stand: what the three actions show after their names. Empty hides one. */
+    char          send_from[96];
+    char          merge[48];
+    char          agent_answers[120];
 } ContactPanel;
 
 void          contact_panel_open(ContactPanel *panel, const Chat *chat, int blocked);
+/* Says how this chat's own settings stand, adding their actions the first time. An empty text leaves one out. */
+void          contact_panel_set_prefs(ContactPanel *panel, const char *send_from, const char *merge, const char *agent_answers);
 PopupResult   contact_panel_key(ContactPanel *panel, int is_key_code, int ch);
 PopupResult   contact_panel_click(ContactPanel *panel, int y, int x);
 void          contact_panel_wheel(ContactPanel *panel, int delta);

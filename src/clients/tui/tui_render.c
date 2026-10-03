@@ -57,7 +57,7 @@ static int use_pixel_images(TuiApp *app, const Settings *s, int beside_contact) 
              app->emoji_picker.open || app->options.open || app->attach_menu.open || app->camera_view.open || app->message_info.open || app->palette.open ||
              app->file_picker.open || app->settings_panel.open || profile_dialogs_is_open(&app->profile) ||
              app->status_composer.open || status_feed_dialogs_is_open(&app->feed) || app->forward_picker.open || app->self_chats.open || app->scheduled_list.open || app->agents.open ||
-             app->accounts_dialog.open || health.show_overlay || typing_command);
+             app->accounts_dialog.open || app->send_accounts.open || health.show_overlay || typing_command);
 }
 
 /* The status line above the input: an attachment or the message being answered. */
@@ -99,7 +99,7 @@ void tui_render_frame(TuiApp *app, int64_t now) {
     }
 
     char tally[160];
-    unread_tally_format(messaging_manager_tally(mm), tally, sizeof(tally));
+    unread_tally_format(tui_app_tally(app), tally, sizeof(tally));
     char account_chip[ACCOUNT_LABEL_SIZE + 8];
     tui_app_account_chip(app, account_chip, sizeof(account_chip));
     AuthState auth = messaging_manager_auth_state(mm);
@@ -258,6 +258,8 @@ void tui_render_frame(TuiApp *app, int64_t now) {
         message_menu_render(&app->message_menu, l->body);
     } else if (app->agents.open) {
         tui_app_agents_render(app, l->body);
+    } else if (app->send_accounts.open) {
+        tui_app_send_accounts_render(app, l->body);
     } else if (app->accounts_dialog.open) {
         tui_app_accounts_render(app, l->body);
     } else if (app->scheduled_list.open) {

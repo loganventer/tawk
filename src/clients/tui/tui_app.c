@@ -1194,6 +1194,7 @@ void tui_app_open_contact(TuiApp *app, const char *jid) {
     profile_manager_details(app->deps.profiles, chat->jid, 1, &fresh);      /* ask WhatsApp again */
     contact_profile_dispose(&fresh);
     contact_panel_open(&app->contact, chat, profile_manager_is_blocked(app->deps.profiles, chat->jid));
+    tui_app_refresh_contact_prefs(app);
     app->dirty = 1;
 }
 
@@ -1226,6 +1227,9 @@ void tui_app_contact_action(TuiApp *app) {
     str_copy(name, sizeof(name), app->contact.name);
     switch (contact_panel_choice(&app->contact)) {
         case CONTACT_ACTION_VIEW_PHOTO: tui_app_show_portrait(app, jid); break;
+        case CONTACT_ACTION_SEND_FROM:     tui_app_step_send_from(app, jid); break;
+        case CONTACT_ACTION_MERGE:         tui_app_step_merge(app, jid); break;
+        case CONTACT_ACTION_AGENT_ANSWERS: tui_app_toggle_agent_answers(app, jid); break;
         case CONTACT_ACTION_SEARCH:     app->contact.open = 0; tui_app_open_search(app, ""); break;
         case CONTACT_ACTION_OPTIONS:    app->contact.open = 0; tui_app_open_chat_options(app, jid); break;
         case CONTACT_ACTION_SOFT_LOCK:  tui_app_toggle_soft_lock(app, jid); break;
@@ -1234,6 +1238,7 @@ void tui_app_contact_action(TuiApp *app) {
         case CONTACT_ACTION_UNBLOCK:
             profile_manager_set_blocked(app->deps.profiles, jid, 0);
             contact_panel_open(&app->contact, chat_by_jid(app, jid), 0);
+            tui_app_refresh_contact_prefs(app);
             tui_app_toast(app, "Unblocked", 0);
             break;
         case CONTACT_ACTION_BLOCK:
@@ -1297,6 +1302,7 @@ void tui_app_confirmed(TuiApp *app) {
         case CONFIRM_BLOCK:
             profile_manager_set_blocked(app->deps.profiles, app->confirm.subject, 1);
             if (app->contact.open) contact_panel_open(&app->contact, chat_by_jid(app, app->confirm.subject), 1);
+            tui_app_refresh_contact_prefs(app);
             tui_app_toast(app, "\xF0\x9F\x9A\xAB Blocked", 0);
             break;
         case CONFIRM_CLEAR_CHAT:
@@ -1534,7 +1540,7 @@ static void update_tab(TuiApp *app, int64_t now) {
         .dnd = settings(app)->do_not_disturb,
         .recording = media_manager_is_recording(app->deps.media),
         .playing = media_manager_playing(app->deps.media)[0] != '\0',
-        .tally = messaging_manager_tally(mm),
+        .tally = tui_app_tally(app),
         .progress = health.breaker == CIRCUIT_OPEN ? TERMINAL_PROGRESS_ERROR :
                     (auth == AUTH_STATE_RECONNECTING || auth == AUTH_STATE_STARTING) ? TERMINAL_PROGRESS_BUSY :
                     TERMINAL_PROGRESS_NONE,

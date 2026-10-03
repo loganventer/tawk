@@ -13,6 +13,10 @@ typedef enum ContactAction {
     CONTACT_ACTION_UNBLOCK,
     CONTACT_ACTION_CLEAR,            /* delete the messages, keep the chat */
     CONTACT_ACTION_DELETE,           /* delete the whole chat */
+    /* This chat's own settings. Each steps to its next choice; the panel is told what to show for them. */
+    CONTACT_ACTION_SEND_FROM,        /* which of your accounts sends to this contact */
+    CONTACT_ACTION_MERGE,            /* whether their chats in several accounts show as one */
+    CONTACT_ACTION_AGENT_ANSWERS,    /* whether an agent may answer here by itself */
     CONTACT_ACTION_COUNT
 } ContactAction;
 

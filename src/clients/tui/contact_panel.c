@@ -59,6 +59,38 @@ void contact_panel_open(ContactPanel *p, const Chat *chat, int blocked) {
     p->open = 1;
 }
 
+/* The value shown after one of this chat's own settings; NULL for any other action. */
+static const char *pref_value(const ContactPanel *p, ContactAction a) {
+    switch (a) {
+        case CONTACT_ACTION_SEND_FROM:     return p->send_from;
+        case CONTACT_ACTION_MERGE:         return p->merge;
+        case CONTACT_ACTION_AGENT_ANSWERS: return p->agent_answers;
+        default:                           return NULL;
+    }
+}
+
+static int has_action(const ContactPanel *p, ContactAction a) {
+    for (int i = 0; i < p->action_count; i++) if (p->actions[i] == a) return 1;
+    return 0;
+}
+
+void contact_panel_set_prefs(ContactPanel *p, const char *send_from, const char *merge, const char *agent_answers) {
+    str_copy(p->send_from, sizeof(p->send_from), send_from ? send_from : "");
+    str_copy(p->merge, sizeof(p->merge), merge ? merge : "");
+    str_copy(p->agent_answers, sizeof(p->agent_answers), agent_answers ? agent_answers : "");
+    static const ContactAction PREFS[] = { CONTACT_ACTION_SEND_FROM, CONTACT_ACTION_MERGE, CONTACT_ACTION_AGENT_ANSWERS };
+    /* They go first, above the things that are done once: settings are what a card is opened for. */
+    int added = 0;
+    for (int k = 0; k < 3; k++) {
+        const char *value = pref_value(p, PREFS[k]);
+        if (!value[0] || has_action(p, PREFS[k]) || p->action_count >= CONTACT_ACTION_COUNT) continue;
+        for (int i = p->action_count; i > added; i--) p->actions[i] = p->actions[i - 1];
+        p->actions[added++] = PREFS[k];
+        p->action_count++;
+    }
+    if (added) p->selected += added;                       /* what was highlighted stays highlighted */
+}
+
 PopupResult contact_panel_key(ContactPanel *p, int is_key, int ch) {
     if (!is_key && (ch == 27 || ch == 'q')) { p->open = 0; return POPUP_CLOSED; }
     if (is_key && ch == KEY_UP && p->selected > 0) p->selected--;
@@ -212,6 +244,12 @@ int contact_panel_render(ContactPanel *p, UiRect area, const Chat *c, const Cont
         tui_fill((UiRect){ actions_top + i, in.x, 1, in.w }, i == p->selected ? attr : base);
         const char *label = contact_action_label(a);
         if (a == CONTACT_ACTION_SOFT_LOCK && c->soft_locked) label = "\xF0\x9F\x91\x80  Show chat (remove soft lock)";
+        char with_value[260];
+        const char *value = pref_value(p, a);
+        if (value) {
+            snprintf(with_value, sizeof(with_value), "%s: %s", label, value);
+            label = with_value;
+        }
         tui_text(actions_top + i, in.x + 1, in.w - 1, label, attr);
     }
     return placed;

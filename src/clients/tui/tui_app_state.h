@@ -9,6 +9,7 @@
 #include "clients/tui/chat_list_view.h"
 #include "clients/tui/unified_chat_list.h"
 #include "clients/tui/accounts_dialog.h"
+#include "clients/tui/send_account_dialog.h"
 #include "clients/tui/merged_message_window.h"
 #include "clients/tui/chat_picker.h"
 #include "clients/tui/chat_toggle_dialog.h"
@@ -94,7 +95,9 @@ struct TuiApp {
     SplashView          splash;               /* the start-up animation */
     ChatPicker          forward_picker;       /* choosing chats to forward a message to */
     ChatToggleDialog    self_chats;           /* the chats an admin agent may answer its own requests in */
+    SendAccountDialog   send_accounts;        /* the contacts with a sending account of their own */
     AccountsDialog      accounts_dialog;      /* your accounts: add, name, link and remove them */
+    UnreadTally         total_tally;          /* new notifications over every account, for the header and the title */
     MergedMessageWindow merged;               /* the open chat across the accounts that share it */
     AccountId           peers[ACCOUNT_MAX];   /* the other accounts the open chat is merged with */
     int                 peer_count;
@@ -313,14 +316,25 @@ void tui_app_take_services(TuiApp *app, const AccountServices *services);
 int  tui_app_turn_to(TuiApp *app, AccountId account);
 /* Acts through the account message `index` belongs to, saying so when that changes who sends. */
 void tui_app_follow_message(TuiApp *app, int index);
+/* New notifications over every running account. */
+const UnreadTally *tui_app_tally(TuiApp *app);
+/* Alt+Shift+A: the account that sends now is the one this contact is always sent to from. */
+void tui_app_keep_send_account(TuiApp *app);
 /* Alt+A: the next account that has this chat sends. */
 void tui_app_cycle_send_account(TuiApp *app);
 /* "as <label>" for the input; empty with one account or no chat open. */
 void tui_app_send_label(TuiApp *app, char *out, size_t size);
 /* Loads older messages of the open chat in every account it is merged with; 1 when any had more. */
 int  tui_app_peers_load_older(TuiApp *app);
+/* The contact card's settings for one chat: what they show, and stepping each to its next choice. */
+void tui_app_refresh_contact_prefs(TuiApp *app);
+void tui_app_step_send_from(TuiApp *app, const char *jid);
+void tui_app_step_merge(TuiApp *app, const char *jid);
+void tui_app_toggle_agent_answers(TuiApp *app, const char *jid);
 /* The contacts with a sending account of their own. */
 void tui_app_open_send_accounts(TuiApp *app);
+void tui_app_send_accounts_request(TuiApp *app, SendAccountRequest request);
+void tui_app_send_accounts_render(TuiApp *app, UiRect area);
 void tui_app_self_chats_request(TuiApp *app, PopupResult result);
 /* "no chat", "3 chats" or "every chat agents may use". */
 void tui_app_self_chats_summary(TuiApp *app, char *out, size_t size);

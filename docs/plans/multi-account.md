@@ -1,6 +1,6 @@
 # Plan: several WhatsApp accounts in one tawk
 
-Status: in progress, steps 1 to 3 done (see [Progress](#progress)). Branch: `feature/multi-account` in `tawk` and in `tawk-mcp`, both cut from `main`.
+Status: in progress, steps 1 to 5 done (see [Progress](#progress)). Branch: `feature/multi-account` in `tawk` and in `tawk-mcp`, both cut from `main`.
 
 ## Table of Contents
 
@@ -55,8 +55,8 @@ These were chosen by the owner before planning and are not open in this plan.
 | 1. The account and the database | Done: migration 17, every store bound to an account, the account and per-contact stores, the label rules, the roster manager, and the tests |
 | 2. Several sessions in the backend | Done: the Go bridge keeps its sessions by handle and marks every event with one; the C gateway routes them. Two sessions were run side by side in one tawk, each with its own login store and log, without a linked number |
 | 3. One runtime per account | Done: `composition/account_runtime` and `account_host`, the account directory the clients are given, and every account started and served each frame. The clients still show the primary account only |
-| 4. The terminal client | Mostly done: every account's chats in one list with account badges, the header's account filter, bringing an account into view, and Settings, Account, Accounts (add, rename, primary, agent access, log out, remove), with adding an account opening its linking wizard. Still to do: the unread total and the tab title across accounts, and the blink marking the right account's row |
-| 5. Merged chats and a contact's own settings | The store, the two rules and the merged rows of the chat list are in. Still to do: the merged conversation, "send as" in the input, the contact card's section and the list of contacts with a sending number of their own |
+| 4. The terminal client | Done: every account's chats in one list with account badges, the header's account filter, bringing an account into view, Settings, Account, Accounts (add, rename, primary, agent access, log out, remove), adding an account opening its own linking wizard, and the unread total and tab title over all accounts. Not done: the blink marking the right account's row when a contact is on two and not merged |
+| 5. Merged chats and a contact's own settings | Done: the merged conversation with each message marked by its account, the input saying which account sends, Alt+A for the next account and Alt+Shift+A to keep it for the contact, the contact card's three settings, and the list of contacts with a sending number of their own. The planned "send as" menu on the label was left out in favour of the two keys |
 | 6. The control socket and the shell commands | Not started |
 | 7. tawk-mcp | Not started |
 | 8. Encryption, backup, doctor and logs | Not started |
