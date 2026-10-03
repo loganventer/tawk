@@ -55,6 +55,7 @@ static const ControlOpEntry OPS[] = {
     { "set_setting",            control_op_set_setting, 0 },
     { "list_themes",            control_op_list_themes, 1 },
     { "app_status",             control_op_app_status, 1 },
+    { "list_accounts",          control_op_list_accounts, 1 },
     { "reconnect",              control_op_reconnect, 0 },
     { "decline_call",           control_op_decline_call, 0 },
     { "confirm",                control_op_confirm, 0 },
@@ -180,15 +181,22 @@ static void hello(ControlServer *s, ControlSession *session, const ControlReques
         automation_manager_record(s->deps.automation, parsed, session->client, "hello", "", "", AUTOMATION_OUTCOME_CONNECTED);
     }
 
+    /* With no account open to agents the client is still greeted, and told so by an empty list. */
+    int nobody = control_serve_account(s, control_default_account(s)) != 0;
     MessagingManager *mm = s->deps.messaging;
     cJSON *r = cJSON_CreateObject();
     cJSON_AddNumberToObject(r, "protocol", CONTROL_PROTOCOL);
     cJSON_AddStringToObject(r, "tawk", APP_VERSION);
     cJSON_AddStringToObject(r, "access", automation_manager_access(s->deps.automation));
     cJSON *account = cJSON_AddObjectToObject(r, "account");
-    cJSON_AddStringToObject(account, "jid", messaging_manager_user_jid(mm));
-    cJSON_AddStringToObject(account, "name", messaging_manager_user_name(mm));
-    cJSON_AddBoolToObject(r, "connected", messaging_manager_auth_state(mm) == AUTH_STATE_CONNECTED);
+    cJSON_AddStringToObject(account, "jid", nobody ? "" : messaging_manager_user_jid(mm));
+    cJSON_AddStringToObject(account, "name", nobody ? "" : messaging_manager_user_name(mm));
+    cJSON_AddBoolToObject(r, "connected", !nobody && messaging_manager_auth_state(mm) == AUTH_STATE_CONNECTED);
+    if (s->deps.directory && s->deps.roster) {              /* this tawk serves each request from the account it names */
+        cJSON_AddBoolToObject(r, "multi_account", 1);
+        cJSON_AddItemToObject(r, "accounts", control_accounts_json(s));
+        cJSON_AddNumberToObject(r, "default_account", control_default_account(s));
+    }
     control_reply(s, session->conn, control_codec_ok(req->id, r));
 }
 
@@ -210,7 +218,9 @@ static void handle_line(ControlServer *s, int conn, const char *line) {
         for (size_t i = 0; i < sizeof(OPS) / sizeof(OPS[0]) && !entry; i++) {
             if (strcmp(OPS[i].name, req.op) == 0) entry = &OPS[i];
         }
-        if (entry) {
+        if (entry && control_request_account(s, session, &req) != 0) {
+            /* answered: it named an account it may not use */
+        } else if (entry) {
             session->requests++;
             if (entry->read) {
                 const char *chat = control_codec_string(req.args, "chat");
@@ -337,7 +347,8 @@ int control_server_tick(ControlServer *s) {
     int64_t now = clock_now_ms();
     s->changed = 0;
     follow_setting(s, now);
-    if (s->listening) automation_manager_tick(s->deps.automation);   /* the admin token follows the access setting */
+    automation_manager_admin_wanted(s->deps.automation, control_any_admin(s));
+    if (s->listening) automation_manager_tick(s->deps.automation);   /* the admin token follows the access levels */
     obey(s);
     if (s->listening) {
         ControlInbound in[INBOUND_PER_TICK];

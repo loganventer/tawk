@@ -791,7 +791,7 @@ int main(void) {
     automation = automation_manager_create(&automation_deps);
     queue = approval_queue_create();
     ControlServerDeps control_deps = { &transport, approval_queue_prompt(queue), mm, NULL, scheduling, NULL, automation,
-                                       settings_mgr, NULL, NULL, NULL, "test", "/tmp/unused.sock" };
+                                       settings_mgr, NULL, NULL, NULL, "test", "/tmp/unused.sock", NULL, NULL };
     server = control_server_create(&control_deps);
 
 

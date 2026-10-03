@@ -1,6 +1,7 @@
 #ifndef APP_CORE_AUTOMATION_ENTRY_H
 #define APP_CORE_AUTOMATION_ENTRY_H
 
+#include "core/account_id.h"
 #include <stdint.h>
 
 #include "core/automation_outcome.h"
@@ -16,6 +17,7 @@ typedef struct AutomationEntry {
     char              chat_jid[128];
     char              summary[256];    /* the start of the text sent, or the emoji */
     AutomationOutcome outcome;
+    AccountId         account;         /* which of your accounts it was about */
 } AutomationEntry;
 
 #endif

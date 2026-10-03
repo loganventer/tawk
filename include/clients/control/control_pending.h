@@ -5,6 +5,7 @@
 
 #include "cJSON.h"
 #include "clients/control/control_execute.h"
+#include "core/account_id.h"
 #include "core/control_origin.h"
 #include "core/write_kind.h"
 
@@ -24,6 +25,7 @@ typedef struct ControlPending {
     char           client[64];
     char           op[32];
     char           chat_jid[128];     /* "" when it is about no chat */
+    AccountId      account;           /* the account it was asked of, and is carried out by */
     char           action[128];       /* what you are asked: "delete the chat", "change Theme to dracula" */
     char          *text;              /* owned, may be NULL: words to send or post */
     cJSON         *args;              /* owned copy of the checked arguments */

@@ -24,9 +24,20 @@ static void record(ControlServer *s, const ControlPending *p, AutomationOutcome 
     s->changed = 1;
 }
 
+/* A session's "allow for this session" is kept for a chat of one account: the same
+ * contact on another account is asked about again. */
+static void allowance_key(const ControlPending *p, char *out, size_t size) {
+    if (p->account > ACCOUNT_ID_FIRST && p->chat_jid[0]) snprintf(out, size, "%d/%s", p->account, p->chat_jid);
+    else str_copy(out, size, p->chat_jid);
+}
+
 static void finish(ControlServer *s, const ControlPending *p, AutomationOutcome done) {
     ControlFailure failure = { "failed", "" };
-    if (p->needs_connection && !control_connected(s)) {
+    /* It may have waited while other requests were served: back to the account it was asked of. */
+    if (p->account != ACCOUNT_ID_NONE && control_serve_account(s, p->account) != 0) {
+        failure.code = "not_allowed";
+        str_copy(failure.why, sizeof(failure.why), "That account is no longer open to agents");
+    } else if (p->needs_connection && !control_connected(s)) {
         failure.code = "offline";
         str_copy(failure.why, sizeof(failure.why), "tawk is not connected to WhatsApp right now");
     }
@@ -57,12 +68,21 @@ static void carry_out(ControlServer *s, ControlPending *p, AutomationOutcome don
     finish(s, p, done);
 }
 
+/* The chat's name as you are shown it. With more than one account open to
+ * agents it starts with the account, so you see which number is being asked of. */
 static void chat_name(ControlServer *s, const char *jid, char *out, size_t size) {
     out[0] = '\0';
     if (!jid[0]) return;
+    char name[128] = "";
     const Chat *c = control_visible_chat(s, jid);
-    if (c) str_copy(out, size, c->name);
-    else messaging_manager_display_name(s->deps.messaging, jid, out, size);
+    if (c) str_copy(name, sizeof(name), c->name);
+    else messaging_manager_display_name(s->deps.messaging, jid, name, sizeof(name));
+    Account account;
+    if (control_account_count(s) > 1 && s->deps.roster && account_roster_manager_get(s->deps.roster, s->account, &account) == 0) {
+        snprintf(out, size, "[%s] %s", account.label, name);
+    } else {
+        str_copy(out, size, name);
+    }
 }
 
 /* Moves `p` to the list waiting for your answer, and asks. */
@@ -133,6 +153,7 @@ static void hold(ControlServer *s, ControlPending *p) {
 void control_write(ControlServer *s, ControlSession *session, ControlPending *p) {
     p->conn = session->conn;
     p->origin = session->origin;
+    p->account = s->account;                               /* the account this request was served by */
     str_copy(p->client, sizeof(p->client), session->client);
     if (session->paused) {
         record(s, p, AUTOMATION_OUTCOME_REFUSED);
@@ -146,6 +167,8 @@ void control_write(ControlServer *s, ControlSession *session, ControlPending *p)
         return;
     }
     int retry = 0;
+    char key[128];
+    allowance_key(p, key, sizeof(key));
     AutomationVerdict v = automation_manager_check_write(s->deps.automation, session->origin, p->kind, clock_now_ms(), &retry);
     if (v == AUTOMATION_VERDICT_REFUSE) {
         record(s, p, AUTOMATION_OUTCOME_REFUSED);
@@ -160,7 +183,7 @@ void control_write(ControlServer *s, ControlSession *session, ControlPending *p)
     } else if (p->kind == WRITE_KIND_DESTRUCTIVE) {
         hold(s, p);
         return;
-    } else if (v == AUTOMATION_VERDICT_ASK && !control_session_allows(session, p->op, p->chat_jid)) {
+    } else if (v == AUTOMATION_VERDICT_ASK && !control_session_allows(session, p->op, key)) {
         ask(s, p);
         return;
     } else if (v == AUTOMATION_VERDICT_ASK) {
@@ -247,6 +270,11 @@ void control_op_approve(ControlServer *s, ControlSession *session, const Control
         control_fail(s, session->conn, req->id, "not_allowed", "You paused this client in tawk's Agents tab");
         return;
     }
+    /* The rules that decide are those of the account the request was made of. */
+    if (p->account != ACCOUNT_ID_NONE && control_serve_account(s, p->account) != 0) {
+        control_fail(s, session->conn, req->id, "not_allowed", "That account is no longer open to agents");
+        return;
+    }
     int retry = 0;
     SelfApprovalVerdict v = automation_manager_self_approve(s->deps.automation, p->op, control_visible_chat(s, p->chat_jid),
                                                             control_codec_string(req->args, "admin_token"), clock_now_ms(), &retry);
@@ -288,7 +316,9 @@ void control_writes_tick(ControlServer *s, int64_t now_ms) {
                     p->edited = 1;
                 }
                 ControlSession *session = control_session_of(s, p->conn);
-                if (answer.remember && session && p->kind != WRITE_KIND_DESTRUCTIVE) control_session_allow(session, p->op, p->chat_jid);
+                char key[128];
+                allowance_key(p, key, sizeof(key));
+                if (answer.remember && session && p->kind != WRITE_KIND_DESTRUCTIVE) control_session_allow(session, p->op, key);
                 carry_out(s, p, AUTOMATION_OUTCOME_APPROVED);
             } else {
                 record(s, p, AUTOMATION_OUTCOME_DECLINED);

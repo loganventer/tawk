@@ -35,9 +35,33 @@ struct ControlServer {
     char                error[160];
     int64_t             next_listen_ms;       /* when to try listening again */
     int64_t             next_check_ms;        /* when to look at the socket file and unread counts */
-    uint64_t            live_seq;             /* the newest message already sent to subscribers */
+    uint64_t            live_seq;             /* the newest message already sent to subscribers, with one account */
+    /* With several accounts: the account being served now, and how far each one's live messages were sent. */
+    AccountId           account;
+    AccountId           live_accounts[ACCOUNT_MAX];
+    uint64_t            live_seqs[ACCOUNT_MAX];
     int                 changed;
 };
+
+/* ---- accounts (control_accounts.c) ---- */
+/* Serves the account a request names in "account" (an id or a label), or the
+ * default one, answering the client itself when it names one it may not use.
+ * Returns 0 once that account's managers and rules are the ones in force. */
+int   control_request_account(ControlServer *server, const ControlSession *session, const ControlRequest *req);
+/* Serves the account `id`; -1 when it is not running or closed to agents. */
+int   control_serve_account(ControlServer *server, AccountId id);
+/* The account served when a request names none: the primary one if agents may use it, else the first they may. */
+AccountId control_default_account(ControlServer *server);
+/* The accounts agents may use, as hello and list_accounts give them. */
+cJSON *control_accounts_json(ControlServer *server);
+/* Marks an event or an answer with the account being served, when there is more than one. */
+void  control_tag_account(ControlServer *server, cJSON *object);
+/* How many accounts agents may use, and the n-th of them. */
+int   control_account_count(ControlServer *server);
+AccountId control_account_at(ControlServer *server, int index);
+/* Whether any account lets an agent answer its own requests. */
+int   control_any_admin(ControlServer *server);
+void  control_op_list_accounts(ControlServer *server, ControlSession *session, const ControlRequest *req);
 
 /* ---- helpers (control_server.c) ---- */
 const Settings *control_settings(ControlServer *server);

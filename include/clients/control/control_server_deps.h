@@ -1,7 +1,9 @@
 #ifndef APP_CLIENTS_CONTROL_CONTROL_SERVER_DEPS_H
 #define APP_CLIENTS_CONTROL_CONTROL_SERVER_DEPS_H
 
+#include "clients/i_account_directory.h"
 #include "contracts/i_approval_prompt.h"
+#include "managers/account_roster_manager.h"
 #include "contracts/i_control_transport.h"
 #include "managers/account_manager.h"
 #include "managers/automation_manager.h"
@@ -28,6 +30,11 @@ typedef struct ControlServerDeps {
     CallManager        *calls;
     const char         *backend_name;
     const char         *socket_path;
+    /* The managers above are those of the account being served. With a
+     * directory and a roster, each request is served by the account it names;
+     * without them there is the one account, as there always was. */
+    IAccountDirectory  *directory;
+    AccountRosterManager *roster;
 } ControlServerDeps;
 
 #endif

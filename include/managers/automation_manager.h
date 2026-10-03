@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "core/account_id.h"
 #include "core/approval_risk.h"
 #include "core/automation_command.h"
 #include "core/automation_entry.h"
@@ -26,6 +27,15 @@ typedef struct AutomationManager AutomationManager;
 
 AutomationManager *automation_manager_create(const AutomationManagerDeps *deps);
 void               automation_manager_destroy(AutomationManager *mgr);
+
+/* Serves one of your accounts from here on: its access level ("read",
+ * "send", "manage" or "admin") and the chats an agent may answer by itself
+ * in take the place of what the settings say, and what is logged names it.
+ * A NULL access goes back to the settings, as with one account. */
+void automation_manager_serve(AutomationManager *mgr, AccountId account, const char *access, const char *self_chats);
+/* Whether any account's access is admin, so the admin token is kept for it.
+ * Until this is called the access setting alone decides. */
+void automation_manager_admin_wanted(AutomationManager *mgr, int wanted);
 
 int               automation_manager_chat_allowed(AutomationManager *mgr, const Chat *chat);
 /* The one chat `ref` names among `chats`; see chat_reference_resolve. */

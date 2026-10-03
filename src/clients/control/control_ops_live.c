@@ -89,6 +89,7 @@ static void send_message(ControlServer *s, const LiveMessageRef *ref) {
         cJSON_AddStringToObject(c, "jid", chat->jid);
         cJSON_AddStringToObject(c, "name", chat->name);
         cJSON_AddItemToObject(evt, "message", control_codec_message(&msg, name));
+        control_tag_account(s, evt);
         control_reply(s, session->conn, control_codec_event("message", evt));
     }
     if (loaded) message_dispose(&msg);
@@ -139,6 +140,7 @@ static void send_activity(ControlServer *s, const LiveMessageRef *ref) {
             }
         }
         cJSON_AddNumberToObject(evt, "at", (double)ref->at);
+        control_tag_account(s, evt);
         control_reply(s, session->conn, control_codec_event(evt_name, evt));
     }
 }
@@ -156,21 +158,50 @@ static void send_unread_changes(ControlServer *s, ControlSession *session) {
         if (!w && all[i].unread == 0) continue;
         cJSON *evt = cJSON_CreateObject();
         cJSON_AddItemToObject(evt, "chat", control_codec_chat(&all[i]));
+        control_tag_account(s, evt);
         control_reply(s, session->conn, control_codec_event("chat", evt));
         if (!w) { snapshot(s, session); return; }         /* a chat it had not seen: start over */
         w->unread = all[i].unread;
     }
 }
 
-void control_live_tick(ControlServer *s, int check_unread) {
+/* How far the live messages of the account being served were sent. Each
+ * account counts its own, so each has its own place. */
+static uint64_t *live_cursor(ControlServer *s) {
+    if (s->account == ACCOUNT_ID_NONE) return &s->live_seq;
+    int free_slot = -1;
+    for (int i = 0; i < ACCOUNT_MAX; i++) {
+        if (s->live_accounts[i] == s->account) return &s->live_seqs[i];
+        if (free_slot < 0 && s->live_accounts[i] == ACCOUNT_ID_NONE) free_slot = i;
+    }
+    if (free_slot < 0) free_slot = 0;                        /* an account that is gone gives up its place */
+    s->live_accounts[free_slot] = s->account;
+    s->live_seqs[free_slot] = 0;
+    return &s->live_seqs[free_slot];
+}
+
+/* What happened in the account being served since last time, to whoever follows it. */
+static void push_live(ControlServer *s) {
     LiveMessageRef refs[LIVE_PER_TICK];
-    int n = messaging_manager_live_since(s->deps.messaging, s->live_seq, refs, LIVE_PER_TICK);
+    uint64_t *cursor = live_cursor(s);
+    int n = messaging_manager_live_since(s->deps.messaging, *cursor, refs, LIVE_PER_TICK);
     for (int i = 0; i < n; i++) {
         if (refs[i].kind == LIVE_KIND_MESSAGE) send_message(s, &refs[i]);
         else send_activity(s, &refs[i]);
-        s->live_seq = refs[i].seq;
+        *cursor = refs[i].seq;
+    }
+}
+
+void control_live_tick(ControlServer *s, int check_unread) {
+    /* Every account agents may use is looked at in turn, each served while it is. */
+    int accounts = control_account_count(s);
+    for (int a = 0; a < accounts; a++) {
+        if (control_serve_account(s, control_account_at(s, a)) != 0) continue;
+        push_live(s);
     }
     if (!check_unread) return;
+    /* Unread counts are watched for the default account, the one a client is on when it names none. */
+    if (control_serve_account(s, control_default_account(s)) != 0) return;
     for (int i = 0; i < s->session_count; i++) {
         if (s->sessions[i].greeted && s->sessions[i].subscribed) send_unread_changes(s, &s->sessions[i]);
     }
