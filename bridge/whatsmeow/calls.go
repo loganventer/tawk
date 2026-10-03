@@ -23,7 +23,7 @@ func (s *Session) emitCall(meta types.BasicCallMeta, state string, video, group 
 	if !isSafeID(meta.CallID) {
 		return
 	}
-	emit(map[string]any{"evt": "call", "id": meta.CallID, "from": s.phoneJID(meta.From), "state": state,
+	s.emit(map[string]any{"evt": "call", "id": meta.CallID, "from": s.phoneJID(meta.From), "state": state,
 		"video": video, "group": group, "ts": meta.Timestamp.Unix()})
 }
 

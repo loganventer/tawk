@@ -17,7 +17,7 @@ const maxVoiceBytes = 16 * 1024 * 1024
 
 // sendVoice uploads an Ogg/Opus recording and sends it as a push-to-talk voice note.
 func (s *Session) sendVoice(cmd Command) {
-	fail := func() { emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "failed"}) }
+	fail := func() { s.emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "failed"}) }
 	if s.client == nil || !s.client.IsLoggedIn() || !isSafeID(cmd.ID) {
 		fail()
 		return
@@ -59,7 +59,7 @@ func (s *Session) sendVoice(cmd Command) {
 		fail()
 		return
 	}
-	emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "sent"})
+	s.emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "sent"})
 }
 
 // insideMediaDir rejects any path outside the configured media folder.

@@ -25,13 +25,13 @@ func (s *Session) postStatus(cmd Command) {
 		if err != nil {
 			out["detail"] = err.Error()
 		}
-		emit(out)
+		s.emit(out)
 	}
 	if !isSafeID(cmd.ID) {
 		return
 	}
 	if s.client == nil || !s.client.IsLoggedIn() {
-		emit(map[string]any{"evt": "status_posted", "id": cmd.ID, "ok": false, "detail": "Not connected to WhatsApp."})
+		s.emit(map[string]any{"evt": "status_posted", "id": cmd.ID, "ok": false, "detail": "Not connected to WhatsApp."})
 		return
 	}
 	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Minute)
@@ -57,7 +57,7 @@ func (s *Session) postStatus(cmd Command) {
 		}
 		msg = built
 	default:
-		emit(map[string]any{"evt": "status_posted", "id": cmd.ID, "ok": false, "detail": "Unknown kind of status."})
+		s.emit(map[string]any{"evt": "status_posted", "id": cmd.ID, "ok": false, "detail": "Unknown kind of status."})
 		return
 	}
 	resp, err := s.client.SendMessage(ctx, types.StatusBroadcastJID, msg, whatsmeow.SendRequestExtra{ID: types.MessageID(cmd.ID)})
@@ -92,5 +92,5 @@ func (s *Session) echoStatus(cmd Command, msg *waE2E.Message, at time.Time) {
 		out["ref"] = content.ref
 		out["path"] = cmd.Path
 	}
-	emit(out)
+	s.emit(out)
 }

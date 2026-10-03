@@ -17,15 +17,15 @@ func (s *Session) onEvent(raw any) {
 		if pm := evt.Message.GetProtocolMessage(); pm != nil && pm.GetKey().GetID() != "" {
 			switch pm.GetType() {
 			case waE2E.ProtocolMessage_MESSAGE_EDIT:
-				emit(map[string]any{"evt": "edit", "id": pm.GetKey().GetID(), "chat": s.phoneJID(evt.Info.Chat),
+				s.emit(map[string]any{"evt": "edit", "id": pm.GetKey().GetID(), "chat": s.phoneJID(evt.Info.Chat),
 					"text": describe(pm.GetEditedMessage()).text})
 			case waE2E.ProtocolMessage_REVOKE:
-				emit(map[string]any{"evt": "edit", "id": pm.GetKey().GetID(), "chat": s.phoneJID(evt.Info.Chat), "deleted": true})
+				s.emit(map[string]any{"evt": "edit", "id": pm.GetKey().GetID(), "chat": s.phoneJID(evt.Info.Chat), "deleted": true})
 			}
 			return
 		}
 		if r := evt.Message.GetReactionMessage(); r != nil {
-			emit(map[string]any{"evt": "reaction", "id": r.GetKey().GetID(), "chat": s.phoneJID(evt.Info.Chat),
+			s.emit(map[string]any{"evt": "reaction", "id": r.GetKey().GetID(), "chat": s.phoneJID(evt.Info.Chat),
 				"sender": s.phoneJID(evt.Info.Sender), "emoji": r.GetText()})
 			return
 		}
@@ -38,7 +38,7 @@ func (s *Session) onEvent(raw any) {
 				state = "recording"
 			}
 		}
-		emit(map[string]any{"evt": "typing", "chat": s.phoneJID(evt.Chat), "sender": s.phoneJID(evt.Sender), "state": state})
+		s.emit(map[string]any{"evt": "typing", "chat": s.phoneJID(evt.Chat), "sender": s.phoneJID(evt.Sender), "state": state})
 	case *events.CallOffer:
 		s.emitCallOffer(evt)
 	case *events.CallOfferNotice:
@@ -50,16 +50,16 @@ func (s *Session) onEvent(raw any) {
 	case *events.Blocklist:
 		go s.publishBlocklist()
 	case *events.Picture:
-		emit(map[string]any{"evt": "picture_changed", "jid": s.phoneJID(evt.JID)})
+		s.emit(map[string]any{"evt": "picture_changed", "jid": s.phoneJID(evt.JID)})
 	case *events.DeleteChat:
-		emit(map[string]any{"evt": "chat_removed", "jid": s.phoneJID(evt.JID)})
+		s.emit(map[string]any{"evt": "chat_removed", "jid": s.phoneJID(evt.JID)})
 	case *events.DeleteForMe:
 		if isSafeID(evt.MessageID) {
-			emit(map[string]any{"evt": "removed", "id": evt.MessageID, "chat": s.phoneJID(evt.ChatJID)})
+			s.emit(map[string]any{"evt": "removed", "id": evt.MessageID, "chat": s.phoneJID(evt.ChatJID)})
 		}
 	case *events.Archive:
 		if evt.Action != nil {
-			emit(map[string]any{"evt": "chat", "jid": s.phoneJID(evt.JID), "unread": -1, "archived": evt.Action.GetArchived()})
+			s.emit(map[string]any{"evt": "chat", "jid": s.phoneJID(evt.JID), "unread": -1, "archived": evt.Action.GetArchived()})
 		}
 	case *events.HistorySync:
 		go s.emitHistory(evt)
@@ -73,7 +73,7 @@ func (s *Session) onEvent(raw any) {
 		}
 		if status != "" && evt.IsFromMe == false {
 			for _, id := range evt.MessageIDs {
-				emit(map[string]any{"evt": "status", "id": string(s.edits.Resolve(id)), "status": status})
+				s.emit(map[string]any{"evt": "status", "id": string(s.edits.Resolve(id)), "status": status})
 			}
 		}
 		// Who got how far with each message, for the message info panel.
@@ -89,7 +89,7 @@ func (s *Session) onEvent(raw any) {
 		if kind != "" && !evt.IsFromMe {
 			by := s.phoneJID(evt.Sender.ToNonAD())
 			for _, id := range evt.MessageIDs {
-				emit(map[string]any{"evt": "receipt", "id": string(s.edits.Resolve(id)), "by": by, "kind": kind, "at": evt.Timestamp.Unix()})
+				s.emit(map[string]any{"evt": "receipt", "id": string(s.edits.Resolve(id)), "by": by, "kind": kind, "at": evt.Timestamp.Unix()})
 			}
 		}
 	case *events.Connected:
@@ -100,47 +100,47 @@ func (s *Session) onEvent(raw any) {
 			jid = s.client.Store.ID.ToNonAD().String()
 			name = s.client.Store.PushName
 		}
-		emit(map[string]any{"evt": "connected", "jid": jid, "name": name})
-		emit(map[string]any{"evt": "connection", "reason": "open", "detail": "Connected"})
+		s.emit(map[string]any{"evt": "connected", "jid": jid, "name": name})
+		s.emit(map[string]any{"evt": "connection", "reason": "open", "detail": "Connected"})
 		go func() {
 			s.emitStoredAliases()
 			s.syncDirectory()
 			s.publishBlocklist()
 		}()
 	case *events.Disconnected:
-		emitClosed("closed", "The connection to WhatsApp dropped.")
+		s.emitClosed("closed", "The connection to WhatsApp dropped.")
 	case *events.KeepAliveTimeout:
 		// With auto-reconnect off, whatsmeow keeps a socket whose pings go
 		// unanswered open forever (typically after a network change), so
 		// close it here once and let the C side dial again.
 		if evt.ErrorCount >= 3 && s.dropped.CompareAndSwap(false, true) {
 			go s.client.Disconnect()
-			emitClosed("closed", "WhatsApp stopped answering keep-alive pings.")
+			s.emitClosed("closed", "WhatsApp stopped answering keep-alive pings.")
 		}
 	case *events.KeepAliveRestored:
 		if !s.dropped.Load() {
-			emit(map[string]any{"evt": "connection", "reason": "open", "detail": "Connected"})
+			s.emit(map[string]any{"evt": "connection", "reason": "open", "detail": "Connected"})
 		}
 	case *events.StreamReplaced:
-		emitClosed("replaced", "Another WhatsApp Web session took over this login.")
+		s.emitClosed("replaced", "Another WhatsApp Web session took over this login.")
 	case *events.LoggedOut:
 		s.client = nil
-		emit(map[string]any{"evt": "logged_out"})
+		s.emit(map[string]any{"evt": "logged_out"})
 	case *events.TemporaryBan:
-		emitClosed("banned", "WhatsApp temporarily blocked this account: "+evt.String())
+		s.emitClosed("banned", "WhatsApp temporarily blocked this account: "+evt.String())
 	case *events.ClientOutdated:
-		emitClosed("outdated", "WhatsApp rejected this client version; update tawk.")
+		s.emitClosed("outdated", "WhatsApp rejected this client version; update tawk.")
 	case *events.ConnectFailure:
-		emitClosed("error", "WhatsApp refused the connection: "+evt.Reason.String())
+		s.emitClosed("error", "WhatsApp refused the connection: "+evt.Reason.String())
 	case *events.PushName:
-		emit(map[string]any{"evt": "contact", "jid": s.phoneJID(evt.JID), "push_name": evt.NewPushName})
+		s.emit(map[string]any{"evt": "contact", "jid": s.phoneJID(evt.JID), "push_name": evt.NewPushName})
 	case *events.Contact:
 		if evt.Action != nil {
-			emit(map[string]any{"evt": "contact", "jid": s.phoneJID(evt.JID), "name": evt.Action.GetFullName()})
+			s.emit(map[string]any{"evt": "contact", "jid": s.phoneJID(evt.JID), "name": evt.Action.GetFullName()})
 		}
 	case *events.GroupInfo:
 		if evt.Name != nil {
-			emit(map[string]any{"evt": "chat", "jid": evt.JID.String(), "name": evt.Name.Name, "unread": -1})
+			s.emit(map[string]any{"evt": "chat", "jid": evt.JID.String(), "name": evt.Name.Name, "unread": -1})
 		}
 	}
 }
@@ -221,7 +221,7 @@ func (s *Session) emitMessage(evt *events.Message, live bool) {
 		out["mentions"] = mentions
 		out["mentions_me"] = me
 	}
-	emit(out)
+	s.emit(out)
 	if live && !evt.Info.IsFromMe {
 		s.unread.Add(evt.Info.Chat.String(), evt.Info.Sender.String(), evt.Info.ID)
 	}
@@ -249,7 +249,7 @@ func (s *Session) emitHistory(evt *events.HistorySync) {
 		if err != nil {
 			continue
 		}
-		emit(map[string]any{
+		s.emit(map[string]any{
 			"evt":      "chat",
 			"jid":      s.phoneJID(jid),
 			"name":     conv.GetName(),
@@ -285,12 +285,12 @@ func (s *Session) syncDirectory() {
 	}
 	if groups, err := s.client.GetJoinedGroups(ctx); err == nil {
 		for _, g := range groups {
-			emit(map[string]any{"evt": "chat", "jid": g.JID.String(), "name": g.Name, "unread": -1})
+			s.emit(map[string]any{"evt": "chat", "jid": g.JID.String(), "name": g.Name, "unread": -1})
 		}
 	}
 	if contacts, err := s.client.Store.Contacts.GetAllContacts(ctx); err == nil {
 		for jid, c := range contacts {
-			emit(map[string]any{"evt": "contact", "jid": s.phoneJID(jid), "name": c.FullName, "push_name": c.PushName})
+			s.emit(map[string]any{"evt": "contact", "jid": s.phoneJID(jid), "name": c.FullName, "push_name": c.PushName})
 		}
 	}
 }

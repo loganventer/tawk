@@ -13,7 +13,7 @@ import (
 var errNotConnected = errors.New("not connected to WhatsApp")
 
 // profileUpdated reports how a change to your own profile went.
-func profileUpdated(field string, err error, extra map[string]any) {
+func (s *Session) profileUpdated(field string, err error, extra map[string]any) {
 	out := map[string]any{"evt": "profile_updated", "field": field, "ok": err == nil}
 	if err != nil {
 		out["detail"] = err.Error()
@@ -21,7 +21,7 @@ func profileUpdated(field string, err error, extra map[string]any) {
 	for k, v := range extra {
 		out[k] = v
 	}
-	emit(out)
+	s.emit(out)
 }
 
 // ownJID is the linked account's phone-number JID, "" before linking.
@@ -34,7 +34,7 @@ func (s *Session) ownJID() string {
 
 func (s *Session) accountReady(field string) bool {
 	if s.client == nil || !s.client.IsLoggedIn() {
-		profileUpdated(field, errNotConnected, nil)
+		s.profileUpdated(field, errNotConnected, nil)
 		return false
 	}
 	return true
@@ -49,12 +49,12 @@ func (s *Session) setName(cmd Command) {
 	ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
 	defer cancel()
 	if err := s.client.SendAppState(ctx, appstate.BuildSettingPushName(cmd.PushName)); err != nil {
-		profileUpdated("name", err, nil)
+		s.profileUpdated("name", err, nil)
 		return
 	}
 	s.client.Store.PushName = cmd.PushName
 	_ = s.client.Store.Save(ctx)
-	profileUpdated("name", nil, map[string]any{"name": cmd.PushName})
+	s.profileUpdated("name", nil, map[string]any{"name": cmd.PushName})
 }
 
 // setAbout changes the about text on your profile.
@@ -66,10 +66,10 @@ func (s *Session) setAbout(cmd Command) {
 	defer cancel()
 	text := cmd.Text
 	if err := s.client.SetStatusMessage(ctx, types.SetStatusInput{Text: &text}); err != nil {
-		profileUpdated("about", err, nil)
+		s.profileUpdated("about", err, nil)
 		return
 	}
-	profileUpdated("about", nil, nil)
+	s.profileUpdated("about", nil, nil)
 	s.profile(Command{JID: s.ownJID()})
 }
 
@@ -81,18 +81,18 @@ func (s *Session) setPicture(cmd Command) {
 		return
 	}
 	if !s.insideMediaDir(cmd.Path) {
-		profileUpdated("picture", errMediaFile, nil)
+		s.profileUpdated("picture", errMediaFile, nil)
 		return
 	}
 	f, err := os.Open(cmd.Path)
 	if err != nil {
-		profileUpdated("picture", errMediaFile, nil)
+		s.profileUpdated("picture", errMediaFile, nil)
 		return
 	}
 	jpeg, err := avatarJPEG(f)
 	f.Close()
 	if err != nil {
-		profileUpdated("picture", err, nil)
+		s.profileUpdated("picture", err, nil)
 		return
 	}
 	s.changePicture(jpeg)
@@ -110,11 +110,11 @@ func (s *Session) changePicture(jpeg []byte) {
 	ctx, cancel := context.WithTimeout(s.ctx, 60*time.Second)
 	defer cancel()
 	if _, err := s.client.SetGroupPhoto(ctx, types.EmptyJID, jpeg); err != nil {
-		profileUpdated("picture", err, nil)
+		s.profileUpdated("picture", err, nil)
 		return
 	}
-	profileUpdated("picture", nil, nil)
+	s.profileUpdated("picture", nil, nil)
 	if jid := s.ownJID(); jid != "" {
-		emit(map[string]any{"evt": "picture_changed", "jid": jid})
+		s.emit(map[string]any{"evt": "picture_changed", "jid": jid})
 	}
 }

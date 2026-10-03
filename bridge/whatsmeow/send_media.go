@@ -10,7 +10,7 @@ import (
 
 // sendMedia uploads a dropped file and sends it as a photo, video, audio file or document.
 func (s *Session) sendMedia(cmd Command) {
-	fail := func() { emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "failed"}) }
+	fail := func() { s.emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "failed"}) }
 	if s.client == nil || !s.client.IsLoggedIn() || !isSafeID(cmd.ID) || !s.insideMediaDir(cmd.Path) {
 		fail()
 		return
@@ -34,5 +34,5 @@ func (s *Session) sendMedia(cmd Command) {
 		fail()
 		return
 	}
-	emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "sent"})
+	s.emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "sent"})
 }

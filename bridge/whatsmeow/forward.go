@@ -14,7 +14,7 @@ import (
 // download reference) to another chat, marked as forwarded, without
 // downloading or uploading it.
 func (s *Session) forwardMedia(cmd Command) {
-	fail := func() { emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "failed"}) }
+	fail := func() { s.emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "failed"}) }
 	if s.client == nil || !s.client.IsLoggedIn() || !isSafeID(cmd.ID) {
 		fail()
 		return
@@ -52,7 +52,7 @@ func (s *Session) forwardMedia(cmd Command) {
 		fail()
 		return
 	}
-	emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "sent"})
+	s.emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "sent"})
 }
 
 // markForwarded sets the "Forwarded" mark on whatever the message carries,

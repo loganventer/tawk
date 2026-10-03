@@ -31,6 +31,8 @@ func init() {
 
 // Session owns the whatsmeow client and serialises every command on one goroutine.
 type Session struct {
+	// id names this session to the C side: every event it sends carries it.
+	id        int
 	cfg       Config
 	container *sqlstore.Container
 	client    *whatsmeow.Client
@@ -54,7 +56,7 @@ type Session struct {
 const connectTimeout = 30 * time.Second
 
 // NewSession opens the login store and starts the command loop.
-func NewSession(cfg Config) (*Session, error) {
+func NewSession(handle int, cfg Config) (*Session, error) {
 	if err := os.MkdirAll(cfg.AuthDir, 0o700); err != nil {
 		return nil, err
 	}
@@ -67,7 +69,7 @@ func NewSession(cfg Config) (*Session, error) {
 	// Never log to stdout or stderr: they belong to the terminal UI.
 	log := waLog.Noop
 	if cfg.Debug {
-		path := filepath.Join(cfg.LogDir, "whatsmeow.log")
+		path := filepath.Join(cfg.LogDir, logName(handle))
 		if f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600); err == nil {
 			log = waLog.Zerolog(zerolog.New(f).With().Timestamp().Logger().Level(zerolog.InfoLevel))
 		}
@@ -84,6 +86,7 @@ func NewSession(cfg Config) (*Session, error) {
 		return nil, err
 	}
 	s := &Session{
+		id:        handle,
 		cfg:       cfg,
 		container: container,
 		log:       log,
@@ -96,6 +99,20 @@ func NewSession(cfg Config) (*Session, error) {
 	s.wg.Add(1)
 	go s.loop()
 	return s, nil
+}
+
+// logName gives each session its own debug log. The first keeps the name it
+// always had.
+func logName(handle int) string {
+	if handle <= 1 {
+		return "whatsmeow.log"
+	}
+	return fmt.Sprintf("whatsmeow-%d.log", handle)
+}
+
+// emit sends one protocol event to the C side, marked as this session's.
+func (s *Session) emit(event map[string]any) {
+	emitTo(s.id, event)
 }
 
 // Enqueue hands a command to the session loop without blocking the caller.
@@ -133,7 +150,7 @@ func (s *Session) loop() {
 func (s *Session) handle(cmd Command) {
 	defer func() {
 		if r := recover(); r != nil {
-			emit(map[string]any{"evt": "error", "detail": fmt.Sprintf("Internal error handling %s", cmd.Cmd)})
+			s.emit(map[string]any{"evt": "error", "detail": fmt.Sprintf("Internal error handling %s", cmd.Cmd)})
 		}
 	}()
 	switch cmd.Cmd {
@@ -216,7 +233,7 @@ func (s *Session) ensureClient() error {
 
 func (s *Session) connect(freshQR bool) {
 	if err := s.ensureClient(); err != nil {
-		emitClosed("error", "Could not load the login store: "+err.Error())
+		s.emitClosed("error", "Could not load the login store: "+err.Error())
 		return
 	}
 	stale := s.dropped.Load() || (s.client.Store.ID != nil && !s.client.IsLoggedIn())
@@ -225,15 +242,15 @@ func (s *Session) connect(freshQR bool) {
 	}
 	if s.client.IsConnected() {
 		if s.client.IsLoggedIn() {
-			emit(map[string]any{"evt": "connection", "reason": "open", "detail": "Connected"})
+			s.emit(map[string]any{"evt": "connection", "reason": "open", "detail": "Connected"})
 		}
 		return
 	}
 	if s.client.Store.ID == nil {
-		emit(map[string]any{"evt": "auth_required"})
+		s.emit(map[string]any{"evt": "auth_required"})
 		s.startQR()
 	}
-	emit(map[string]any{"evt": "connection", "reason": "connecting", "detail": "Connecting to WhatsApp"})
+	s.emit(map[string]any{"evt": "connection", "reason": "connecting", "detail": "Connecting to WhatsApp"})
 	// The socket lives in the context it was dialled with, so the deadline
 	// cancels it only while the dial and handshake are still running.
 	if s.connCancel != nil {
@@ -248,7 +265,7 @@ func (s *Session) connect(freshQR bool) {
 	}
 	if err != nil {
 		cancel()
-		emitClosed("error", "Could not reach WhatsApp: "+err.Error())
+		s.emitClosed("error", "Could not reach WhatsApp: "+err.Error())
 		return
 	}
 	s.dropped.Store(false)
@@ -282,14 +299,14 @@ func (s *Session) startQR() {
 		for item := range qrChan {
 			switch item.Event {
 			case "code":
-				emit(map[string]any{"evt": "qr", "ascii": renderQR(item.Code)})
+				s.emit(map[string]any{"evt": "qr", "ascii": renderQR(item.Code)})
 			case "timeout":
-				emitClosed("qr_timeout", "The QR code expired. Press R for a new one.")
+				s.emitClosed("qr_timeout", "The QR code expired. Press R for a new one.")
 			case "success":
 				return
 			default:
 				if item.Error != nil {
-					emit(map[string]any{"evt": "error", "detail": "Pairing failed: " + item.Error.Error()})
+					s.emit(map[string]any{"evt": "error", "detail": "Pairing failed: " + item.Error.Error()})
 				}
 			}
 		}
@@ -299,7 +316,7 @@ func (s *Session) startQR() {
 func (s *Session) pair(phone string) {
 	digits := onlyDigits(phone)
 	if len(digits) < 8 || len(digits) > 15 {
-		emit(map[string]any{"evt": "error", "detail": "Enter the full number with country code, e.g. 27821234567."})
+		s.emit(map[string]any{"evt": "error", "detail": "Enter the full number with country code, e.g. 27821234567."})
 		return
 	}
 	// WhatsApp closes the login websocket 160 seconds after the QR session
@@ -318,10 +335,10 @@ func (s *Session) pair(phone string) {
 		}
 	}
 	if err != nil {
-		emit(map[string]any{"evt": "error", "detail": "Could not get a pairing code: " + err.Error()})
+		s.emit(map[string]any{"evt": "error", "detail": "Could not get a pairing code: " + err.Error()})
 		return
 	}
-	emit(map[string]any{"evt": "pairing_code", "code": code})
+	s.emit(map[string]any{"evt": "pairing_code", "code": code})
 }
 
 // freshLoginSocket reconnects with a new QR session and waits until the
@@ -340,12 +357,12 @@ func (s *Session) freshLoginSocket() error {
 
 func (s *Session) send(cmd Command) {
 	if s.client == nil || !s.client.IsLoggedIn() {
-		emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "failed"})
+		s.emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "failed"})
 		return
 	}
 	jid, err := types.ParseJID(cmd.JID)
 	if err != nil || len(cmd.Text) == 0 || len(cmd.Text) > 65536 {
-		emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "failed"})
+		s.emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "failed"})
 		return
 	}
 	text := cmd.Text
@@ -398,16 +415,16 @@ func (s *Session) send(cmd Command) {
 		extra.ID = types.MessageID(cmd.ID)
 	}
 	if _, err := s.client.SendMessage(s.ctx, jid, msg, extra); err != nil {
-		emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "failed"})
+		s.emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "failed"})
 		return
 	}
-	emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "sent"})
+	s.emit(map[string]any{"evt": "status", "id": cmd.ID, "status": "sent"})
 	if preview != nil {
 		link := map[string]any{"evt": "link", "id": cmd.ID, "url": preview.URL, "title": preview.Title, "desc": preview.Description}
 		if len(preview.Thumb) > 0 {
 			link["thumb"] = base64.StdEncoding.EncodeToString(preview.Thumb)
 		}
-		emit(link)
+		s.emit(link)
 	}
 }
 
@@ -420,11 +437,11 @@ func (s *Session) logout() {
 		_ = s.client.Store.Delete(s.ctx)
 	}
 	s.client = nil
-	emit(map[string]any{"evt": "logged_out"})
+	s.emit(map[string]any{"evt": "logged_out"})
 }
 
-func emitClosed(reason, detail string) {
-	emit(map[string]any{"evt": "connection", "reason": reason, "detail": detail})
+func (s *Session) emitClosed(reason, detail string) {
+	s.emit(map[string]any{"evt": "connection", "reason": reason, "detail": detail})
 }
 
 func onlyDigits(s string) string {

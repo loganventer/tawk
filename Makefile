@@ -256,7 +256,8 @@ TESTS := $(BUILD)/tests/pty_idle_action_test $(BUILD)/tests/ncurses_mouse_queue_
          $(BUILD)/tests/status_answer_test $(BUILD)/tests/message_search_test \
          $(BUILD)/tests/control_transport_test $(BUILD)/tests/control_protocol_test $(BUILD)/tests/status_photo_viewer_test \
          $(BUILD)/tests/status_auto_advance_test $(BUILD)/tests/message_window_test \
-         $(BUILD)/tests/chat_toggle_test $(BUILD)/tests/account_store_test
+         $(BUILD)/tests/chat_toggle_test $(BUILD)/tests/account_store_test \
+         $(BUILD)/tests/whatsmeow_sessions_test
 
 test: $(TESTS)
 	$(call say,Running tests)
@@ -344,6 +345,10 @@ $(BUILD)/tests/control_transport_test: $(BUILD)/tests/control_transport_test.o $
 	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
 
 $(BUILD)/tests/control_protocol_test: $(BUILD)/tests/control_protocol_test.o $(filter-out $(BUILD)/src/main.o,$(OBJ)) $(LINK_WM)
+	$(call step,LD,$@)
+	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
+
+$(BUILD)/tests/whatsmeow_sessions_test: $(BUILD)/tests/whatsmeow_sessions_test.o $(filter-out $(BUILD)/src/main.o,$(OBJ)) $(LINK_WM)
 	$(call step,LD,$@)
 	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
 

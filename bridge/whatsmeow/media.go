@@ -86,7 +86,7 @@ func extensionFor(mime, kind string) string {
 
 func (s *Session) download(cmd Command) {
 	fail := func(detail string) {
-		emit(map[string]any{"evt": "error", "id": cmd.ID, "detail": detail})
+		s.emit(map[string]any{"evt": "error", "id": cmd.ID, "detail": detail})
 	}
 	if !isSafeID(cmd.ID) {
 		fail("Invalid message id.")
@@ -118,5 +118,5 @@ func (s *Session) download(cmd Command) {
 		fail("Could not save media: " + err.Error())
 		return
 	}
-	emit(map[string]any{"evt": "media", "id": cmd.ID, "path": path})
+	s.emit(map[string]any{"evt": "media", "id": cmd.ID, "path": path})
 }

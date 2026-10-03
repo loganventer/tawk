@@ -64,7 +64,7 @@ func (s *Session) profile(cmd Command) {
 			out["business"] = map[string]any{"address": biz.Address, "email": biz.Email, "category": strings.Join(categories, ", ")}
 		}
 	}
-	emit(out)
+	s.emit(out)
 }
 
 // picture downloads a contact's or group's profile picture (the small
@@ -82,7 +82,7 @@ func (s *Session) picture(cmd Command) {
 	defer cancel()
 	info, err := s.client.GetProfilePictureInfo(ctx, jid, &whatsmeow.GetProfilePictureParams{Preview: !full})
 	if err != nil || info == nil || info.URL == "" {
-		emit(map[string]any{"evt": "picture", "jid": cmd.JID, "full": full, "none": true})
+		s.emit(map[string]any{"evt": "picture", "jid": cmd.JID, "full": full, "none": true})
 		return
 	}
 	sum := sha256.Sum256([]byte(cmd.JID))
@@ -96,7 +96,7 @@ func (s *Session) picture(cmd Command) {
 			return
 		}
 	}
-	emit(map[string]any{"evt": "picture", "jid": cmd.JID, "full": full, "path": path, "id": info.ID})
+	s.emit(map[string]any{"evt": "picture", "jid": cmd.JID, "full": full, "path": path, "id": info.ID})
 }
 
 func safeName(s string) string {
@@ -182,5 +182,5 @@ func (s *Session) emitBlocklist(jids []types.JID) {
 	for _, j := range jids {
 		out = append(out, s.phoneJID(j))
 	}
-	emit(map[string]any{"evt": "blocklist", "jids": out})
+	s.emit(map[string]any{"evt": "blocklist", "jids": out})
 }

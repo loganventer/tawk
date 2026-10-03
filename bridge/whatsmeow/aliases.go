@@ -15,11 +15,11 @@ import (
 // anything it had stored under the LID.
 
 // emitAlias reports lid -> pn when both halves have the expected servers.
-func emitAlias(lid, pn types.JID) {
+func (s *Session) emitAlias(lid, pn types.JID) {
 	if lid.Server != types.HiddenUserServer || pn.Server != types.DefaultUserServer || lid.User == "" || pn.User == "" {
 		return
 	}
-	emit(map[string]any{"evt": "alias", "lid": lid.ToNonAD().String(), "pn": pn.ToNonAD().String()})
+	s.emit(map[string]any{"evt": "alias", "lid": lid.ToNonAD().String(), "pn": pn.ToNonAD().String()})
 }
 
 // rememberAlias stores a mapping learnt from message metadata so later
@@ -31,7 +31,7 @@ func (s *Session) rememberAlias(lid, pn types.JID) {
 	if s.client != nil {
 		_ = s.client.Store.LIDs.PutLIDMapping(context.Background(), lid.ToNonAD(), pn.ToNonAD())
 	}
-	emitAlias(lid, pn)
+	s.emitAlias(lid, pn)
 }
 
 // emitStoredAliases reports every mapping whatsmeow has persisted, which
@@ -50,7 +50,7 @@ func (s *Session) emitStoredAliases() {
 	for rows.Next() {
 		var lid, pn string
 		if rows.Scan(&lid, &pn) == nil {
-			emitAlias(types.NewJID(lid, types.HiddenUserServer), types.NewJID(pn, types.DefaultUserServer))
+			s.emitAlias(types.NewJID(lid, types.HiddenUserServer), types.NewJID(pn, types.DefaultUserServer))
 		}
 	}
 }
@@ -63,7 +63,7 @@ func (s *Session) storeHistoryMappings(pairs [][2]types.JID) {
 	mappings := make([]store.LIDMapping, 0, len(pairs))
 	for _, p := range pairs {
 		mappings = append(mappings, store.LIDMapping{LID: p[0], PN: p[1]})
-		emitAlias(p[0], p[1])
+		s.emitAlias(p[0], p[1])
 	}
 	_ = s.client.Store.LIDs.PutManyLIDMappings(context.Background(), mappings)
 }
