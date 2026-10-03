@@ -112,12 +112,12 @@ static void test_manager(const char *dir) {
     gw.forward_media = fake_forward_media;
     INotifier notifier = { NULL, fake_notify, NULL };
     EventQueue *events = event_queue_create(16);
-    IMessageStore *messages = sqlite_message_store_create(db);
-    IChatStore *chats = sqlite_chat_store_create(db);
-    IContactStore *contacts = sqlite_contact_store_create(db);
-    IJidAliasStore *aliases = sqlite_jid_alias_store_create(db);
-    IReactionStore *reactions = sqlite_reaction_store_create(db);
-    IReceiptStore *receipts = sqlite_receipt_store_create(db);
+    IMessageStore *messages = sqlite_message_store_create(db, ACCOUNT_ID_FIRST);
+    IChatStore *chats = sqlite_chat_store_create(db, ACCOUNT_ID_FIRST);
+    IContactStore *contacts = sqlite_contact_store_create(db, ACCOUNT_ID_FIRST);
+    IJidAliasStore *aliases = sqlite_jid_alias_store_create(db, ACCOUNT_ID_FIRST);
+    IReactionStore *reactions = sqlite_reaction_store_create(db, ACCOUNT_ID_FIRST);
+    IReceiptStore *receipts = sqlite_receipt_store_create(db, ACCOUNT_ID_FIRST);
     IChatExporter *exporter = text_chat_exporter_create();
     MessagingManagerDeps deps = { &gw, messages, chats, contacts, aliases, reactions, receipts, &notifier, events,
                                   &settings, NULL, exporter, NULL, NULL };

@@ -52,7 +52,7 @@ int main(void) {
     sqlite3 *db = sqlite_database_open(path, NULL);
     CHECK(db != NULL, "the database opens on this SQLite, with or without FTS5");
     if (!db) return 1;
-    IMessageStore *s = sqlite_message_store_create(db);
+    IMessageStore *s = sqlite_message_store_create(db, ACCOUNT_ID_FIRST);
     save(s, "A", "Hello world, see you at the braai", 100);
     save(s, "B", "Worldwide shipping is 50% off", 200);
     CHECK(found(s, "hello wor", "A") && !found(s, "hello wor", "B"), "every word must match");
@@ -72,7 +72,7 @@ int main(void) {
     db = sqlite_database_open(path, NULL);
     CHECK(db != NULL, "the database opens again");
     if (db) {
-        s = sqlite_message_store_create(db);
+        s = sqlite_message_store_create(db, ACCOUNT_ID_FIRST);
         CHECK(found(s, "late braai", "C"), "messages saved without the index are found after it returns");
         s->destroy(s);
         sqlite_database_close(db);

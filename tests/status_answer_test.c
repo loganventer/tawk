@@ -79,12 +79,12 @@ static void test_protocol(void) {
 
 static MessagingManager *manager(IMessageGateway *gw, IStatusLiker *liker, sqlite3 *db, Settings *settings,
                                  INotifier *notifier, EventQueue *events, void *stores[7]) {
-    IMessageStore *messages = sqlite_message_store_create(db);
-    IChatStore *chats = sqlite_chat_store_create(db);
-    IContactStore *contacts = sqlite_contact_store_create(db);
-    IJidAliasStore *aliases = sqlite_jid_alias_store_create(db);
-    IReactionStore *reactions = sqlite_reaction_store_create(db);
-    IReceiptStore *receipts = sqlite_receipt_store_create(db);
+    IMessageStore *messages = sqlite_message_store_create(db, ACCOUNT_ID_FIRST);
+    IChatStore *chats = sqlite_chat_store_create(db, ACCOUNT_ID_FIRST);
+    IContactStore *contacts = sqlite_contact_store_create(db, ACCOUNT_ID_FIRST);
+    IJidAliasStore *aliases = sqlite_jid_alias_store_create(db, ACCOUNT_ID_FIRST);
+    IReactionStore *reactions = sqlite_reaction_store_create(db, ACCOUNT_ID_FIRST);
+    IReceiptStore *receipts = sqlite_receipt_store_create(db, ACCOUNT_ID_FIRST);
     IChatExporter *exporter = text_chat_exporter_create();
     void *all[7] = { messages, chats, contacts, aliases, reactions, receipts, exporter };
     memcpy(stores, all, sizeof(all));

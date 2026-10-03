@@ -1,4 +1,5 @@
 #include "resource_access/sqlite_message_store.h"
+#include "resource_access/sqlite_account_scope.h"
 #include "utilities/log.h"
 #include "utilities/str_util.h"
 
@@ -10,7 +11,8 @@
                 "quoted_id, quoted_sender, quoted_text, thumbnail, edited, deleted, " \
                 "mentions, mentions_me, forwarded, link_url, link_title, link_desc, quoted_status"
 
-static sqlite3 *db_of(IMessageStore *self) { return (sqlite3 *)self->ctx; }
+static SqliteAccountScope *scope_of(IMessageStore *self) { return (SqliteAccountScope *)self->ctx; }
+static sqlite3 *db_of(IMessageStore *self) { return scope_of(self)->db; }
 
 static int exec_step(sqlite3 *db, sqlite3_stmt *stmt) {
     int rc = sqlite3_step(stmt);
@@ -51,8 +53,8 @@ static void read_row(sqlite3_stmt *st, Message *m) {
 static int store_save(IMessageStore *self, const Message *m) {
     sqlite3_stmt *st = NULL;
     const char *sql =
-        "INSERT INTO messages (" COLUMNS ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
-        "ON CONFLICT(id) DO UPDATE SET "
+        "INSERT INTO messages (" COLUMNS ", account_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,{acct}) "
+        "ON CONFLICT(account_id, id) DO UPDATE SET "
         " text = COALESCE(excluded.text, text),"
         " media_ref = COALESCE(excluded.media_ref, media_ref),"
         " media_path = CASE WHEN excluded.media_path <> '' THEN excluded.media_path ELSE media_path END,"
@@ -74,7 +76,7 @@ static int store_save(IMessageStore *self, const Message *m) {
         " link_title = COALESCE(excluded.link_title, link_title),"
         " link_desc = COALESCE(excluded.link_desc, link_desc),"
         " quoted_status = MAX(quoted_status, excluded.quoted_status)";
-    if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, m->id, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 2, m->chat_jid, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 3, m->sender_jid, -1, SQLITE_TRANSIENT);
@@ -113,9 +115,9 @@ static int select_page(IMessageStore *self, const char *jid, int64_t before, int
     *count = 0;
     sqlite3_stmt *st = NULL;
     const char *sql = before > 0
-        ? "SELECT " COLUMNS " FROM messages WHERE chat_jid = ? AND ts < ? ORDER BY ts DESC, rowid DESC LIMIT ? OFFSET ?"
-        : "SELECT " COLUMNS " FROM messages WHERE chat_jid = ? ORDER BY ts DESC, rowid DESC LIMIT ? OFFSET ?";
-    if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return -1;
+        ? "SELECT " COLUMNS " FROM messages WHERE account_id = {acct} AND chat_jid = ? AND ts < ? ORDER BY ts DESC, rowid DESC LIMIT ? OFFSET ?"
+        : "SELECT " COLUMNS " FROM messages WHERE account_id = {acct} AND chat_jid = ? ORDER BY ts DESC, rowid DESC LIMIT ? OFFSET ?";
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) return -1;
     int arg = 1;
     sqlite3_bind_text(st, arg++, jid, -1, SQLITE_TRANSIENT);
     if (before > 0) sqlite3_bind_int64(st, arg++, before);
@@ -161,7 +163,7 @@ static int store_before(IMessageStore *self, const char *jid, int64_t before, in
 
 static int store_get(IMessageStore *self, const char *id, Message *out) {
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), "SELECT " COLUMNS " FROM messages WHERE id = ?", -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), "SELECT " COLUMNS " FROM messages WHERE account_id = {acct} AND id = ?", &st) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, id, -1, SQLITE_TRANSIENT);
     int found = sqlite3_step(st) == SQLITE_ROW;
     if (found) read_row(st, out);
@@ -174,9 +176,9 @@ static int store_update_status(IMessageStore *self, const char *id, MessageStatu
     /* Ticks only move forward, except that a retry (pending) or any
      * progress replaces a failure. */
     const char *sql = status == MESSAGE_STATUS_FAILED
-        ? "UPDATE messages SET status = ? WHERE id = ?"
-        : "UPDATE messages SET status = CASE WHEN status = 4 THEN ?1 ELSE MAX(status, ?1) END WHERE id = ?2";
-    if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return -1;
+        ? "UPDATE messages SET status = ? WHERE account_id = {acct} AND id = ?"
+        : "UPDATE messages SET status = CASE WHEN status = 4 THEN ?1 ELSE MAX(status, ?1) END WHERE account_id = {acct} AND id = ?2";
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) return -1;
     sqlite3_bind_int(st, 1, status);
     sqlite3_bind_text(st, 2, id, -1, SQLITE_TRANSIENT);
     return exec_step(db_of(self), st);
@@ -184,7 +186,7 @@ static int store_update_status(IMessageStore *self, const char *id, MessageStatu
 
 static int store_set_media_path(IMessageStore *self, const char *id, const char *path) {
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), "UPDATE messages SET media_path = ? WHERE id = ?", -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), "UPDATE messages SET media_path = ? WHERE account_id = {acct} AND id = ?", &st) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, path, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 2, id, -1, SQLITE_TRANSIENT);
     return exec_step(db_of(self), st);
@@ -251,11 +253,11 @@ static int search_plain(IMessageStore *self, const char *query, int limit, Messa
     }
     if (n == 0) return 0;
     char sql[1024];
-    int len = snprintf(sql, sizeof(sql), "SELECT " COLUMNS " FROM messages WHERE ");
+    int len = snprintf(sql, sizeof(sql), "SELECT " COLUMNS " FROM messages WHERE account_id = {acct} AND ");
     for (int i = 0; i < n; i++) len += snprintf(sql + len, sizeof(sql) - (size_t)len, "%stext LIKE ? ESCAPE '\\'", i ? " AND " : "");
     snprintf(sql + len, sizeof(sql) - (size_t)len, " ORDER BY ts DESC LIMIT ?");
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) {
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) {
         LOG_WARN("search unavailable: %s", sqlite3_errmsg(db_of(self)));
         return -1;
     }
@@ -281,10 +283,10 @@ static int store_search(IMessageStore *self, const char *query, int limit, Messa
     if (!search_index_ready(db_of(self))) return search_plain(self, query, limit, out, count);
     sqlite3_stmt *st = NULL;
     const char *sql =
-        "SELECT " COLUMNS " FROM messages WHERE rowid IN "
+        "SELECT " COLUMNS " FROM messages WHERE account_id = {acct} AND rowid IN "
         "(SELECT rowid FROM messages_fts WHERE messages_fts MATCH ? ORDER BY rank LIMIT 500) "
         "ORDER BY ts DESC LIMIT ?";
-    if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return search_plain(self, query, limit, out, count);
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) return search_plain(self, query, limit, out, count);
     sqlite3_bind_text(st, 1, fts, -1, SQLITE_TRANSIENT);
     sqlite3_bind_int(st, 2, limit);
     return collect(st, limit, out, count);
@@ -292,8 +294,8 @@ static int store_search(IMessageStore *self, const char *query, int limit, Messa
 
 static int store_edit_text(IMessageStore *self, const char *id, const char *text, int deleted) {
     sqlite3_stmt *st = NULL;
-    const char *sql = "UPDATE messages SET text = ?, edited = CASE WHEN ? THEN edited ELSE 1 END, deleted = ? WHERE id = ?";
-    if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    const char *sql = "UPDATE messages SET text = ?, edited = CASE WHEN ? THEN edited ELSE 1 END, deleted = ? WHERE account_id = {acct} AND id = ?";
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) return -1;
     if (deleted || !text) sqlite3_bind_null(st, 1); else sqlite3_bind_text(st, 1, text, -1, SQLITE_TRANSIENT);
     sqlite3_bind_int(st, 2, deleted);
     sqlite3_bind_int(st, 3, deleted);
@@ -303,14 +305,14 @@ static int store_edit_text(IMessageStore *self, const char *id, const char *text
 
 static int store_remove(IMessageStore *self, const char *id) {
     static const char *const SQL[] = {
-        "DELETE FROM reactions WHERE message_id = ?",
-        "DELETE FROM message_receipts WHERE message_id = ?",
-        "DELETE FROM messages WHERE id = ?",
+        "DELETE FROM reactions WHERE account_id = {acct} AND message_id = ?",
+        "DELETE FROM message_receipts WHERE account_id = {acct} AND message_id = ?",
+        "DELETE FROM messages WHERE account_id = {acct} AND id = ?",
     };
     int rc = 0;
     for (size_t i = 0; i < sizeof(SQL) / sizeof(SQL[0]); i++) {
         sqlite3_stmt *st = NULL;
-        if (sqlite3_prepare_v2(db_of(self), SQL[i], -1, &st, NULL) != SQLITE_OK) return -1;
+        if (sqlite_account_scope_prepare(scope_of(self), SQL[i], &st) != SQLITE_OK) return -1;
         sqlite3_bind_text(st, 1, id, -1, SQLITE_TRANSIENT);
         if (exec_step(db_of(self), st) != 0) rc = -1;
     }
@@ -319,14 +321,14 @@ static int store_remove(IMessageStore *self, const char *id) {
 
 static int store_remove_chat(IMessageStore *self, const char *jid) {
     static const char *const SQL[] = {
-        "DELETE FROM reactions WHERE message_id IN (SELECT id FROM messages WHERE chat_jid = ?)",
-        "DELETE FROM message_receipts WHERE message_id IN (SELECT id FROM messages WHERE chat_jid = ?)",
-        "DELETE FROM messages WHERE chat_jid = ?",
+        "DELETE FROM reactions WHERE account_id = {acct} AND message_id IN (SELECT id FROM messages WHERE account_id = {acct} AND chat_jid = ?)",
+        "DELETE FROM message_receipts WHERE account_id = {acct} AND message_id IN (SELECT id FROM messages WHERE account_id = {acct} AND chat_jid = ?)",
+        "DELETE FROM messages WHERE account_id = {acct} AND chat_jid = ?",
     };
     int rc = 0;
     for (size_t i = 0; i < sizeof(SQL) / sizeof(SQL[0]); i++) {
         sqlite3_stmt *st = NULL;
-        if (sqlite3_prepare_v2(db_of(self), SQL[i], -1, &st, NULL) != SQLITE_OK) return -1;
+        if (sqlite_account_scope_prepare(scope_of(self), SQL[i], &st) != SQLITE_OK) return -1;
         sqlite3_bind_text(st, 1, jid, -1, SQLITE_TRANSIENT);
         if (exec_step(db_of(self), st) != 0) rc = -1;
     }
@@ -335,12 +337,12 @@ static int store_remove_chat(IMessageStore *self, const char *jid) {
 
 static int store_reassign_jid(IMessageStore *self, const char *from, const char *to) {
     static const char *const SQL[] = {
-        "UPDATE OR IGNORE messages SET chat_jid = ?2 WHERE chat_jid = ?1",
-        "UPDATE messages SET sender_jid = ?2 WHERE sender_jid = ?1",
+        "UPDATE OR IGNORE messages SET chat_jid = ?2 WHERE account_id = {acct} AND chat_jid = ?1",
+        "UPDATE messages SET sender_jid = ?2 WHERE account_id = {acct} AND sender_jid = ?1",
     };
     for (int i = 0; i < 2; i++) {
         sqlite3_stmt *st = NULL;
-        if (sqlite3_prepare_v2(db_of(self), SQL[i], -1, &st, NULL) != SQLITE_OK) return -1;
+        if (sqlite_account_scope_prepare(scope_of(self), SQL[i], &st) != SQLITE_OK) return -1;
         sqlite3_bind_text(st, 1, from, -1, SQLITE_TRANSIENT);
         sqlite3_bind_text(st, 2, to, -1, SQLITE_TRANSIENT);
         if (exec_step(db_of(self), st) != 0) return -1;
@@ -349,13 +351,16 @@ static int store_reassign_jid(IMessageStore *self, const char *from, const char 
 }
 
 static void store_destroy(IMessageStore *self) {
+    if (!self) return;
+    sqlite_account_scope_destroy(scope_of(self));
     free(self);
 }
 
-IMessageStore *sqlite_message_store_create(sqlite3 *db) {
+IMessageStore *sqlite_message_store_create(sqlite3 *db, AccountId account) {
     IMessageStore *s = calloc(1, sizeof(*s));
-    if (!s) return NULL;
-    s->ctx = db;
+    SqliteAccountScope *scope = sqlite_account_scope_create(db, account);
+    if (!s || !scope) { free(s); sqlite_account_scope_destroy(scope); return NULL; }
+    s->ctx = scope;
     s->save = store_save;
     s->recent = store_recent;
     s->slice = store_slice;

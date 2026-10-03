@@ -1,4 +1,5 @@
 #include "resource_access/sqlite_chat_store.h"
+#include "resource_access/sqlite_account_scope.h"
 #include "utilities/log.h"
 #include "utilities/str_util.h"
 
@@ -10,7 +11,8 @@
 #define COLUMNS "jid, name, preview, last_ts, unread, is_group, is_muted, is_pinned, is_archived, is_locked, muted_until, tone, " \
                 "substr(replace(draft, char(10), ' '), 1, 200), theme, soft_locked, unread_mention"
 
-static sqlite3 *db_of(IChatStore *self) { return (sqlite3 *)self->ctx; }
+static SqliteAccountScope *scope_of(IChatStore *self) { return (SqliteAccountScope *)self->ctx; }
+static sqlite3 *db_of(IChatStore *self) { return scope_of(self)->db; }
 
 static int finish(sqlite3 *db, sqlite3_stmt *st) {
     int rc = sqlite3_step(st);
@@ -44,9 +46,9 @@ static void read_row(sqlite3_stmt *st, Chat *c) {
 static int store_upsert(IChatStore *self, const Chat *c) {
     sqlite3_stmt *st = NULL;
     const char *sql =
-        "INSERT INTO chats (jid, name, preview, last_ts, unread, is_group, is_archived, is_locked) "
-        "VALUES (?,?,?,?,MAX(?,0),?,MAX(?,0),MAX(?,0)) "
-        "ON CONFLICT(jid) DO UPDATE SET "
+        "INSERT INTO chats (jid, name, preview, last_ts, unread, is_group, is_archived, is_locked, account_id) "
+        "VALUES (?,?,?,?,MAX(?,0),?,MAX(?,0),MAX(?,0),{acct}) "
+        "ON CONFLICT(account_id, jid) DO UPDATE SET "
         " name = CASE WHEN excluded.name <> '' THEN excluded.name ELSE name END,"
         " preview = CASE WHEN excluded.preview <> '' AND excluded.last_ts >= last_ts THEN excluded.preview ELSE preview END,"
         " last_ts = MAX(last_ts, excluded.last_ts),"
@@ -54,7 +56,7 @@ static int store_upsert(IChatStore *self, const Chat *c) {
         " is_group = excluded.is_group,"
         " is_archived = CASE WHEN ?9 >= 0 THEN ?9 ELSE is_archived END,"
         " is_locked = CASE WHEN ?10 >= 0 THEN ?10 ELSE is_locked END";
-    if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, c->jid, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 2, c->name, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 3, c->preview, -1, SQLITE_TRANSIENT);
@@ -82,7 +84,7 @@ static int store_get_all(IChatStore *self, Chat **out, int *count) {
     *out = NULL;
     *count = 0;
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), "SELECT " COLUMNS " FROM chats", -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), "SELECT " COLUMNS " FROM chats WHERE account_id = {acct}", &st) != SQLITE_OK) return -1;
     int cap = 64, n = 0;
     Chat *items = malloc((size_t)cap * sizeof(Chat));
     while (items && sqlite3_step(st) == SQLITE_ROW) {
@@ -103,7 +105,7 @@ static int store_get_all(IChatStore *self, Chat **out, int *count) {
 
 static int store_get(IChatStore *self, const char *jid, Chat *out) {
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), "SELECT " COLUMNS " FROM chats WHERE jid = ?", -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), "SELECT " COLUMNS " FROM chats WHERE account_id = {acct} AND jid = ?", &st) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, jid, -1, SQLITE_TRANSIENT);
     int found = sqlite3_step(st) == SQLITE_ROW;
     if (found) read_row(st, out);
@@ -113,7 +115,7 @@ static int store_get(IChatStore *self, const char *jid, Chat *out) {
 
 static int update_int(IChatStore *self, const char *sql, int value, const char *jid) {
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) return -1;
     sqlite3_bind_int(st, 1, value);
     sqlite3_bind_text(st, 2, jid, -1, SQLITE_TRANSIENT);
     return finish(db_of(self), st);
@@ -121,24 +123,24 @@ static int update_int(IChatStore *self, const char *sql, int value, const char *
 
 static int store_set_unread(IChatStore *self, const char *jid, int unread) {
     return update_int(self, "UPDATE chats SET unread = MAX(?1, 0), unread_mention = CASE WHEN ?1 > 0 THEN unread_mention ELSE 0 END"
-                            " WHERE jid = ?2", unread, jid);
+                            " WHERE account_id = {acct} AND jid = ?2", unread, jid);
 }
 
 static int store_mark_mention(IChatStore *self, const char *jid) {
-    return update_int(self, "UPDATE chats SET unread_mention = ? WHERE jid = ?", 1, jid);
+    return update_int(self, "UPDATE chats SET unread_mention = ? WHERE account_id = {acct} AND jid = ?", 1, jid);
 }
 
 static int store_add_unread(IChatStore *self, const char *jid, int delta) {
-    return update_int(self, "UPDATE chats SET unread = MAX(unread + ?, 0) WHERE jid = ?", delta, jid);
+    return update_int(self, "UPDATE chats SET unread = MAX(unread + ?, 0) WHERE account_id = {acct} AND jid = ?", delta, jid);
 }
 
 static int store_set_muted(IChatStore *self, const char *jid, int muted) {
-    return update_int(self, "UPDATE chats SET muted_until = CASE WHEN ? THEN -1 ELSE 0 END WHERE jid = ?", muted ? 1 : 0, jid);
+    return update_int(self, "UPDATE chats SET muted_until = CASE WHEN ? THEN -1 ELSE 0 END WHERE account_id = {acct} AND jid = ?", muted ? 1 : 0, jid);
 }
 
 static int store_set_muted_until(IChatStore *self, const char *jid, int64_t until) {
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), "UPDATE chats SET muted_until = ? WHERE jid = ?", -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), "UPDATE chats SET muted_until = ? WHERE account_id = {acct} AND jid = ?", &st) != SQLITE_OK) return -1;
     sqlite3_bind_int64(st, 1, until);
     sqlite3_bind_text(st, 2, jid, -1, SQLITE_TRANSIENT);
     return finish(db_of(self), st);
@@ -146,43 +148,43 @@ static int store_set_muted_until(IChatStore *self, const char *jid, int64_t unti
 
 static int update_text(IChatStore *self, const char *sql, const char *value, const char *jid) {
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, value ? value : "", -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 2, jid, -1, SQLITE_TRANSIENT);
     return finish(db_of(self), st);
 }
 
 static int store_set_tone(IChatStore *self, const char *jid, const char *tone) {
-    return update_text(self, "UPDATE chats SET tone = ? WHERE jid = ?", tone, jid);
+    return update_text(self, "UPDATE chats SET tone = ? WHERE account_id = {acct} AND jid = ?", tone, jid);
 }
 
 static int store_set_theme(IChatStore *self, const char *jid, const char *theme) {
-    return update_text(self, "UPDATE chats SET theme = ? WHERE jid = ?", theme, jid);
+    return update_text(self, "UPDATE chats SET theme = ? WHERE account_id = {acct} AND jid = ?", theme, jid);
 }
 
 static int store_set_draft(IChatStore *self, const char *jid, const char *draft) {
-    return update_text(self, "UPDATE chats SET draft = ? WHERE jid = ?", draft, jid);
+    return update_text(self, "UPDATE chats SET draft = ? WHERE account_id = {acct} AND jid = ?", draft, jid);
 }
 
 static int store_remove(IChatStore *self, const char *jid) {
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), "DELETE FROM chats WHERE jid = ?", -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), "DELETE FROM chats WHERE account_id = {acct} AND jid = ?", &st) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, jid, -1, SQLITE_TRANSIENT);
     return finish(db_of(self), st);
 }
 
 static int store_set_soft_locked(IChatStore *self, const char *jid, int locked) {
-    return update_int(self, "UPDATE chats SET soft_locked = ? WHERE jid = ?", locked ? 1 : 0, jid);
+    return update_int(self, "UPDATE chats SET soft_locked = ? WHERE account_id = {acct} AND jid = ?", locked ? 1 : 0, jid);
 }
 
 static int store_set_archived(IChatStore *self, const char *jid, int archived) {
-    return update_int(self, "UPDATE chats SET is_archived = ? WHERE jid = ?", archived ? 1 : 0, jid);
+    return update_int(self, "UPDATE chats SET is_archived = ? WHERE account_id = {acct} AND jid = ?", archived ? 1 : 0, jid);
 }
 
 static char *store_get_draft(IChatStore *self, const char *jid) {
     sqlite3_stmt *st = NULL;
     char *out = NULL;
-    if (sqlite3_prepare_v2(db_of(self), "SELECT draft FROM chats WHERE jid = ?", -1, &st, NULL) == SQLITE_OK) {
+    if (sqlite_account_scope_prepare(scope_of(self), "SELECT draft FROM chats WHERE account_id = {acct} AND jid = ?", &st) == SQLITE_OK) {
         sqlite3_bind_text(st, 1, jid, -1, SQLITE_TRANSIENT);
         if (sqlite3_step(st) == SQLITE_ROW) out = str_dup((const char *)sqlite3_column_text(st, 0));
         sqlite3_finalize(st);
@@ -191,14 +193,15 @@ static char *store_get_draft(IChatStore *self, const char *jid) {
 }
 
 static int store_set_pinned(IChatStore *self, const char *jid, int pinned) {
-    return update_int(self, "UPDATE chats SET is_pinned = ? WHERE jid = ?", pinned ? 1 : 0, jid);
+    return update_int(self, "UPDATE chats SET is_pinned = ? WHERE account_id = {acct} AND jid = ?", pinned ? 1 : 0, jid);
 }
 
 static int store_merge(IChatStore *self, const char *from, const char *to) {
     static const char *const SQL[] = {
-        "INSERT INTO chats (jid, name, preview, last_ts, unread, is_group, is_muted, is_pinned, is_archived, is_locked, muted_until, tone, draft, theme) "
-        "SELECT ?2, name, preview, last_ts, unread, is_group, is_muted, is_pinned, is_archived, is_locked, muted_until, tone, draft, theme FROM chats WHERE jid = ?1 "
-        "ON CONFLICT(jid) DO UPDATE SET "
+        "INSERT INTO chats (account_id, jid, name, preview, last_ts, unread, is_group, is_muted, is_pinned, is_archived, is_locked, muted_until, tone, draft, theme) "
+        "SELECT {acct}, ?2, name, preview, last_ts, unread, is_group, is_muted, is_pinned, is_archived, is_locked, muted_until, tone, draft, theme "
+        "FROM chats WHERE account_id = {acct} AND jid = ?1 "
+        "ON CONFLICT(account_id, jid) DO UPDATE SET "
         " name = CASE WHEN chats.name = '' THEN excluded.name ELSE chats.name END,"
         " preview = CASE WHEN excluded.last_ts > chats.last_ts THEN excluded.preview ELSE chats.preview END,"
         " last_ts = MAX(chats.last_ts, excluded.last_ts),"
@@ -209,11 +212,11 @@ static int store_merge(IChatStore *self, const char *from, const char *to) {
         " tone = CASE WHEN chats.tone = '' THEN excluded.tone ELSE chats.tone END,"
         " draft = CASE WHEN chats.draft = '' THEN excluded.draft ELSE chats.draft END,"
         " theme = CASE WHEN chats.theme = '' THEN excluded.theme ELSE chats.theme END",
-        "DELETE FROM chats WHERE jid = ?1",
+        "DELETE FROM chats WHERE account_id = {acct} AND jid = ?1",
     };
     for (int i = 0; i < 2; i++) {
         sqlite3_stmt *st = NULL;
-        if (sqlite3_prepare_v2(db_of(self), SQL[i], -1, &st, NULL) != SQLITE_OK) return -1;
+        if (sqlite_account_scope_prepare(scope_of(self), SQL[i], &st) != SQLITE_OK) return -1;
         sqlite3_bind_text(st, 1, from, -1, SQLITE_TRANSIENT);
         sqlite3_bind_text(st, 2, to, -1, SQLITE_TRANSIENT);
         if (finish(db_of(self), st) != 0) return -1;
@@ -221,12 +224,17 @@ static int store_merge(IChatStore *self, const char *from, const char *to) {
     return 0;
 }
 
-static void store_destroy(IChatStore *self) { free(self); }
+static void store_destroy(IChatStore *self) {
+    if (!self) return;
+    sqlite_account_scope_destroy(scope_of(self));
+    free(self);
+}
 
-IChatStore *sqlite_chat_store_create(sqlite3 *db) {
+IChatStore *sqlite_chat_store_create(sqlite3 *db, AccountId account) {
     IChatStore *s = calloc(1, sizeof(*s));
-    if (!s) return NULL;
-    s->ctx = db;
+    SqliteAccountScope *scope = sqlite_account_scope_create(db, account);
+    if (!s || !scope) { free(s); sqlite_account_scope_destroy(scope); return NULL; }
+    s->ctx = scope;
     s->upsert = store_upsert;
     s->touch = store_touch;
     s->get_all = store_get_all;

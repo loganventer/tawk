@@ -398,15 +398,15 @@ int main(int argc, char **argv) {
         fprintf(stderr, "%s: cannot open %s (see %s)\n", APP_NAME, db_path, log_path);
         return 1;
     }
-    IMessageStore *messages = caching_message_store_create(sqlite_message_store_create(db), 16);
-    IChatStore *chats = sqlite_chat_store_create(db);
-    IContactStore *contacts = caching_contact_store_create(sqlite_contact_store_create(db), 512);
-    IJidAliasStore *aliases = sqlite_jid_alias_store_create(db);
-    IReactionStore *reactions = sqlite_reaction_store_create(db);
-    IReceiptStore *receipts = sqlite_receipt_store_create(db);
-    IProfileStore *profile_store = sqlite_profile_store_create(db);
-    IStatusStore *status_store = sqlite_status_store_create(db);
-    IScheduledMessageStore *scheduled_store = sqlite_scheduled_message_store_create(db);
+    IMessageStore *messages = caching_message_store_create(sqlite_message_store_create(db, ACCOUNT_ID_FIRST), 16);
+    IChatStore *chats = sqlite_chat_store_create(db, ACCOUNT_ID_FIRST);
+    IContactStore *contacts = caching_contact_store_create(sqlite_contact_store_create(db, ACCOUNT_ID_FIRST), 512);
+    IJidAliasStore *aliases = sqlite_jid_alias_store_create(db, ACCOUNT_ID_FIRST);
+    IReactionStore *reactions = sqlite_reaction_store_create(db, ACCOUNT_ID_FIRST);
+    IReceiptStore *receipts = sqlite_receipt_store_create(db, ACCOUNT_ID_FIRST);
+    IProfileStore *profile_store = sqlite_profile_store_create(db, ACCOUNT_ID_FIRST);
+    IStatusStore *status_store = sqlite_status_store_create(db, ACCOUNT_ID_FIRST);
+    IScheduledMessageStore *scheduled_store = sqlite_scheduled_message_store_create(db, ACCOUNT_ID_FIRST);
     IChatExporter *exporter = text_chat_exporter_create();
 
     /* WhatsApp backend */

@@ -4,7 +4,9 @@
 #include <sqlite3.h>
 
 #include "contracts/i_receipt_store.h"
+#include "core/account_id.h"
 
-IReceiptStore *sqlite_receipt_store_create(sqlite3 *db);
+/* A store over the receipts of one account's messages. */
+IReceiptStore *sqlite_receipt_store_create(sqlite3 *db, AccountId account);
 
 #endif

@@ -4,7 +4,9 @@
 #include <sqlite3.h>
 
 #include "contracts/i_contact_store.h"
+#include "core/account_id.h"
 
-IContactStore *sqlite_contact_store_create(sqlite3 *db);
+/* A store over the contacts of one account. */
+IContactStore *sqlite_contact_store_create(sqlite3 *db, AccountId account);
 
 #endif

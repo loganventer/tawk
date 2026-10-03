@@ -82,7 +82,7 @@ static void test_manager(const char *dir) {
     snprintf(path, sizeof(path), "%s/tawk.db", dir);
     sqlite3 *db = sqlite_database_open(path, NULL);
     if (!db) { failures++; return; }
-    IScheduledMessageStore *store = sqlite_scheduled_message_store_create(db);
+    IScheduledMessageStore *store = sqlite_scheduled_message_store_create(db, ACCOUNT_ID_FIRST);
     SchedulingManagerDeps deps = { store };
     SchedulingManager *m = scheduling_manager_create(&deps);
     int64_t now = local(1, 10, 0);
@@ -158,7 +158,7 @@ static void test_manager(const char *dir) {
     store->destroy(store);
     sqlite_database_close(db);
     db = sqlite_database_open(path, NULL);
-    store = sqlite_scheduled_message_store_create(db);
+    store = sqlite_scheduled_message_store_create(db, ACCOUNT_ID_FIRST);
     deps.store = store;
     m = scheduling_manager_create(&deps);
     scheduling_manager_take_due(m, now + 3600, &items, &count);

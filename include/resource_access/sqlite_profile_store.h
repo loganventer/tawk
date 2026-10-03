@@ -4,8 +4,10 @@
 #include <sqlite3.h>
 
 #include "contracts/i_profile_store.h"
+#include "core/account_id.h"
 
 /* Profiles in the `profiles` table (migration 6). Does not own `db`. */
-IProfileStore *sqlite_profile_store_create(sqlite3 *db);
+/* A store over the profiles one account has seen. */
+IProfileStore *sqlite_profile_store_create(sqlite3 *db, AccountId account);
 
 #endif

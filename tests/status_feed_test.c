@@ -201,8 +201,8 @@ static void test_protocol(void) {
 
 /* Who saw and liked your statuses: read receipts and heart reactions. */
 static void test_viewers(sqlite3 *db, IStatusStore *s, const char *media_dir) {
-    IReceiptStore *receipts = sqlite_receipt_store_create(db);
-    IReactionStore *reactions = sqlite_reaction_store_create(db);
+    IReceiptStore *receipts = sqlite_receipt_store_create(db, ACCOUNT_ID_FIRST);
+    IReactionStore *reactions = sqlite_reaction_store_create(db, ACCOUNT_ID_FIRST);
     IMessageGateway gw;
     memset(&gw, 0, sizeof(gw));
     Settings settings;
@@ -261,7 +261,7 @@ int main(void) {
     sqlite3 *db = sqlite_database_open(db_path, NULL);
     CHECK(db != NULL, "the database opens and migrates");
     if (!db) return 1;
-    IStatusStore *s = sqlite_status_store_create(db);
+    IStatusStore *s = sqlite_status_store_create(db, ACCOUNT_ID_FIRST);
     test_store(s, media);
     test_manager(s, media);
     test_protocol();

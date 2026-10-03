@@ -1,4 +1,5 @@
 #include "resource_access/sqlite_reaction_store.h"
+#include "resource_access/sqlite_account_scope.h"
 #include "utilities/log.h"
 #include "utilities/str_util.h"
 
@@ -6,11 +7,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-static sqlite3 *db_of(IReactionStore *self) { return (sqlite3 *)self->ctx; }
+static SqliteAccountScope *scope_of(IReactionStore *self) { return (SqliteAccountScope *)self->ctx; }
+static sqlite3 *db_of(IReactionStore *self) { return scope_of(self)->db; }
 
 static int run(IReactionStore *self, const char *sql, const char *a, const char *b, const char *c) {
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, a, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 2, b, -1, SQLITE_TRANSIENT);
     if (c) sqlite3_bind_text(st, 3, c, -1, SQLITE_TRANSIENT);
@@ -22,18 +24,18 @@ static int run(IReactionStore *self, const char *sql, const char *a, const char 
 
 static int reaction_put(IReactionStore *self, const char *message_id, const char *sender, const char *emoji) {
     if (!emoji || !emoji[0]) {
-        return run(self, "DELETE FROM reactions WHERE message_id = ? AND sender_jid = ?", message_id, sender, NULL);
+        return run(self, "DELETE FROM reactions WHERE message_id = ? AND sender_jid = ? AND account_id = {acct}", message_id, sender, NULL);
     }
-    return run(self, "INSERT INTO reactions (message_id, sender_jid, emoji) VALUES (?, ?, ?) "
-                     "ON CONFLICT(message_id, sender_jid) DO UPDATE SET emoji = excluded.emoji",
+    return run(self, "INSERT INTO reactions (message_id, sender_jid, emoji, account_id) VALUES (?, ?, ?, {acct}) "
+                     "ON CONFLICT(account_id, message_id, sender_jid) DO UPDATE SET emoji = excluded.emoji",
                message_id, sender, emoji);
 }
 
 static void reaction_summary(IReactionStore *self, const char *message_id, char *out, size_t size) {
     out[0] = '\0';
     sqlite3_stmt *st = NULL;
-    const char *sql = "SELECT emoji, COUNT(*) FROM reactions WHERE message_id = ? GROUP BY emoji ORDER BY COUNT(*) DESC LIMIT 4";
-    if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return;
+    const char *sql = "SELECT emoji, COUNT(*) FROM reactions WHERE account_id = {acct} AND message_id = ? GROUP BY emoji ORDER BY COUNT(*) DESC LIMIT 4";
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) return;
     sqlite3_bind_text(st, 1, message_id, -1, SQLITE_TRANSIENT);
     size_t used = 0;
     while (sqlite3_step(st) == SQLITE_ROW && used < size) {
@@ -51,7 +53,7 @@ static void reaction_summary(IReactionStore *self, const char *message_id, char 
 
 static int reaction_list(IReactionStore *self, const char *message_id, Reaction *out, int max) {
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), "SELECT sender_jid, emoji FROM reactions WHERE message_id = ?", -1, &st, NULL) != SQLITE_OK) return 0;
+    if (sqlite_account_scope_prepare(scope_of(self), "SELECT sender_jid, emoji FROM reactions WHERE account_id = {acct} AND message_id = ?", &st) != SQLITE_OK) return 0;
     sqlite3_bind_text(st, 1, message_id, -1, SQLITE_TRANSIENT);
     int n = 0;
     while (n < max && sqlite3_step(st) == SQLITE_ROW) {
@@ -65,15 +67,20 @@ static int reaction_list(IReactionStore *self, const char *message_id, Reaction 
 }
 
 static int reaction_reassign_sender(IReactionStore *self, const char *from, const char *to) {
-    return run(self, "UPDATE OR REPLACE reactions SET sender_jid = ?2 WHERE sender_jid = ?1", from, to, NULL);
+    return run(self, "UPDATE OR REPLACE reactions SET sender_jid = ?2 WHERE account_id = {acct} AND sender_jid = ?1", from, to, NULL);
 }
 
-static void reaction_destroy(IReactionStore *self) { free(self); }
+static void reaction_destroy(IReactionStore *self) {
+    if (!self) return;
+    sqlite_account_scope_destroy(scope_of(self));
+    free(self);
+}
 
-IReactionStore *sqlite_reaction_store_create(sqlite3 *db) {
+IReactionStore *sqlite_reaction_store_create(sqlite3 *db, AccountId account) {
     IReactionStore *s = calloc(1, sizeof(*s));
-    if (!s) return NULL;
-    s->ctx = db;
+    SqliteAccountScope *scope = sqlite_account_scope_create(db, account);
+    if (!s || !scope) { free(s); sqlite_account_scope_destroy(scope); return NULL; }
+    s->ctx = scope;
     s->put = reaction_put;
     s->summary = reaction_summary;
     s->list = reaction_list;

@@ -108,12 +108,12 @@ static void test_reconnects_on_network_change(void) {
     INotifier notifier = { NULL, fake_notify, NULL };
     INetworkMonitor network = { NULL, fake_changed, NULL };
     EventQueue *events = event_queue_create(64);
-    IMessageStore *messages = sqlite_message_store_create(db);
-    IChatStore *chats = sqlite_chat_store_create(db);
-    IContactStore *contacts = sqlite_contact_store_create(db);
-    IJidAliasStore *aliases = sqlite_jid_alias_store_create(db);
-    IReactionStore *reactions = sqlite_reaction_store_create(db);
-    IReceiptStore *receipts = sqlite_receipt_store_create(db);
+    IMessageStore *messages = sqlite_message_store_create(db, ACCOUNT_ID_FIRST);
+    IChatStore *chats = sqlite_chat_store_create(db, ACCOUNT_ID_FIRST);
+    IContactStore *contacts = sqlite_contact_store_create(db, ACCOUNT_ID_FIRST);
+    IJidAliasStore *aliases = sqlite_jid_alias_store_create(db, ACCOUNT_ID_FIRST);
+    IReactionStore *reactions = sqlite_reaction_store_create(db, ACCOUNT_ID_FIRST);
+    IReceiptStore *receipts = sqlite_receipt_store_create(db, ACCOUNT_ID_FIRST);
     IChatExporter *exporter = text_chat_exporter_create();
     MessagingManagerDeps deps = { &gateway, messages, chats, contacts, aliases, reactions, receipts, &notifier, events,
                                   &settings, NULL, exporter, &network, NULL };
@@ -200,12 +200,12 @@ static void test_marks_chats_read(void) {
     gateway.mark_read = fake_mark_read;
     INotifier notifier = { NULL, fake_notify, NULL };
     EventQueue *events = event_queue_create(64);
-    IMessageStore *messages = sqlite_message_store_create(db);
-    IChatStore *chats = sqlite_chat_store_create(db);
-    IContactStore *contacts = sqlite_contact_store_create(db);
-    IJidAliasStore *aliases = sqlite_jid_alias_store_create(db);
-    IReactionStore *reactions = sqlite_reaction_store_create(db);
-    IReceiptStore *receipts = sqlite_receipt_store_create(db);
+    IMessageStore *messages = sqlite_message_store_create(db, ACCOUNT_ID_FIRST);
+    IChatStore *chats = sqlite_chat_store_create(db, ACCOUNT_ID_FIRST);
+    IContactStore *contacts = sqlite_contact_store_create(db, ACCOUNT_ID_FIRST);
+    IJidAliasStore *aliases = sqlite_jid_alias_store_create(db, ACCOUNT_ID_FIRST);
+    IReactionStore *reactions = sqlite_reaction_store_create(db, ACCOUNT_ID_FIRST);
+    IReceiptStore *receipts = sqlite_receipt_store_create(db, ACCOUNT_ID_FIRST);
     IChatExporter *exporter = text_chat_exporter_create();
     MessagingManagerDeps deps = { &gateway, messages, chats, contacts, aliases, reactions, receipts, &notifier, events,
                                   &settings, NULL, exporter, NULL, NULL };

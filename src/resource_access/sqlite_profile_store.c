@@ -1,11 +1,13 @@
 #include "resource_access/sqlite_profile_store.h"
+#include "resource_access/sqlite_account_scope.h"
 #include "utilities/log.h"
 #include "utilities/str_util.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-static sqlite3 *db_of(IProfileStore *self) { return (sqlite3 *)self->ctx; }
+static SqliteAccountScope *scope_of(IProfileStore *self) { return (SqliteAccountScope *)self->ctx; }
+static sqlite3 *db_of(IProfileStore *self) { return scope_of(self)->db; }
 
 static int run(sqlite3 *db, sqlite3_stmt *st) {
     int rc = sqlite3_step(st);
@@ -23,8 +25,8 @@ static int store_get(IProfileStore *self, const char *jid, ContactProfile *p) {
     sqlite3_stmt *st = NULL;
     const char *sql = "SELECT about, verified_name, is_business, business_category, business_address, business_email,"
                       " is_group, group_subject, group_description, group_owner, group_created, participant_count,"
-                      " participants, picture, picture_full, picture_none, blocked, fetched_at FROM profiles WHERE jid = ?";
-    if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return -1;
+                      " participants, picture, picture_full, picture_none, blocked, fetched_at FROM profiles WHERE account_id = {acct} AND jid = ?";
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, jid, -1, SQLITE_TRANSIENT);
     int found = sqlite3_step(st) == SQLITE_ROW;
     if (found) {
@@ -56,7 +58,7 @@ static int store_get(IProfileStore *self, const char *jid, ContactProfile *p) {
 /* Makes sure a row exists, so the updates below have something to change. */
 static void ensure_row(IProfileStore *self, const char *jid) {
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), "INSERT OR IGNORE INTO profiles (jid) VALUES (?)", -1, &st, NULL) != SQLITE_OK) return;
+    if (sqlite_account_scope_prepare(scope_of(self), "INSERT OR IGNORE INTO profiles (jid, account_id) VALUES (?, {acct})", &st) != SQLITE_OK) return;
     sqlite3_bind_text(st, 1, jid, -1, SQLITE_TRANSIENT);
     run(db_of(self), st);
 }
@@ -67,8 +69,8 @@ static int store_save_details(IProfileStore *self, const ContactProfile *p) {
     const char *sql = "UPDATE profiles SET about = ?, verified_name = ?, is_business = ?, business_category = ?,"
                       " business_address = ?, business_email = ?, is_group = ?, group_subject = ?, group_description = ?,"
                       " group_owner = ?, group_created = ?, participant_count = ?, participants = ?, fetched_at = ?"
-                      " WHERE jid = ?";
-    if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return -1;
+                      " WHERE account_id = {acct} AND jid = ?";
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, p->about, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 2, p->verified_name, -1, SQLITE_TRANSIENT);
     sqlite3_bind_int(st, 3, p->is_business);
@@ -91,10 +93,10 @@ static int store_save_details(IProfileStore *self, const ContactProfile *p) {
 static int store_set_picture(IProfileStore *self, const char *jid, const char *path, int full, int none) {
     ensure_row(self, jid);
     sqlite3_stmt *st = NULL;
-    const char *sql = none ? "UPDATE profiles SET picture = '', picture_full = '', picture_none = 1 WHERE jid = ?2"
-                    : full ? "UPDATE profiles SET picture_full = ?1, picture_none = 0 WHERE jid = ?2"
-                           : "UPDATE profiles SET picture = ?1, picture_none = 0 WHERE jid = ?2";
-    if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    const char *sql = none ? "UPDATE profiles SET picture = '', picture_full = '', picture_none = 1 WHERE account_id = {acct} AND jid = ?2"
+                    : full ? "UPDATE profiles SET picture_full = ?1, picture_none = 0 WHERE account_id = {acct} AND jid = ?2"
+                           : "UPDATE profiles SET picture = ?1, picture_none = 0 WHERE account_id = {acct} AND jid = ?2";
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) return -1;
     if (!none) sqlite3_bind_text(st, 1, path ? path : "", -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 2, jid, -1, SQLITE_TRANSIENT);
     return run(db_of(self), st);
@@ -102,21 +104,24 @@ static int store_set_picture(IProfileStore *self, const char *jid, const char *p
 
 static int store_forget_picture(IProfileStore *self, const char *jid) {
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), "UPDATE profiles SET picture = '', picture_full = '', picture_none = 0 WHERE jid = ?",
-                           -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), "UPDATE profiles SET picture = '', picture_full = '', picture_none = 0 WHERE account_id = {acct} AND jid = ?", &st) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, jid, -1, SQLITE_TRANSIENT);
     return run(db_of(self), st);
 }
 
 static int store_set_blocklist(IProfileStore *self, const char *jids) {
     sqlite3 *db = db_of(self);
-    sqlite3_exec(db, "BEGIN; UPDATE profiles SET blocked = 0 WHERE blocked = 1;", NULL, NULL, NULL);
+    sqlite3_exec(db, "BEGIN;", NULL, NULL, NULL);
+    sqlite3_stmt *clear = NULL;
+    if (sqlite_account_scope_prepare(scope_of(self), "UPDATE profiles SET blocked = 0 WHERE account_id = {acct} AND blocked = 1", &clear) == SQLITE_OK) {
+        run(db, clear);
+    }
     char *copy = strdup(jids ? jids : "");
     char *save = NULL;
     for (char *jid = copy ? strtok_r(copy, "\n", &save) : NULL; jid; jid = strtok_r(NULL, "\n", &save)) {
         ensure_row(self, jid);
         sqlite3_stmt *st = NULL;
-        if (sqlite3_prepare_v2(db, "UPDATE profiles SET blocked = 1 WHERE jid = ?", -1, &st, NULL) != SQLITE_OK) continue;
+        if (sqlite_account_scope_prepare(scope_of(self), "UPDATE profiles SET blocked = 1 WHERE account_id = {acct} AND jid = ?", &st) != SQLITE_OK) continue;
         sqlite3_bind_text(st, 1, jid, -1, SQLITE_TRANSIENT);
         run(db, st);
     }
@@ -124,12 +129,17 @@ static int store_set_blocklist(IProfileStore *self, const char *jids) {
     return sqlite3_exec(db, "COMMIT;", NULL, NULL, NULL) == SQLITE_OK ? 0 : -1;
 }
 
-static void store_destroy(IProfileStore *self) { free(self); }
+static void store_destroy(IProfileStore *self) {
+    if (!self) return;
+    sqlite_account_scope_destroy(scope_of(self));
+    free(self);
+}
 
-IProfileStore *sqlite_profile_store_create(sqlite3 *db) {
+IProfileStore *sqlite_profile_store_create(sqlite3 *db, AccountId account) {
     IProfileStore *s = calloc(1, sizeof(*s));
-    if (!s) return NULL;
-    s->ctx = db;
+    SqliteAccountScope *scope = sqlite_account_scope_create(db, account);
+    if (!s || !scope) { free(s); sqlite_account_scope_destroy(scope); return NULL; }
+    s->ctx = scope;
     s->get = store_get;
     s->save_details = store_save_details;
     s->set_picture = store_set_picture;

@@ -1,11 +1,13 @@
 #include "resource_access/sqlite_status_store.h"
+#include "resource_access/sqlite_account_scope.h"
 #include "utilities/log.h"
 #include "utilities/str_util.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-static sqlite3 *db_of(IStatusStore *self) { return (sqlite3 *)self->ctx; }
+static SqliteAccountScope *scope_of(IStatusStore *self) { return (SqliteAccountScope *)self->ctx; }
+static sqlite3 *db_of(IStatusStore *self) { return scope_of(self)->db; }
 
 static int step_done(IStatusStore *self, sqlite3_stmt *st) {
     int rc = sqlite3_step(st);
@@ -25,14 +27,14 @@ static int status_save(IStatusStore *self, const StatusUpdate *u) {
      * in what the first one lacked. */
     static const char *const SQL =
         "INSERT INTO statuses (id, author_jid, author_name, type, text, media_ref, media_path, thumbnail,"
-        " background_argb, timestamp, from_me, viewed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
-        "ON CONFLICT(id) DO UPDATE SET"
+        " background_argb, timestamp, from_me, viewed, account_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, {acct}) "
+        "ON CONFLICT(account_id, id) DO UPDATE SET"
         " author_name = CASE WHEN author_name = '' THEN excluded.author_name ELSE author_name END,"
         " media_ref = coalesce(media_ref, excluded.media_ref),"
         " media_path = CASE WHEN media_path = '' THEN excluded.media_path ELSE media_path END,"
         " thumbnail = coalesce(thumbnail, excluded.thumbnail)";
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), SQL, -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), SQL, &st) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, u->id, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 2, u->author_jid, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 3, u->author_name, -1, SQLITE_TRANSIENT);
@@ -51,22 +53,22 @@ static int status_save(IStatusStore *self, const StatusUpdate *u) {
 
 static int by_id(IStatusStore *self, const char *sql, const char *id) {
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, id, -1, SQLITE_TRANSIENT);
     return step_done(self, st);
 }
 
 static int status_remove(IStatusStore *self, const char *id) {
-    return by_id(self, "DELETE FROM statuses WHERE id = ?", id);
+    return by_id(self, "DELETE FROM statuses WHERE account_id = {acct} AND id = ?", id);
 }
 
 static int status_mark_viewed(IStatusStore *self, const char *id) {
-    return by_id(self, "UPDATE statuses SET viewed = 1 WHERE id = ?", id);
+    return by_id(self, "UPDATE statuses SET viewed = 1 WHERE account_id = {acct} AND id = ?", id);
 }
 
 static int status_set_media_path(IStatusStore *self, const char *id, const char *path) {
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), "UPDATE statuses SET media_path = ?2 WHERE id = ?1", -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), "UPDATE statuses SET media_path = ?2 WHERE account_id = {acct} AND id = ?1", &st) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, id, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 2, path ? path : "", -1, SQLITE_TRANSIENT);
     return step_done(self, st);
@@ -97,7 +99,7 @@ static void read_row(sqlite3_stmt *st, StatusUpdate *u) {
 
 static int status_get(IStatusStore *self, const char *id, StatusUpdate *out) {
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), "SELECT " COLUMNS " FROM statuses WHERE id = ?", -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), "SELECT " COLUMNS " FROM statuses WHERE account_id = {acct} AND id = ?", &st) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, id, -1, SQLITE_TRANSIENT);
     int found = sqlite3_step(st) == SQLITE_ROW;
     if (found) read_row(st, out);
@@ -109,11 +111,11 @@ static int status_authors(IStatusStore *self, int64_t since, int64_t until, Stat
     /* The name comes from the newest row that has one. */
     static const char *const SQL =
         "SELECT author_jid, count(*), sum(viewed = 0 AND from_me = 0), max(timestamp), max(from_me),"
-        " (SELECT author_name FROM statuses n WHERE n.author_jid = s.author_jid AND n.author_name != ''"
+        " (SELECT author_name FROM statuses n WHERE n.account_id = {acct} AND n.author_jid = s.author_jid AND n.author_name != ''"
         "  ORDER BY n.timestamp DESC LIMIT 1) "
-        "FROM statuses s WHERE timestamp > ? AND timestamp <= ? GROUP BY author_jid ORDER BY max(timestamp) DESC";
+        "FROM statuses s WHERE account_id = {acct} AND timestamp > ? AND timestamp <= ? GROUP BY author_jid ORDER BY max(timestamp) DESC";
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), SQL, -1, &st, NULL) != SQLITE_OK) return 0;
+    if (sqlite_account_scope_prepare(scope_of(self), SQL, &st) != SQLITE_OK) return 0;
     sqlite3_bind_int64(st, 1, since);
     sqlite3_bind_int64(st, 2, until);
     int n = 0;
@@ -133,8 +135,8 @@ static int status_authors(IStatusStore *self, int64_t since, int64_t until, Stat
 
 static int status_updates_by(IStatusStore *self, const char *jid, int64_t since, int64_t until, StatusUpdate *out, int max) {
     sqlite3_stmt *st = NULL;
-    const char *sql = "SELECT " COLUMNS " FROM statuses WHERE author_jid = ? AND timestamp > ? AND timestamp <= ? ORDER BY timestamp, rowid";
-    if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return 0;
+    const char *sql = "SELECT " COLUMNS " FROM statuses WHERE account_id = {acct} AND author_jid = ? AND timestamp > ? AND timestamp <= ? ORDER BY timestamp, rowid";
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) return 0;
     sqlite3_bind_text(st, 1, jid, -1, SQLITE_TRANSIENT);
     sqlite3_bind_int64(st, 2, since);
     sqlite3_bind_int64(st, 3, until);
@@ -147,24 +149,29 @@ static int status_updates_by(IStatusStore *self, const char *jid, int64_t since,
 static int status_prune(IStatusStore *self, int64_t before, void (*on_media)(void *ctx, const char *path), void *ctx) {
     sqlite3_stmt *st = NULL;
     if (on_media &&
-        sqlite3_prepare_v2(db_of(self), "SELECT media_path FROM statuses WHERE timestamp <= ? AND media_path != ''", -1, &st, NULL) == SQLITE_OK) {
+        sqlite_account_scope_prepare(scope_of(self), "SELECT media_path FROM statuses WHERE account_id = {acct} AND timestamp <= ? AND media_path != ''", &st) == SQLITE_OK) {
         sqlite3_bind_int64(st, 1, before);
         while (sqlite3_step(st) == SQLITE_ROW) on_media(ctx, (const char *)sqlite3_column_text(st, 0));
         sqlite3_finalize(st);
         st = NULL;
     }
-    if (sqlite3_prepare_v2(db_of(self), "DELETE FROM statuses WHERE timestamp <= ?", -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), "DELETE FROM statuses WHERE account_id = {acct} AND timestamp <= ?", &st) != SQLITE_OK) return -1;
     sqlite3_bind_int64(st, 1, before);
     if (step_done(self, st) != 0) return -1;
     return sqlite3_changes(db_of(self));
 }
 
-static void status_destroy(IStatusStore *self) { free(self); }
+static void status_destroy(IStatusStore *self) {
+    if (!self) return;
+    sqlite_account_scope_destroy(scope_of(self));
+    free(self);
+}
 
-IStatusStore *sqlite_status_store_create(sqlite3 *db) {
+IStatusStore *sqlite_status_store_create(sqlite3 *db, AccountId account) {
     IStatusStore *s = calloc(1, sizeof(*s));
-    if (!s) return NULL;
-    s->ctx = db;
+    SqliteAccountScope *scope = sqlite_account_scope_create(db, account);
+    if (!s || !scope) { free(s); sqlite_account_scope_destroy(scope); return NULL; }
+    s->ctx = scope;
     s->save = status_save;
     s->remove = status_remove;
     s->get = status_get;

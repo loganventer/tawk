@@ -4,8 +4,10 @@
 #include <sqlite3.h>
 
 #include "contracts/i_jid_alias_store.h"
+#include "core/account_id.h"
 
 /* Persists aliases in SQLite and keeps them all in memory for lookups. */
-IJidAliasStore *sqlite_jid_alias_store_create(sqlite3 *db);
+/* A store over the address aliases one account has learned. */
+IJidAliasStore *sqlite_jid_alias_store_create(sqlite3 *db, AccountId account);
 
 #endif

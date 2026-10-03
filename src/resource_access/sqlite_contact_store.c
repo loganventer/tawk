@@ -1,19 +1,21 @@
 #include "resource_access/sqlite_contact_store.h"
+#include "resource_access/sqlite_account_scope.h"
 #include "utilities/log.h"
 #include "utilities/str_util.h"
 
 #include <stdlib.h>
 
-static sqlite3 *db_of(IContactStore *self) { return (sqlite3 *)self->ctx; }
+static SqliteAccountScope *scope_of(IContactStore *self) { return (SqliteAccountScope *)self->ctx; }
+static sqlite3 *db_of(IContactStore *self) { return scope_of(self)->db; }
 
 static int store_upsert(IContactStore *self, const Contact *c) {
     sqlite3_stmt *st = NULL;
     const char *sql =
-        "INSERT INTO contacts (jid, name, push_name) VALUES (?,?,?) "
-        "ON CONFLICT(jid) DO UPDATE SET "
+        "INSERT INTO contacts (jid, name, push_name, account_id) VALUES (?,?,?,{acct}) "
+        "ON CONFLICT(account_id, jid) DO UPDATE SET "
         " name = CASE WHEN excluded.name <> '' THEN excluded.name ELSE name END,"
         " push_name = CASE WHEN excluded.push_name <> '' THEN excluded.push_name ELSE push_name END";
-    if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, c->jid, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 2, c->name, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 3, c->push_name, -1, SQLITE_TRANSIENT);
@@ -25,7 +27,7 @@ static int store_upsert(IContactStore *self, const Contact *c) {
 
 static int store_get(IContactStore *self, const char *jid, Contact *out) {
     sqlite3_stmt *st = NULL;
-    if (sqlite3_prepare_v2(db_of(self), "SELECT jid, name, push_name FROM contacts WHERE jid = ?", -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), "SELECT jid, name, push_name FROM contacts WHERE account_id = {acct} AND jid = ?", &st) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, jid, -1, SQLITE_TRANSIENT);
     int found = sqlite3_step(st) == SQLITE_ROW;
     if (found) {
@@ -40,11 +42,11 @@ static int store_get(IContactStore *self, const char *jid, Contact *out) {
 static int store_merge(IContactStore *self, const char *from, const char *to) {
     sqlite3_stmt *st = NULL;
     const char *sql =
-        "INSERT INTO contacts (jid, name, push_name) SELECT ?2, name, push_name FROM contacts WHERE jid = ?1 "
-        "ON CONFLICT(jid) DO UPDATE SET "
+        "INSERT INTO contacts (account_id, jid, name, push_name) SELECT {acct}, ?2, name, push_name FROM contacts WHERE account_id = {acct} AND jid = ?1 "
+        "ON CONFLICT(account_id, jid) DO UPDATE SET "
         " name = CASE WHEN contacts.name = '' THEN excluded.name ELSE contacts.name END,"
         " push_name = CASE WHEN contacts.push_name = '' THEN excluded.push_name ELSE contacts.push_name END";
-    if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, from, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(st, 2, to, -1, SQLITE_TRANSIENT);
     int rc = sqlite3_step(st);
@@ -52,12 +54,17 @@ static int store_merge(IContactStore *self, const char *from, const char *to) {
     return rc == SQLITE_DONE ? 0 : -1;
 }
 
-static void store_destroy(IContactStore *self) { free(self); }
+static void store_destroy(IContactStore *self) {
+    if (!self) return;
+    sqlite_account_scope_destroy(scope_of(self));
+    free(self);
+}
 
-IContactStore *sqlite_contact_store_create(sqlite3 *db) {
+IContactStore *sqlite_contact_store_create(sqlite3 *db, AccountId account) {
     IContactStore *s = calloc(1, sizeof(*s));
-    if (!s) return NULL;
-    s->ctx = db;
+    SqliteAccountScope *scope = sqlite_account_scope_create(db, account);
+    if (!s || !scope) { free(s); sqlite_account_scope_destroy(scope); return NULL; }
+    s->ctx = scope;
     s->upsert = store_upsert;
     s->get = store_get;
     s->merge = store_merge;

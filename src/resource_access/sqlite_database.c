@@ -25,6 +25,8 @@ static const char *BASE_SCHEMA =
     "CREATE TABLE IF NOT EXISTS contacts ("
     "  jid TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '', push_name TEXT NOT NULL DEFAULT '');";
 
+/* One step of a version. A version with a lot to do is written as several
+ * entries with the same number; they run in order inside one transaction. */
 typedef struct Migration {
     int         version;
     const char *sql;
@@ -124,9 +126,142 @@ static const Migration MIGRATIONS[] = {
       /* a contact changing its address rewrites these by who, not by message */
       "CREATE INDEX IF NOT EXISTS idx_reactions_sender ON reactions(sender_jid);"
       "CREATE INDEX IF NOT EXISTS idx_receipts_jid ON message_receipts(jid);" },
+    { 17,
+      /* Several accounts in one database. What was here becomes the first
+       * account. The same message reaches two accounts in a shared group with
+       * the same id, so the account joins every key, and a key cannot be
+       * altered: each table is set aside, made again and filled from the old
+       * one. messages keeps its rowids, which the search index is tied to. */
+      "CREATE TABLE accounts ("
+      "  id INTEGER PRIMARY KEY AUTOINCREMENT, label TEXT NOT NULL, jid TEXT NOT NULL DEFAULT '',"
+      "  name TEXT NOT NULL DEFAULT '', colour INTEGER NOT NULL DEFAULT 0, is_primary INTEGER NOT NULL DEFAULT 0,"
+      "  agent_access TEXT NOT NULL DEFAULT 'off', self_approval_chats TEXT NOT NULL DEFAULT '',"
+      "  last_chat TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL DEFAULT 0);"
+      /* 'follow': the first account keeps obeying [automation] access, as it did before */
+      "INSERT INTO accounts (id, label, is_primary, agent_access, created_at)"
+      "  VALUES (1, 'main', 1, 'follow', CAST(strftime('%s', 'now') AS INTEGER));"
+
+      "DROP TRIGGER IF EXISTS messages_fts_ai; DROP TRIGGER IF EXISTS messages_fts_ad; DROP TRIGGER IF EXISTS messages_fts_au;"
+      "CREATE TABLE messages_v16 AS SELECT rowid AS old_rowid, * FROM messages;"
+      "DROP TABLE messages;"
+      "CREATE TABLE messages ("
+      "  account_id INTEGER NOT NULL DEFAULT 1, id TEXT NOT NULL, chat_jid TEXT NOT NULL, sender_jid TEXT NOT NULL DEFAULT '',"
+      "  sender_name TEXT NOT NULL DEFAULT '', text TEXT, media_ref TEXT, media_path TEXT NOT NULL DEFAULT '',"
+      "  type INTEGER NOT NULL DEFAULT 0, status INTEGER NOT NULL DEFAULT 0,"
+      "  ts INTEGER NOT NULL DEFAULT 0, from_me INTEGER NOT NULL DEFAULT 0, duration INTEGER NOT NULL DEFAULT 0,"
+      "  quoted_id TEXT NOT NULL DEFAULT '', quoted_sender TEXT NOT NULL DEFAULT '', quoted_text TEXT, thumbnail BLOB,"
+      "  edited INTEGER NOT NULL DEFAULT 0, deleted INTEGER NOT NULL DEFAULT 0, mentions TEXT,"
+      "  mentions_me INTEGER NOT NULL DEFAULT 0, forwarded INTEGER NOT NULL DEFAULT 0,"
+      "  link_url TEXT, link_title TEXT, link_desc TEXT, quoted_status INTEGER NOT NULL DEFAULT 0,"
+      "  PRIMARY KEY (account_id, id));"
+      "INSERT INTO messages (rowid, account_id, id, chat_jid, sender_jid, sender_name, text, media_ref, media_path, type, status,"
+      "  ts, from_me, duration, quoted_id, quoted_sender, quoted_text, thumbnail, edited, deleted, mentions, mentions_me,"
+      "  forwarded, link_url, link_title, link_desc, quoted_status)"
+      " SELECT old_rowid, 1, id, chat_jid, sender_jid, sender_name, text, media_ref, media_path, type, status,"
+      "  ts, from_me, duration, quoted_id, quoted_sender, quoted_text, thumbnail, edited, deleted, mentions, mentions_me,"
+      "  forwarded, link_url, link_title, link_desc, quoted_status FROM messages_v16;"
+      "DROP TABLE messages_v16;"
+      "CREATE INDEX idx_messages_chat_ts ON messages(account_id, chat_jid, ts);"
+      "CREATE INDEX idx_messages_sender ON messages(account_id, sender_jid);" },
+    { 17,
+      "CREATE TABLE chats_v16 AS SELECT * FROM chats;"
+      "DROP TABLE chats;"
+      "CREATE TABLE chats ("
+      "  account_id INTEGER NOT NULL DEFAULT 1, jid TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', preview TEXT NOT NULL DEFAULT '',"
+      "  last_ts INTEGER NOT NULL DEFAULT 0, unread INTEGER NOT NULL DEFAULT 0,"
+      "  is_group INTEGER NOT NULL DEFAULT 0, is_muted INTEGER NOT NULL DEFAULT 0, is_pinned INTEGER NOT NULL DEFAULT 0,"
+      "  is_archived INTEGER NOT NULL DEFAULT 0, is_locked INTEGER NOT NULL DEFAULT 0, muted_until INTEGER NOT NULL DEFAULT 0,"
+      "  tone TEXT NOT NULL DEFAULT '', draft TEXT NOT NULL DEFAULT '', theme TEXT NOT NULL DEFAULT '',"
+      "  soft_locked INTEGER NOT NULL DEFAULT 0, unread_mention INTEGER NOT NULL DEFAULT 0,"
+      "  PRIMARY KEY (account_id, jid));"
+      "INSERT INTO chats (account_id, jid, name, preview, last_ts, unread, is_group, is_muted, is_pinned, is_archived, is_locked,"
+      "  muted_until, tone, draft, theme, soft_locked, unread_mention)"
+      " SELECT 1, jid, name, preview, last_ts, unread, is_group, is_muted, is_pinned, is_archived, is_locked,"
+      "  muted_until, tone, draft, theme, soft_locked, unread_mention FROM chats_v16;"
+      "DROP TABLE chats_v16;"
+
+      "CREATE TABLE contacts_v16 AS SELECT * FROM contacts;"
+      "DROP TABLE contacts;"
+      "CREATE TABLE contacts ("
+      "  account_id INTEGER NOT NULL DEFAULT 1, jid TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', push_name TEXT NOT NULL DEFAULT '',"
+      "  PRIMARY KEY (account_id, jid));"
+      "INSERT INTO contacts (account_id, jid, name, push_name) SELECT 1, jid, name, push_name FROM contacts_v16;"
+      "DROP TABLE contacts_v16;"
+
+      "CREATE TABLE jid_aliases_v16 AS SELECT * FROM jid_aliases;"
+      "DROP TABLE jid_aliases;"
+      "CREATE TABLE jid_aliases ("
+      "  account_id INTEGER NOT NULL DEFAULT 1, alias TEXT NOT NULL, canonical TEXT NOT NULL, PRIMARY KEY (account_id, alias));"
+      "INSERT INTO jid_aliases (account_id, alias, canonical) SELECT 1, alias, canonical FROM jid_aliases_v16;"
+      "DROP TABLE jid_aliases_v16;" },
+    { 17,
+      "CREATE TABLE reactions_v16 AS SELECT * FROM reactions;"
+      "DROP TABLE reactions;"
+      "CREATE TABLE reactions ("
+      "  account_id INTEGER NOT NULL DEFAULT 1, message_id TEXT NOT NULL, sender_jid TEXT NOT NULL, emoji TEXT NOT NULL,"
+      "  PRIMARY KEY (account_id, message_id, sender_jid));"
+      "INSERT INTO reactions (account_id, message_id, sender_jid, emoji) SELECT 1, message_id, sender_jid, emoji FROM reactions_v16;"
+      "DROP TABLE reactions_v16;"
+      "CREATE INDEX idx_reactions_sender ON reactions(account_id, sender_jid);"
+
+      "CREATE TABLE message_receipts_v16 AS SELECT * FROM message_receipts;"
+      "DROP TABLE message_receipts;"
+      "CREATE TABLE message_receipts ("
+      "  account_id INTEGER NOT NULL DEFAULT 1, message_id TEXT NOT NULL, jid TEXT NOT NULL,"
+      "  delivered_at INTEGER NOT NULL DEFAULT 0, read_at INTEGER NOT NULL DEFAULT 0, played_at INTEGER NOT NULL DEFAULT 0,"
+      "  PRIMARY KEY (account_id, message_id, jid));"
+      "INSERT INTO message_receipts (account_id, message_id, jid, delivered_at, read_at, played_at)"
+      " SELECT 1, message_id, jid, delivered_at, read_at, played_at FROM message_receipts_v16;"
+      "DROP TABLE message_receipts_v16;"
+      "CREATE INDEX idx_receipts_jid ON message_receipts(account_id, jid);" },
+    { 17,
+      "CREATE TABLE profiles_v16 AS SELECT * FROM profiles;"
+      "DROP TABLE profiles;"
+      "CREATE TABLE profiles ("
+      "  account_id INTEGER NOT NULL DEFAULT 1, jid TEXT NOT NULL, about TEXT NOT NULL DEFAULT '', verified_name TEXT NOT NULL DEFAULT '',"
+      "  is_business INTEGER NOT NULL DEFAULT 0, business_category TEXT NOT NULL DEFAULT '',"
+      "  business_address TEXT NOT NULL DEFAULT '', business_email TEXT NOT NULL DEFAULT '',"
+      "  is_group INTEGER NOT NULL DEFAULT 0, group_subject TEXT NOT NULL DEFAULT '',"
+      "  group_description TEXT NOT NULL DEFAULT '', group_owner TEXT NOT NULL DEFAULT '',"
+      "  group_created INTEGER NOT NULL DEFAULT 0, participant_count INTEGER NOT NULL DEFAULT 0,"
+      "  participants TEXT, picture TEXT NOT NULL DEFAULT '', picture_full TEXT NOT NULL DEFAULT '',"
+      "  picture_none INTEGER NOT NULL DEFAULT 0, blocked INTEGER NOT NULL DEFAULT 0,"
+      "  fetched_at INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (account_id, jid));"
+      "INSERT INTO profiles (account_id, jid, about, verified_name, is_business, business_category, business_address,"
+      "  business_email, is_group, group_subject, group_description, group_owner, group_created, participant_count,"
+      "  participants, picture, picture_full, picture_none, blocked, fetched_at)"
+      " SELECT 1, jid, about, verified_name, is_business, business_category, business_address,"
+      "  business_email, is_group, group_subject, group_description, group_owner, group_created, participant_count,"
+      "  participants, picture, picture_full, picture_none, blocked, fetched_at FROM profiles_v16;"
+      "DROP TABLE profiles_v16;"
+
+      "CREATE TABLE statuses_v16 AS SELECT * FROM statuses;"
+      "DROP TABLE statuses;"
+      "CREATE TABLE statuses ("
+      "  account_id INTEGER NOT NULL DEFAULT 1, id TEXT NOT NULL, author_jid TEXT NOT NULL, author_name TEXT NOT NULL DEFAULT '',"
+      "  type INTEGER NOT NULL DEFAULT 0, text TEXT, media_ref TEXT, media_path TEXT NOT NULL DEFAULT '',"
+      "  thumbnail BLOB, background_argb INTEGER NOT NULL DEFAULT 0, timestamp INTEGER NOT NULL DEFAULT 0,"
+      "  from_me INTEGER NOT NULL DEFAULT 0, viewed INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (account_id, id));"
+      "INSERT INTO statuses (account_id, id, author_jid, author_name, type, text, media_ref, media_path, thumbnail,"
+      "  background_argb, timestamp, from_me, viewed)"
+      " SELECT 1, id, author_jid, author_name, type, text, media_ref, media_path, thumbnail,"
+      "  background_argb, timestamp, from_me, viewed FROM statuses_v16;"
+      "DROP TABLE statuses_v16;"
+      "CREATE INDEX idx_statuses_author_ts ON statuses(account_id, author_jid, timestamp);"
+      "CREATE INDEX idx_statuses_ts ON statuses(account_id, timestamp);"
+
+      /* What you chose for a person or group, whichever of your accounts they are on: the account
+       * that sends to them (0: the primary one) and whether their chats in several accounts show as
+       * one (0 follows the setting, 1 always, 2 never). */
+      "CREATE TABLE chat_prefs ("
+      "  jid TEXT PRIMARY KEY, send_account INTEGER NOT NULL DEFAULT 0, merge INTEGER NOT NULL DEFAULT 0);"
+
+      /* These two keep their own ids, so the account is a plain column. */
+      "ALTER TABLE scheduled_messages ADD COLUMN account_id INTEGER NOT NULL DEFAULT 1;"
+      "ALTER TABLE automation_log ADD COLUMN account_id INTEGER NOT NULL DEFAULT 1;" },
 };
 
-#define LATEST_VERSION 16
+#define LATEST_VERSION 17
 
 static int user_version(sqlite3 *db) {
     sqlite3_stmt *st = NULL;
@@ -161,22 +296,26 @@ static void keep_copy_before_upgrade(sqlite3 *db, const char *path, int current,
 
 static int migrate(sqlite3 *db) {
     int current = user_version(db);
-    for (size_t i = 0; i < sizeof(MIGRATIONS) / sizeof(MIGRATIONS[0]); i++) {
-        const Migration *m = &MIGRATIONS[i];
-        if (m->version <= current) continue;
+    const size_t count = sizeof(MIGRATIONS) / sizeof(MIGRATIONS[0]);
+    for (size_t i = 0; i < count;) {
+        int version = MIGRATIONS[i].version;
+        size_t end = i;
+        while (end < count && MIGRATIONS[end].version == version) end++;
+        if (version <= current) { i = end; continue; }
         char *err = NULL;
         char pragma[48];
-        snprintf(pragma, sizeof(pragma), "PRAGMA user_version = %d;", m->version);
-        if (sqlite3_exec(db, "BEGIN", NULL, NULL, NULL) != SQLITE_OK ||
-            sqlite3_exec(db, m->sql, NULL, NULL, &err) != SQLITE_OK ||
-            sqlite3_exec(db, pragma, NULL, NULL, &err) != SQLITE_OK ||
-            sqlite3_exec(db, "COMMIT", NULL, NULL, &err) != SQLITE_OK) {
-            LOG_ERROR("database migration to version %d failed: %s", m->version, err ? err : "?");
+        snprintf(pragma, sizeof(pragma), "PRAGMA user_version = %d;", version);
+        int ok = sqlite3_exec(db, "BEGIN", NULL, NULL, NULL) == SQLITE_OK;
+        for (size_t step = i; ok && step < end; step++) ok = sqlite3_exec(db, MIGRATIONS[step].sql, NULL, NULL, &err) == SQLITE_OK;
+        ok = ok && sqlite3_exec(db, pragma, NULL, NULL, &err) == SQLITE_OK && sqlite3_exec(db, "COMMIT", NULL, NULL, &err) == SQLITE_OK;
+        if (!ok) {
+            LOG_ERROR("database migration to version %d failed: %s", version, err ? err : "?");
             sqlite3_free(err);
             sqlite3_exec(db, "ROLLBACK", NULL, NULL, NULL);
             return -1;
         }
-        LOG_INFO("database upgraded to version %d", m->version);
+        LOG_INFO("database upgraded to version %d", version);
+        i = end;
     }
     return 0;
 }
@@ -259,7 +398,10 @@ sqlite3 *sqlite_database_open(const char *path, const Passphrase *key) {
 
     char *err = NULL;
     keep_copy_before_upgrade(db, path, user_version(db), key);
-    if (sqlite3_exec(db, BASE_SCHEMA, NULL, NULL, &err) != SQLITE_OK || migrate(db) != 0) {
+    /* The first tables are made only in a new file. Later versions reshape
+     * them, and making them again here would bring an old index back. */
+    int fresh = user_version(db) == 0;
+    if ((fresh && sqlite3_exec(db, BASE_SCHEMA, NULL, NULL, &err) != SQLITE_OK) || migrate(db) != 0) {
         LOG_ERROR("database schema setup failed: %s", err ? err : "see above");
         sqlite3_free(err);
         sqlite3_close(db);

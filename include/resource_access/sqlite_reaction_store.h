@@ -4,7 +4,9 @@
 #include <sqlite3.h>
 
 #include "contracts/i_reaction_store.h"
+#include "core/account_id.h"
 
-IReactionStore *sqlite_reaction_store_create(sqlite3 *db);
+/* A store over the reactions one account has seen. */
+IReactionStore *sqlite_reaction_store_create(sqlite3 *db, AccountId account);
 
 #endif

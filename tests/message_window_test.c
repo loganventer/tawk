@@ -154,12 +154,12 @@ int main(void) {
     gw.connect = fake_ok;
     INotifier notifier = { NULL, fake_notify, NULL };
     EventQueue *events = event_queue_create(16);
-    IMessageStore *messages = caching_message_store_create(sqlite_message_store_create(db), 4);
-    IChatStore *chats = sqlite_chat_store_create(db);
-    IContactStore *contacts = sqlite_contact_store_create(db);
-    IJidAliasStore *aliases = sqlite_jid_alias_store_create(db);
-    IReactionStore *reactions = sqlite_reaction_store_create(db);
-    IReceiptStore *receipts = sqlite_receipt_store_create(db);
+    IMessageStore *messages = caching_message_store_create(sqlite_message_store_create(db, ACCOUNT_ID_FIRST), 4);
+    IChatStore *chats = sqlite_chat_store_create(db, ACCOUNT_ID_FIRST);
+    IContactStore *contacts = sqlite_contact_store_create(db, ACCOUNT_ID_FIRST);
+    IJidAliasStore *aliases = sqlite_jid_alias_store_create(db, ACCOUNT_ID_FIRST);
+    IReactionStore *reactions = sqlite_reaction_store_create(db, ACCOUNT_ID_FIRST);
+    IReceiptStore *receipts = sqlite_receipt_store_create(db, ACCOUNT_ID_FIRST);
     MessagingManagerDeps deps = { &gw, messages, chats, contacts, aliases, reactions, receipts, &notifier, events,
                                   &settings, NULL, NULL, NULL, NULL };
     MessagingManager *m = messaging_manager_create(&deps);

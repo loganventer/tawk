@@ -4,7 +4,9 @@
 #include <sqlite3.h>
 
 #include "contracts/i_message_store.h"
+#include "core/account_id.h"
 
-IMessageStore *sqlite_message_store_create(sqlite3 *db);
+/* A store over the messages of one account. */
+IMessageStore *sqlite_message_store_create(sqlite3 *db, AccountId account);
 
 #endif

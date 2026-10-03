@@ -4,7 +4,9 @@
 #include <sqlite3.h>
 
 #include "contracts/i_chat_store.h"
+#include "core/account_id.h"
 
-IChatStore *sqlite_chat_store_create(sqlite3 *db);
+/* A store over the chats of one account. */
+IChatStore *sqlite_chat_store_create(sqlite3 *db, AccountId account);
 
 #endif

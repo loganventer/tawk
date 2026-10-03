@@ -52,7 +52,7 @@ static void test_store(void) {
     }
     unlink(log_path);
     if (!db) return;
-    IReceiptStore *s = sqlite_receipt_store_create(db);
+    IReceiptStore *s = sqlite_receipt_store_create(db, ACCOUNT_ID_FIRST);
     Receipt r[8];
 
     s->put(s, "M1", "ann", RECEIPT_DELIVERED, 100);
