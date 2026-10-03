@@ -13,6 +13,7 @@
 #include "contracts/i_receipt_store.h"
 #include "contracts/i_status_liker.h"
 #include "contracts/i_notifier.h"
+#include "core/account_id.h"
 #include "core/settings.h"
 #include "utilities/event_queue.h"
 
@@ -32,6 +33,8 @@ typedef struct MessagingManagerDeps {
     IChatExporter   *exporter;
     INetworkMonitor *network;        /* reconnects when the adapters change; may be NULL */
     IStatusLiker    *liker;          /* private status likes; NULL sends a like as a ❤️ reply */
+    AccountId        account;        /* which of your accounts this manager works for */
+    const char      *account_label;  /* its label, to name it in a notification; may be NULL */
 } MessagingManagerDeps;
 
 #endif

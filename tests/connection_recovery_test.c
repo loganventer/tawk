@@ -116,7 +116,7 @@ static void test_reconnects_on_network_change(void) {
     IReceiptStore *receipts = sqlite_receipt_store_create(db, ACCOUNT_ID_FIRST);
     IChatExporter *exporter = text_chat_exporter_create();
     MessagingManagerDeps deps = { &gateway, messages, chats, contacts, aliases, reactions, receipts, &notifier, events,
-                                  &settings, NULL, exporter, &network, NULL };
+                                  &settings, NULL, exporter, &network, NULL, ACCOUNT_ID_FIRST, NULL };
     MessagingManager *m = messaging_manager_create(&deps);
     ManagerChanges ch;
 
@@ -208,7 +208,7 @@ static void test_marks_chats_read(void) {
     IReceiptStore *receipts = sqlite_receipt_store_create(db, ACCOUNT_ID_FIRST);
     IChatExporter *exporter = text_chat_exporter_create();
     MessagingManagerDeps deps = { &gateway, messages, chats, contacts, aliases, reactions, receipts, &notifier, events,
-                                  &settings, NULL, exporter, NULL, NULL };
+                                  &settings, NULL, exporter, NULL, NULL, ACCOUNT_ID_FIRST, NULL };
 
     /* Two unread messages from before tawk started, and one of yours after them. */
     Chat chat;

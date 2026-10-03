@@ -1340,6 +1340,7 @@ static void set_active(TuiApp *app, int active) {
     if (active == app->active) return;
     app->active = active;
     messaging_manager_set_active(app->deps.messaging, active);
+    tui_app_accounts_set_active(app, active);
 }
 
 static void run_screensaver(TuiApp *app) {
@@ -1636,7 +1637,7 @@ int tui_app_run(TuiApp *app) {
     app->followed_mouse = s->mouse;
     app->settings_revision = settings_manager_revision(app->deps.settings);
 
-    messaging_manager_start(app->deps.messaging);
+    tui_app_accounts_start(app);
     if (s->splash) splash_view_start(&app->splash, clock_now_ms());
     app->running = 1;
     while (app->running && !*app->deps.quit_requested) {
@@ -1648,6 +1649,7 @@ int tui_app_run(TuiApp *app) {
         tui_app_statuses_tick(app);
         tui_app_scheduling_tick(app);
         tui_app_agents_tick(app);
+        tui_app_accounts_tick(app);
         ring(app, now);
         apply_changes(app, &ch);
         follow_auth(app, now);
@@ -1681,6 +1683,7 @@ int tui_app_run(TuiApp *app) {
 
     save_draft(app);
     messaging_manager_set_active(app->deps.messaging, 0);
+    tui_app_accounts_set_active(app, 0);
     terminal_modes(0, 0);
     endwin();
     return 0;

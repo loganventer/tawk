@@ -252,6 +252,15 @@ void tui_app_open_forward(TuiApp *app, int index);
 void tui_app_forward_request(TuiApp *app, PopupResult result);
 /* The chats an admin agent may answer its own requests in: the dialog, and what it answered. */
 void tui_app_open_self_chats(TuiApp *app);
+
+/* tui_scheduling.c: due messages of one account, and what to say about them */
+int  tui_scheduling_send_due(SchedulingManager *scheduling, MessagingManager *messaging, int *late);
+void tui_app_scheduling_report(TuiApp *app, int sent, int late);
+
+/* tui_accounts.c: the accounts that are running besides the one in view */
+void tui_app_accounts_start(TuiApp *app);
+void tui_app_accounts_tick(TuiApp *app);
+void tui_app_accounts_set_active(TuiApp *app, int active);
 void tui_app_self_chats_request(TuiApp *app, PopupResult result);
 /* "no chat", "3 chats" or "every chat agents may use". */
 void tui_app_self_chats_summary(TuiApp *app, char *out, size_t size);

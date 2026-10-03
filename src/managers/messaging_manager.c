@@ -433,6 +433,8 @@ static void on_message(MessagingManager *m, Event *e, ManagerChanges *ch) {
     else messaging_manager_display_name(m, msg->chat_jid, n.title, sizeof(n.title));
     if (m->deps.settings->show_preview) str_copy(n.body, sizeof(n.body), line);
     if (have_chat) str_copy(n.tone, sizeof(n.tone), chat.tone);
+    n.account = m->deps.account;
+    if (m->deps.account_label) str_copy(n.account_label, sizeof(n.account_label), m->deps.account_label);
     m->deps.notifier->notify(m->deps.notifier, &n);
     ch->notified++;
 }

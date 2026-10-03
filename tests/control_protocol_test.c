@@ -783,7 +783,7 @@ int main(void) {
     add_message("M1", MOM, "See you at 6", 0, 1790000100);
     add_message("M2", MOM, "Bring bread", 0, 1790000150);
     MessagingManagerDeps deps = { &gw, messages, chats, contacts, aliases, reaction_store, receipts, &notifier, events,
-                                  settings_manager_current(settings_mgr), NULL, exporter, NULL, NULL };
+                                  settings_manager_current(settings_mgr), NULL, exporter, NULL, NULL, ACCOUNT_ID_FIRST, NULL };
     mm = messaging_manager_create(&deps);
     SchedulingManagerDeps sched_deps = { scheduled };
     SchedulingManager *scheduling = scheduling_manager_create(&sched_deps);

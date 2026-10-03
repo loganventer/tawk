@@ -3,7 +3,9 @@
 
 #include <signal.h>
 
+#include "clients/i_account_directory.h"
 #include "clients/tui/approval_queue.h"
+#include "managers/account_roster_manager.h"
 #include "clients/tui/blink_state.h"
 #include "clients/tui/title_flasher.h"
 #include "contracts/i_audio_player.h"
@@ -61,6 +63,11 @@ typedef struct TuiAppDeps {
     AutomationManager     *automation;            /* what agents may do, and what they did */
     ApprovalQueue         *approvals;             /* their requests waiting for you (the Agents tab) */
     IFrameHook            *frame_hook;            /* another client's work each frame (the control socket); may be NULL */
+    /* The managers above are those of the account in view. The directory holds
+     * every running account's, and the roster names and orders them. */
+    IAccountDirectory     *directory;
+    AccountRosterManager  *roster;
+    AccountId              active_account;
 } TuiAppDeps;
 
 #endif

@@ -1,6 +1,6 @@
 # Plan: several WhatsApp accounts in one tawk
 
-Status: in progress, step 1 done (see [Progress](#progress)). Branch: `feature/multi-account` in `tawk` and in `tawk-mcp`, both cut from `main`.
+Status: in progress, steps 1 to 3 done (see [Progress](#progress)). Branch: `feature/multi-account` in `tawk` and in `tawk-mcp`, both cut from `main`.
 
 ## Table of Contents
 
@@ -53,8 +53,8 @@ These were chosen by the owner before planning and are not open in this plan.
 | Step | State |
 |---|---|
 | 1. The account and the database | Done: migration 17, every store bound to an account, the account and per-contact stores, the label rules, the roster manager, and the tests |
-| 2. Several sessions in the backend | Not started |
-| 3. One runtime per account | Not started |
+| 2. Several sessions in the backend | Done: the Go bridge keeps its sessions by handle and marks every event with one; the C gateway routes them. Two sessions were run side by side in one tawk, each with its own login store and log, without a linked number |
+| 3. One runtime per account | Done: `composition/account_runtime` and `account_host`, the account directory the clients are given, and every account started and served each frame. The clients still show the primary account only |
 | 4. The terminal client | Not started |
 | 5. Merged chats and a contact's own settings | The table and the store are in (step 1). The rules and the screens are not started |
 | 6. The control socket and the shell commands | Not started |

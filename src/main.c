@@ -13,6 +13,7 @@
 #include "clients/tui/title_flasher.h"
 #include "clients/tui/tui_app.h"
 #include "clients/tui/tui_notifier.h"
+#include "composition/account_host.h"
 #include "infrastructure/audio/audio_backend_factory.h"
 #include "infrastructure/composite_notifier.h"
 #include "infrastructure/ffmpeg_camera.h"
@@ -35,6 +36,7 @@
 #include "infrastructure/terminal_passphrase_prompt.h"
 #include "infrastructure/terminal_graphics.h"
 #include "managers/account_manager.h"
+#include "managers/account_roster_manager.h"
 #include "managers/automation_manager.h"
 #include "managers/media_manager.h"
 #include "managers/messaging_manager.h"
@@ -52,6 +54,8 @@
 #include "resource_access/ini_settings_store.h"
 #include "resource_access/json_theme_repository.h"
 #include "resource_access/sidecar_gateway.h"
+#include "resource_access/sqlite_account_store.h"
+#include "resource_access/sqlite_chat_prefs_store.h"
 #include "resource_access/file_admin_token_store.h"
 #include "resource_access/sqlite_automation_log.h"
 #include "resource_access/sqlite_chat_store.h"
@@ -348,13 +352,12 @@ int main(int argc, char **argv) {
     const Settings *s = settings_manager_current(settings_mgr);
 
     /* Data folders and logging */
-    char auth_dir[600], db_path[600], log_path[600], sidecar_log[600], state_dir[512];
+    char auth_dir[600], db_path[600], log_path[600], state_dir[512];
     settings_auth_dir(s, auth_dir, sizeof(auth_dir));
     settings_db_path(s, db_path, sizeof(db_path));
     settings_log_path(s, log_path, sizeof(log_path));
     if (opt.doctor) return run_doctor(&opt, s, settings_mgr, settings_store, themes, emoji, bundled_themes, db_path, log_path);
     path_state_dir(state_dir, sizeof(state_dir));
-    path_join(sidecar_log, sizeof(sidecar_log), state_dir, "sidecar.log");
     path_mkdir_p(state_dir, 0700);
     path_mkdir_p(s->data_dir, 0700);
     path_mkdir_p(auth_dir, 0700);
@@ -398,54 +401,16 @@ int main(int argc, char **argv) {
         fprintf(stderr, "%s: cannot open %s (see %s)\n", APP_NAME, db_path, log_path);
         return 1;
     }
-    IMessageStore *messages = caching_message_store_create(sqlite_message_store_create(db, ACCOUNT_ID_FIRST), 16);
-    IChatStore *chats = sqlite_chat_store_create(db, ACCOUNT_ID_FIRST);
-    IContactStore *contacts = caching_contact_store_create(sqlite_contact_store_create(db, ACCOUNT_ID_FIRST), 512);
-    IJidAliasStore *aliases = sqlite_jid_alias_store_create(db, ACCOUNT_ID_FIRST);
-    IReactionStore *reactions = sqlite_reaction_store_create(db, ACCOUNT_ID_FIRST);
-    IReceiptStore *receipts = sqlite_receipt_store_create(db, ACCOUNT_ID_FIRST);
-    IProfileStore *profile_store = sqlite_profile_store_create(db, ACCOUNT_ID_FIRST);
-    IStatusStore *status_store = sqlite_status_store_create(db, ACCOUNT_ID_FIRST);
-    IScheduledMessageStore *scheduled_store = sqlite_scheduled_message_store_create(db, ACCOUNT_ID_FIRST);
+    IAccountStore *account_store = sqlite_account_store_create(db);
+    IChatPrefsStore *chat_prefs = sqlite_chat_prefs_store_create(db);
+    AccountRosterManagerDeps roster_deps = { account_store, chat_prefs };
+    AccountRosterManager *roster = account_roster_manager_create(&roster_deps);
     IChatExporter *exporter = text_chat_exporter_create();
 
-    /* WhatsApp backend */
-    EventQueue *events = event_queue_create(1024);
-    GatewayOptions gw_opt;
-    memset(&gw_opt, 0, sizeof(gw_opt));
-    str_copy(gw_opt.auth_dir, sizeof(gw_opt.auth_dir), auth_dir);
-    str_copy(gw_opt.media_dir, sizeof(gw_opt.media_dir), s->media_dir);
-    str_copy(gw_opt.node_binary, sizeof(gw_opt.node_binary), s->node_binary);
-    str_copy(gw_opt.log_path, sizeof(gw_opt.log_path), sidecar_log);
-    str_copy(gw_opt.log_dir, sizeof(gw_opt.log_dir), state_dir);
-    locate(s->sidecar_dir, "sidecar", "/src/index.js", gw_opt.sidecar_dir, sizeof(gw_opt.sidecar_dir));
-    gw_opt.debug = opt.debug;
+    /* Which backend the accounts run on, and where its parts are */
     const char *backend = opt.backend ? opt.backend : s->backend;
-    IMessageGateway *gateway = NULL;
-    IProfileEditor *profile_editor = NULL;
-    IStatusPublisher *status_publisher = NULL;
-    IStatusLiker *status_liker = NULL;           /* only Baileys can like a status privately */   /* stays NULL on Baileys: it cannot post statuses */
-    const char *backend_name = "baileys (Node.js sidecar)";
-    if (strcmp(backend, "baileys") != 0) {
-        gateway = whatsmeow_gateway_create(&gw_opt, events);
-        if (gateway) {
-            backend_name = "whatsmeow (in-process)";
-            profile_editor = whatsmeow_gateway_profile_editor(gateway);
-            status_publisher = whatsmeow_gateway_status_publisher(gateway);
-        } else {
-            LOG_WARN("built without whatsmeow; using the Node.js sidecar");
-        }
-    }
-    if (!gateway) {
-        /* Baileys keeps its login in its own folder: its logout clears that
-         * folder, which must never touch the whatsmeow login beside it. */
-        GatewayOptions sidecar_opt = gw_opt;
-        path_join(sidecar_opt.auth_dir, sizeof(sidecar_opt.auth_dir), auth_dir, "baileys");
-        path_mkdir_p(sidecar_opt.auth_dir, 0700);
-        gateway = sidecar_gateway_create(&sidecar_opt, events);
-        profile_editor = sidecar_gateway_profile_editor(gateway);
-        status_liker = sidecar_gateway_status_liker(gateway);
-    }
+    char sidecar_dir[512];
+    locate(s->sidecar_dir, "sidecar", "/src/index.js", sidecar_dir, sizeof(sidecar_dir));
 
     /* Audio, media and terminal integration */
     IAudioBackend *audio = audio_backend_factory_create(s->audio_backend);
@@ -468,29 +433,17 @@ int main(int argc, char **argv) {
     composite_notifier_add(notifier, sound_notifier_create(sound_player, s));
     composite_notifier_add(notifier, tui_notifier_create(&blink, &flasher, title, s));
 
-    /* Managers */
-    ProfileManagerDeps pdeps = { gateway, profile_store, s->media_dir };
-    ProfileManager *profiles = profile_manager_create(&pdeps);
-    CallManager *calls = call_manager_create(gateway);
-    AccountManagerDeps adeps = { profile_editor, s->media_dir };
-    AccountManager *accounts = account_manager_create(&adeps);
-    StatusManagerDeps sdeps = { status_publisher, s->media_dir };
-    StatusManager *statuses = status_manager_create(&sdeps);
-    IEventObserver *observers = composite_event_observer_create();
-    composite_event_observer_add(observers, profile_manager_observer(profiles));
-    composite_event_observer_add(observers, call_manager_observer(calls));
-    composite_event_observer_add(observers, account_manager_observer(accounts));
-    composite_event_observer_add(observers, status_manager_observer(statuses));
-    StatusFeedManagerDeps fdeps = { status_store, gateway, s->media_dir, s, receipts, reactions };
-    StatusFeedManager *feed = status_feed_manager_create(&fdeps);
-    composite_event_observer_add(observers, status_feed_manager_observer(feed));
-    SchedulingManagerDeps sched_deps = { scheduled_store };
-    SchedulingManager *scheduling = scheduling_manager_create(&sched_deps);
-    composite_event_observer_add(observers, scheduling_manager_observer(scheduling));
-    INetworkMonitor *network = ifaddrs_network_monitor_create();
-    MessagingManagerDeps mdeps = { gateway, messages, chats, contacts, aliases, reactions, receipts, notifier, events, s,
-                                   observers, exporter, network, status_liker };
-    MessagingManager *messaging = messaging_manager_create(&mdeps);
+    /* The accounts: each gets its gateway, its stores over the one database
+     * and its managers. The clients start with the primary one in view. */
+    AccountRuntimeParams runtime_params = { db, s, notifier, exporter, backend, sidecar_dir, state_dir, opt.debug };
+    AccountHost *host = account_host_create(&runtime_params, account_store);
+    IAccountDirectory *directory = host ? account_host_directory(host) : NULL;
+    const AccountServices *active = directory ? directory->find(directory, account_roster_manager_primary(roster)) : NULL;
+    if (!active && directory) active = directory->at(directory, 0);
+    if (!active) {
+        fprintf(stderr, "%s: no account could be started (see %s)\n", APP_NAME, log_path);
+        return 1;
+    }
     /* Agents: the control socket, its rules and log, and the requests waiting for you */
     IAutomationLog *automation_log = sqlite_automation_log_create(db);
     char admin_token_file[600];
@@ -502,8 +455,9 @@ int main(int argc, char **argv) {
     IControlTransport *control_transport = unix_control_transport_create();
     char control_path[600];
     control_socket_path(control_path, sizeof(control_path));
-    ControlServerDeps control_deps = { control_transport, approval_queue_prompt(approvals), messaging, profiles, scheduling, feed,
-                                       automation, settings_mgr, accounts, statuses, calls, backend_name, control_path };
+    ControlServerDeps control_deps = { control_transport, approval_queue_prompt(approvals), active->messaging, active->profiles,
+                                       active->scheduling, active->feed, automation, settings_mgr, active->accounts,
+                                       active->statuses, active->calls, active->backend_name, control_path };
     ControlServer *control = control_server_create(&control_deps);
     ICamera *camera = ffmpeg_camera_create();
     MediaManagerDeps media_deps = { opener, voice_player, recorder, camera, audio, s };
@@ -513,10 +467,17 @@ int main(int argc, char **argv) {
     int cell_w, cell_h;
     terminal_graphics_cell_pixels(&cell_w, &cell_h);
     TuiAppDeps tdeps = {
-        messaging, profiles, calls, media, settings_mgr, screensaver, sound_player, emoji, clipboard, posters, pages, clipboard_image, notifier, &blink, &flasher,
-        backend_name, audio->name(audio), user_themes, terminal_graphics_sixel(), cell_w, cell_h, &s_quit,
-        accounts, statuses, whatsmeow_available(), &s_restart, feed, scheduling,
-        automation, approvals, control ? control_server_frame_hook(control) : NULL
+        .messaging = active->messaging, .profiles = active->profiles, .calls = active->calls, .media = media,
+        .settings = settings_mgr, .screensaver = screensaver, .sound_player = sound_player, .emoji = emoji,
+        .clipboard = clipboard, .video_posters = posters, .document_pages = pages, .clipboard_image = clipboard_image,
+        .notifier = notifier, .blink = &blink, .title = &flasher,
+        .backend_name = active->backend_name, .audio_backend_name = audio->name(audio), .user_theme_dir = user_themes,
+        .sixel_supported = terminal_graphics_sixel(), .cell_width_px = cell_w, .cell_height_px = cell_h,
+        .quit_requested = &s_quit,
+        .accounts = active->accounts, .statuses = active->statuses, .whatsmeow_available = whatsmeow_available(),
+        .restart_requested = &s_restart, .feed = active->feed, .scheduling = active->scheduling,
+        .automation = automation, .approvals = approvals, .frame_hook = control ? control_server_frame_hook(control) : NULL,
+        .directory = directory, .roster = roster, .active_account = active->id,
     };
     TuiApp *tui = tui_app_create(&tdeps);
     int exit_code = tui ? tui_app_run(tui) : 1;
@@ -531,17 +492,7 @@ int main(int argc, char **argv) {
     if (admin_tokens) admin_tokens->destroy(admin_tokens);
     if (automation_log) automation_log->destroy(automation_log);
     media_manager_destroy(media);
-    messaging_manager_destroy(messaging);
-    if (network) network->destroy(network);
-    profile_manager_destroy(profiles);
-    call_manager_destroy(calls);
-    observers->destroy(observers);
-    status_feed_manager_destroy(feed);
-    scheduling_manager_destroy(scheduling);
-    status_manager_destroy(statuses);
-    account_manager_destroy(accounts);
-    event_queue_close(events);
-    gateway->destroy(gateway);
+    account_host_destroy(host);
     notifier->destroy(notifier);
     title->destroy(title);
     clipboard->destroy(clipboard);
@@ -555,17 +506,10 @@ int main(int argc, char **argv) {
     sound_player->destroy(sound_player);
     voice_player->destroy(voice_player);
     audio->destroy(audio);
-    event_queue_destroy(events);
-    reactions->destroy(reactions);
-    receipts->destroy(receipts);
-    profile_store->destroy(profile_store);
-    status_store->destroy(status_store);
-    scheduled_store->destroy(scheduled_store);
     exporter->destroy(exporter);
-    aliases->destroy(aliases);
-    contacts->destroy(contacts);
-    chats->destroy(chats);
-    messages->destroy(messages);
+    account_roster_manager_destroy(roster);
+    chat_prefs->destroy(chat_prefs);
+    account_store->destroy(account_store);
     sqlite_database_close(db);
     settings_manager_destroy(settings_mgr);
     themes->destroy(themes);

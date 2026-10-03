@@ -84,40 +84,56 @@ void tui_app_scheduled_render(TuiApp *app, UiRect area) {
     scheduled_message_array_free(items, count);
 }
 
+/* Sends what is due for one account through that account's managers.
+ * Returns how many went; *late gets how many of them were overdue. -1 when
+ * some were due and none could be sent, 0 when nothing was due. */
+int tui_scheduling_send_due(SchedulingManager *scheduling, MessagingManager *messaging, int *late) {
+    *late = 0;
+    if (!scheduling || messaging_manager_auth_state(messaging) != AUTH_STATE_CONNECTED) return 0;
+    int64_t now = (int64_t)time(NULL);
+    ScheduledMessage *due = NULL;
+    int count = 0;
+    if (scheduling_manager_take_due(scheduling, now, &due, &count) != 0 || count == 0) {
+        scheduled_message_array_free(due, count);
+        return 0;
+    }
+    int sent = 0;
+    for (int i = 0; i < count; i++) {
+        MentionList mentions;
+        mention_list_parse(&mentions, due[i].mentions);
+        OutgoingText out = { due[i].text, NULL, mentions.count ? &mentions : NULL, 0, 0, 0 };
+        if (messaging_manager_send_text_to(messaging, due[i].chat_jid, &out) == 0) {
+            scheduling_manager_mark_sent(scheduling, due[i].id);
+            messaging_manager_note_scheduled_sent(messaging, due[i].id, due[i].chat_jid);
+            sent++;
+            if (now - due[i].due_at > LATE_SECONDS) (*late)++;
+        } else {
+            scheduling_manager_mark_failed(scheduling, due[i].id);
+        }
+    }
+    scheduled_message_array_free(due, count);
+    return sent ? sent : -1;
+}
+
+/* Says what tui_scheduling_send_due did. */
+void tui_app_scheduling_report(TuiApp *app, int sent, int late) {
+    if (sent == 0) return;
+    char msg[96];
+    if (late) snprintf(msg, sizeof(msg), "\xF0\x9F\x95\x93 Sent %d scheduled message%s late (tawk was closed or offline)", late, late == 1 ? "" : "s");
+    else if (sent == 1) snprintf(msg, sizeof(msg), "\xF0\x9F\x95\x93 Sent a scheduled message");
+    else if (sent > 0) snprintf(msg, sizeof(msg), "\xF0\x9F\x95\x93 Sent %d scheduled messages", sent);
+    else snprintf(msg, sizeof(msg), "A scheduled message could not be sent");
+    tui_app_toast(app, msg, sent < 0);
+    app->dirty = 1;
+}
+
 /* Due messages go out while connected, each as an ordinary message (with
  * its own id, pending until WhatsApp takes it). Ones that were due while
  * tawk was closed go as soon as it is connected again, with a note. */
 void tui_app_scheduling_tick(TuiApp *app) {
     if (!app->deps.scheduling) return;
     if (scheduling_manager_take_changed(app->deps.scheduling)) app->dirty = 1;
-    if (messaging_manager_auth_state(app->deps.messaging) != AUTH_STATE_CONNECTED) return;
-    int64_t now = (int64_t)time(NULL);
-    ScheduledMessage *due = NULL;
-    int count = 0;
-    if (scheduling_manager_take_due(app->deps.scheduling, now, &due, &count) != 0 || count == 0) {
-        scheduled_message_array_free(due, count);
-        return;
-    }
-    int sent = 0, late = 0;
-    for (int i = 0; i < count; i++) {
-        MentionList mentions;
-        mention_list_parse(&mentions, due[i].mentions);
-        OutgoingText out = { due[i].text, NULL, mentions.count ? &mentions : NULL, 0, 0, 0 };
-        if (messaging_manager_send_text_to(app->deps.messaging, due[i].chat_jid, &out) == 0) {
-            scheduling_manager_mark_sent(app->deps.scheduling, due[i].id);
-            messaging_manager_note_scheduled_sent(app->deps.messaging, due[i].id, due[i].chat_jid);
-            sent++;
-            if (now - due[i].due_at > LATE_SECONDS) late++;
-        } else {
-            scheduling_manager_mark_failed(app->deps.scheduling, due[i].id);
-        }
-    }
-    scheduled_message_array_free(due, count);
-    char msg[96];
-    if (late) snprintf(msg, sizeof(msg), "\xF0\x9F\x95\x93 Sent %d scheduled message%s late (tawk was closed or offline)", late, late == 1 ? "" : "s");
-    else if (sent == 1) snprintf(msg, sizeof(msg), "\xF0\x9F\x95\x93 Sent a scheduled message");
-    else if (sent) snprintf(msg, sizeof(msg), "\xF0\x9F\x95\x93 Sent %d scheduled messages", sent);
-    else snprintf(msg, sizeof(msg), "A scheduled message could not be sent");
-    tui_app_toast(app, msg, sent == 0);
-    app->dirty = 1;
+    int late = 0;
+    int sent = tui_scheduling_send_due(app->deps.scheduling, app->deps.messaging, &late);
+    tui_app_scheduling_report(app, sent, late);
 }

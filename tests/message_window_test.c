@@ -161,7 +161,7 @@ int main(void) {
     IReactionStore *reactions = sqlite_reaction_store_create(db, ACCOUNT_ID_FIRST);
     IReceiptStore *receipts = sqlite_receipt_store_create(db, ACCOUNT_ID_FIRST);
     MessagingManagerDeps deps = { &gw, messages, chats, contacts, aliases, reactions, receipts, &notifier, events,
-                                  &settings, NULL, NULL, NULL, NULL };
+                                  &settings, NULL, NULL, NULL, NULL, ACCOUNT_ID_FIRST, NULL };
     MessagingManager *m = messaging_manager_create(&deps);
     for (int n = 1; n <= TOTAL; n++) store(messages, n);
 
