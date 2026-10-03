@@ -23,6 +23,8 @@ To add the agent side afterwards (reading chats and proposing messages through M
 
 tawk is a WhatsApp client that runs in a terminal. It is one C program built from source on the person's own machine, and it links to their phone as a linked device, the same way WhatsApp Web does. Chats are kept in a SQLite file on that machine. There is no account to create and nothing to pay for.
 
+tawk is an independent project, not affiliated with or endorsed by WhatsApp or Meta, and it uses unofficial protocol libraries. Say so to the person before you install it, so that using it, and in line with WhatsApp's terms of service, is their own decision. The linked session in `~/.local/share/tawk/` gives access to their account, and they can end it at any time on the phone under **Linked devices**.
+
 | Fact | Value |
 |---|---|
 | Source | `https://github.com/loganventer/tawk` (public, MIT) |
