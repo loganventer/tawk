@@ -2,6 +2,7 @@
  * managers, and every one is served every frame: an account nobody looks at
  * still receives, notifies and sends what is due. */
 #include "tui_app_state.h"
+#include "engines/account_agent_policy.h"
 #include "engines/jid_list.h"
 #include "utilities/clock_util.h"
 #include "utilities/str_util.h"
@@ -537,19 +538,15 @@ int tui_app_peers_load_older(TuiApp *app) {
 
 static const Settings *current_settings(TuiApp *app) { return settings_manager_current(app->deps.settings); }
 
-/* What agents may do with an account, following the setting where it says to. */
 static AccountAgentAccess effective_access(TuiApp *app, const Account *account) {
-    if (account->agent_access != ACCOUNT_AGENT_FOLLOW) return account->agent_access;
-    return account_agent_access_parse(current_settings(app)->automation_access);
+    return account_agent_policy_access(account, current_settings(app));
 }
 
-/* The chats an agent may answer by itself in for an account. An account
- * that follows the setting and has no list of its own still uses the one
- * the settings held before accounts had their own. */
+/* The chats an agent may answer by itself in for an account. */
 static void self_approval_chats(TuiApp *app, const Account *account, char *out, size_t size) {
-    out[0] = '\0';
-    account_roster_manager_self_approval_chats(app->deps.roster, account->id, out, size);
-    if (!out[0] && account->agent_access == ACCOUNT_AGENT_FOLLOW) str_copy(out, size, current_settings(app)->automation_self_chats);
+    char own[1024] = "";
+    account_roster_manager_self_approval_chats(app->deps.roster, account->id, own, sizeof(own));
+    str_copy(out, size, account_agent_policy_self_chats(account, own, current_settings(app)));
 }
 
 static const char *label_of(TuiApp *app, AccountId id, Account *scratch) {

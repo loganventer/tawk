@@ -19,6 +19,7 @@ int control_options_parse(ControlCommandKind kind, int argc, char **argv, Contro
         const char *a = argv[i];
         if (!strcmp(a, "--json")) { o->json = 1; continue; }
         if (!strcmp(a, "--format") && i + 1 < argc) { o->format = argv[++i]; continue; }
+        if (!strcmp(a, "--account") && i + 1 < argc) { o->account = argv[++i]; continue; }
         if (kind == CONTROL_COMMAND_SEND) {
             if (o->chat_count == 0) { o->chats[o->chat_count++] = a; continue; }
             if (!strcmp(a, "-") && o->word_count == 0) { o->from_stdin = 1; continue; }

@@ -6,7 +6,8 @@
 #define CONTROL_OPTIONS_CHATS 32
 
 /* What a shell command asked for: tawk send CHAT [TEXT|-], tawk tail
- * [CHAT...] [--json], tawk unread [--json], tawk status-line [--format F]. */
+ * [CHAT...] [--json], tawk unread [--json], tawk status-line [--format F],
+ * each with --account NAME to pick one of your accounts. */
 typedef struct ControlOptions {
     ControlCommandKind kind;
     const char        *chats[CONTROL_OPTIONS_CHATS];
@@ -16,6 +17,7 @@ typedef struct ControlOptions {
     int                from_stdin;         /* send: "-" reads the text from standard input */
     int                json;
     const char        *format;             /* status-line */
+    const char        *account;            /* --account: its label or id; NULL for the default, or all when counting */
 } ControlOptions;
 
 /* Reads the arguments after the command name; returns 0, or -1 with a

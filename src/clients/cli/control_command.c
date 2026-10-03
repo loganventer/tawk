@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #define ANSWER_WAIT_MS (6 * 60 * 1000)     /* longer than tawk waits for your approval */
 
@@ -109,6 +110,7 @@ static int run_send(IControlClient *c, const ControlOptions *o) {
     cJSON *args = cJSON_CreateObject();
     cJSON_AddStringToObject(args, "chat", o->chats[0]);
     cJSON_AddStringToObject(args, "text", text);
+    if (o->account) cJSON_AddStringToObject(args, "account", o->account);
     free(text);
     if (request(c, "send", "send_message", args) != 0) return CONTROL_EXIT_NOT_RUNNING;
     cJSON *reply = answer(c, "send", ANSWER_WAIT_MS, waiting_note);
@@ -121,6 +123,17 @@ static int run_send(IControlClient *c, const ControlOptions *o) {
 static const char *text_of(const cJSON *o, const char *name) {
     const cJSON *v = cJSON_GetObjectItemCaseSensitive(o, name);
     return cJSON_IsString(v) ? v->valuestring : "";
+}
+
+/* Whether an event is about the account `wanted` names, by label or id. An
+ * event with no account comes from a tawk with one account, and always is. */
+static int event_of_account(const cJSON *evt, const char *wanted) {
+    const cJSON *account = cJSON_GetObjectItemCaseSensitive(evt, "account");
+    if (!wanted || !cJSON_IsObject(account)) return 1;
+    const cJSON *id = cJSON_GetObjectItemCaseSensitive(account, "id");
+    char number[16] = "";
+    if (cJSON_IsNumber(id)) snprintf(number, sizeof(number), "%d", id->valueint);
+    return !strcasecmp(text_of(account, "label"), wanted) || !strcmp(number, wanted);
 }
 
 static void print_message(const cJSON *evt, int json) {
@@ -136,7 +149,9 @@ static void print_message(const cJSON *evt, int json) {
     char when[32] = "";
     if (cJSON_IsNumber(ts)) clock_format_time((int64_t)ts->valuedouble, 1, when, sizeof(when));
     const char *text = text_of(msg, "text");
-    printf("[%s] %s \xC2\xB7 %s: %s\n", when, text_of(chat, "name"), text_of(msg, "sender_name"), *text ? text : text_of(msg, "type"));
+    const char *label = text_of(cJSON_GetObjectItemCaseSensitive(evt, "account"), "label");
+    if (*label) printf("[%s] (%s) %s \xC2\xB7 %s: %s\n", when, label, text_of(chat, "name"), text_of(msg, "sender_name"), *text ? text : text_of(msg, "type"));
+    else printf("[%s] %s \xC2\xB7 %s: %s\n", when, text_of(chat, "name"), text_of(msg, "sender_name"), *text ? text : text_of(msg, "type"));
 }
 
 static int run_tail(IControlClient *c, const ControlOptions *o) {
@@ -158,20 +173,42 @@ static int run_tail(IControlClient *c, const ControlOptions *o) {
         cJSON *evt = cJSON_Parse(line);
         free(line);
         const char *name = text_of(evt, "evt");
-        if (!strcmp(name, "message")) print_message(evt, o->json);
+        if (!strcmp(name, "message") && event_of_account(evt, o->account)) print_message(evt, o->json);
         int bye = !strcmp(name, "bye");
         cJSON_Delete(evt);
         if (bye) return CONTROL_EXIT_OK;
     }
 }
 
-static cJSON *unread_summary(IControlClient *c) {
-    if (request(c, "unread", "unread_summary", NULL) != 0) return NULL;
+/* The unread summary of one account: the one named, or the default with NULL. */
+static cJSON *unread_summary(IControlClient *c, const char *account) {
+    cJSON *args = NULL;
+    if (account) {
+        args = cJSON_CreateObject();
+        cJSON_AddStringToObject(args, "account", account);
+    }
+    if (request(c, "unread", "unread_summary", args) != 0) return NULL;
     return answer(c, "unread", 5000, NULL);
 }
 
-static int run_unread(IControlClient *c, const ControlOptions *o) {
-    cJSON *reply = unread_summary(c);
+/* The labels of the accounts this client may use, when tawk has more than
+ * one of them. Returns how many; 0 means ask once, for the default account. */
+static int account_labels(IControlClient *c, const ControlOptions *o, char labels[][64], int max) {
+    if (o->account) return 0;
+    if (request(c, "accounts", "list_accounts", NULL) != 0) return 0;
+    cJSON *reply = answer(c, "accounts", 5000, NULL);
+    int n = 0;
+    const cJSON *account;
+    cJSON_ArrayForEach(account, cJSON_GetObjectItemCaseSensitive(result_of(reply), "accounts")) {
+        if (n < max) snprintf(labels[n++], 64, "%s", text_of(account, "label"));
+    }
+    cJSON_Delete(reply);
+    return n > 1 ? n : 0;
+}
+
+/* One account's unread chats; `label` is put before each name when several accounts are listed. */
+static int print_unread(IControlClient *c, const ControlOptions *o, const char *account, const char *label) {
+    cJSON *reply = unread_summary(c, account);
     const cJSON *r = result_of(reply);
     if (!r) { int rc = reply ? failed(reply) : CONTROL_EXIT_FAILED; cJSON_Delete(reply); return rc; }
     if (o->json) {
@@ -182,23 +219,43 @@ static int run_unread(IControlClient *c, const ControlOptions *o) {
         const cJSON *chat;
         cJSON_ArrayForEach(chat, cJSON_GetObjectItemCaseSensitive(r, "chats")) {
             const cJSON *n = cJSON_GetObjectItemCaseSensitive(chat, "unread");
-            printf("%4d  %s%s\n", cJSON_IsNumber(n) ? n->valueint : 0, text_of(chat, "name"),
-                   cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(chat, "unread_mention")) ? "  @" : "");
+            printf("%4d  %s%s%s%s%s\n", cJSON_IsNumber(n) ? n->valueint : 0, label ? "(" : "", label ? label : "", label ? ") " : "",
+                   text_of(chat, "name"), cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(chat, "unread_mention")) ? "  @" : "");
         }
     }
     cJSON_Delete(reply);
     return CONTROL_EXIT_OK;
 }
 
+/* Every account this client may use, one after the other, unless --account names one. With --json that is a line per account. */
+static int run_unread(IControlClient *c, const ControlOptions *o) {
+    char labels[16][64];
+    int n = account_labels(c, o, labels, 16);
+    if (n == 0) return print_unread(c, o, o->account, NULL);
+    for (int i = 0; i < n; i++) {
+        int rc = print_unread(c, o, labels[i], labels[i]);
+        if (rc != CONTROL_EXIT_OK) return rc;
+    }
+    return CONTROL_EXIT_OK;
+}
+
 /* "💬 {unread}" by default, with " @{mentions}" when someone mentioned you;
  * nothing at all when there is nothing unread or tawk is not running. */
 static int run_status_line(IControlClient *c, const ControlOptions *o) {
-    cJSON *reply = unread_summary(c);
-    const cJSON *r = result_of(reply);
-    int total = r ? cJSON_GetObjectItemCaseSensitive(r, "total")->valueint : 0;
-    int mentions = r ? cJSON_GetObjectItemCaseSensitive(r, "mentions")->valueint : 0;
-    int chats = r ? cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(r, "chats")) : 0;
-    cJSON_Delete(reply);
+    /* Counted over every account this client may use, unless --account names one. */
+    char labels[16][64];
+    int accounts = account_labels(c, o, labels, 16);
+    int total = 0, mentions = 0, chats = 0;
+    for (int i = 0; i < (accounts ? accounts : 1); i++) {
+        cJSON *reply = unread_summary(c, accounts ? labels[i] : o->account);
+        const cJSON *r = result_of(reply);
+        if (r) {
+            total += cJSON_GetObjectItemCaseSensitive(r, "total")->valueint;
+            mentions += cJSON_GetObjectItemCaseSensitive(r, "mentions")->valueint;
+            chats += cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(r, "chats"));
+        }
+        cJSON_Delete(reply);
+    }
     if (total == 0) { printf("\n"); return CONTROL_EXIT_OK; }
     const char *format = o->format ? o->format : mentions ? "\xF0\x9F\x92\xAC {unread} @{mentions}" : "\xF0\x9F\x92\xAC {unread}";
     for (const char *p = format; *p; p++) {
