@@ -3,7 +3,9 @@
 
 #include <stdint.h>
 
-#define BACKUP_FORMAT 1
+/* 2 added the logins of further accounts. A backup of format 1 still restores: it holds the one account. */
+#define BACKUP_FORMAT 2
+#define BACKUP_FORMAT_OLDEST 1
 
 /* What a backup holds, written into it as manifest.txt. */
 typedef struct BackupManifest {
@@ -16,6 +18,7 @@ typedef struct BackupManifest {
     int     has_themes;
     int     has_media;
     int     has_login;
+    int     has_accounts;        /* the logins of accounts after the first */
 } BackupManifest;
 
 #endif

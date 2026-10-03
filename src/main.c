@@ -278,7 +278,9 @@ static int run_backup_or_restore(const Options *opt, const Settings *s, const ch
     IFileCipher *file_cipher = openssl_file_cipher_create();
     BackupManagerDeps deps = { snapshot, archive, file_cipher, sqlite_database_is_encrypted(db_path) };
     BackupManager *backups = backup_manager_create(&deps);
-    BackupPaths paths = { s->data_dir, db_path, config_path, themes_dir, s->media_dir, auth_dir };
+    char accounts_dir[600];
+    path_join(accounts_dir, sizeof(accounts_dir), s->data_dir, "accounts");
+    BackupPaths paths = { s->data_dir, db_path, config_path, themes_dir, s->media_dir, auth_dir, accounts_dir };
     int rc;
     if (opt->backup_path) {
         BackupRequest request = { paths, opt->backup_path, opt->with_media, opt->with_login };

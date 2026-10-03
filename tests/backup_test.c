@@ -2,12 +2,14 @@
  * login, is unreadable without its passphrase, never replaces a file, and
  * restores everything while keeping what it replaced; a tampered archive
  * (a "../" member or a link) is refused before anything is extracted. */
+#include "engines/backup_manifest_codec.h"
 #include "engines/archive_path_policy.h"
 #include "infrastructure/openssl_file_cipher.h"
 #include "infrastructure/tar_archive.h"
 #include "managers/backup_manager.h"
 #include "resource_access/sqlite_database.h"
 #include "resource_access/sqlite_file_snapshot.h"
+#include "utilities/path_util.h"
 #include "utilities/process_quiet.h"
 #include "utilities/process_util.h"
 
@@ -110,6 +112,9 @@ static void test_round_trip(BackupManager *m, const BackupPaths *paths) {
 
     /* Lose some data, change the rest. */
     unlink(db_path);
+    char lost[400];
+    snprintf(lost, sizeof(lost), "%s/2/auth/whatsmeow.db", paths->accounts_dir);
+    unlink(lost);
     write_file(config_path, "[appearance]\ntheme = nord\n");
     RestoreReport report;
     CHECK(backup_manager_restore(m, paths, backup, &wrong, &report, why, sizeof(why)) != 0, "a wrong passphrase restores nothing");
@@ -125,6 +130,13 @@ static void test_round_trip(BackupManager *m, const BackupPaths *paths) {
     CHECK(file_has(path, "jpeg"), "the media");
     snprintf(path, sizeof(path), "%s/whatsmeow.db", auth_dir);
     CHECK(file_has(path, "login"), "and the login");
+    snprintf(path, sizeof(path), "%s/2/auth/whatsmeow.db", paths->accounts_dir);
+    CHECK(file_has(path, "second login") && report.manifest.has_accounts && report.manifest.format == BACKUP_FORMAT,
+          "and the logins of the other accounts");
+    BackupManifest old;
+    CHECK(backup_manifest_parse("format=1\nversion=0.6.4\ndatabase=1\nlogin=1\n", &old) == 0 && old.has_login && !old.has_accounts,
+          "a backup from before accounts still reads, as the one account");
+    CHECK(backup_manifest_parse("format=3\ndatabase=1\n", &old) != 0, "one from a newer tawk is refused");
     CHECK(report.manifest.has_media && report.manifest.has_login && report.moved_aside >= 3, "the report says what happened");
     snprintf(path, sizeof(path), "%s%s", config_path, report.aside_suffix);
     CHECK(file_has(path, "nord"), "what was replaced is kept aside");
@@ -195,7 +207,13 @@ int main(void) {
     IFileCipher *cipher = openssl_file_cipher_create();
     BackupManagerDeps deps = { snapshot, archive, cipher, 0 };
     BackupManager *m = backup_manager_create(&deps);
-    BackupPaths paths = { data_dir, db_path, config_path, themes_dir, media_dir, auth_dir };
+    char accounts_dir[300], second[340], second_login[380];
+    snprintf(accounts_dir, sizeof(accounts_dir), "%s/accounts", data_dir);
+    snprintf(second, sizeof(second), "%s/2/auth", accounts_dir);
+    snprintf(second_login, sizeof(second_login), "%s/whatsmeow.db", second);
+    path_mkdir_p(second, 0700);
+    write_file(second_login, "second login");
+    BackupPaths paths = { data_dir, db_path, config_path, themes_dir, media_dir, auth_dir, accounts_dir };
     test_round_trip(m, &paths);
     test_tampered(m, &paths);
     backup_manager_destroy(m);

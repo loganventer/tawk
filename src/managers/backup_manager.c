@@ -97,6 +97,12 @@ static int gather(BackupManager *m, const BackupRequest *r, const char *content,
         manifest->has_login = 1;
         names[(*count)++] = "auth";
     }
+    join(dest, sizeof(dest), content, "accounts");
+    if (r->with_login && p->accounts_dir && is_dir(p->accounts_dir)) {
+        if (tree_copy(p->accounts_dir, dest) != 0) return -1;
+        manifest->has_accounts = 1;
+        names[(*count)++] = "accounts";
+    }
     char text[512];
     join(dest, sizeof(dest), content, "manifest.txt");
     int fd = open(dest, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
@@ -221,6 +227,10 @@ static int put_back(const BackupPaths *p, const char *content, const BackupManif
     if (mf->has_themes) { join(src, sizeof(src), content, "themes"); rc |= put_in_place(src, p->themes_dir, suffix, &report->moved_aside); }
     if (mf->has_media)  { join(src, sizeof(src), content, "media"); rc |= put_in_place(src, p->media_dir, suffix, &report->moved_aside); }
     if (mf->has_login)  { join(src, sizeof(src), content, "auth"); rc |= put_in_place(src, p->auth_dir, suffix, &report->moved_aside); }
+    if (mf->has_accounts && p->accounts_dir) {
+        join(src, sizeof(src), content, "accounts");
+        rc |= put_in_place(src, p->accounts_dir, suffix, &report->moved_aside);
+    }
     return rc;
 }
 

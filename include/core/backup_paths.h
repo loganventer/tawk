@@ -8,7 +8,8 @@ typedef struct BackupPaths {
     const char *config_path;
     const char *themes_dir;     /* your own themes */
     const char *media_dir;
-    const char *auth_dir;       /* the WhatsApp login */
+    const char *auth_dir;       /* the WhatsApp login of the first account */
+    const char *accounts_dir;   /* the logins of the other accounts, one folder each; may be NULL */
 } BackupPaths;
 
 #endif

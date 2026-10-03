@@ -9,9 +9,9 @@ int backup_manifest_format(const BackupManifest *m, char *out, size_t size) {
     int n = snprintf(out, size,
                      "# tawk backup\n"
                      "format=%d\nversion=%s\ncreated=%lld\n"
-                     "database=%d\ndatabase_encrypted=%d\nconfig=%d\nthemes=%d\nmedia=%d\nlogin=%d\n",
+                     "database=%d\ndatabase_encrypted=%d\nconfig=%d\nthemes=%d\nmedia=%d\nlogin=%d\naccounts=%d\n",
                      m->format, m->app_version, (long long)m->created, m->has_database, m->database_encrypted,
-                     m->has_config, m->has_themes, m->has_media, m->has_login);
+                     m->has_config, m->has_themes, m->has_media, m->has_login, m->has_accounts);
     return n > 0 && (size_t)n < size ? 0 : -1;
 }
 
@@ -26,6 +26,7 @@ static void set_field(BackupManifest *m, const char *key, const char *value) {
     else if (!strcmp(key, "themes")) m->has_themes = v != 0;
     else if (!strcmp(key, "media")) m->has_media = v != 0;
     else if (!strcmp(key, "login")) m->has_login = v != 0;
+    else if (!strcmp(key, "accounts")) m->has_accounts = v != 0;
 }
 
 int backup_manifest_parse(const char *text, BackupManifest *out) {
@@ -42,5 +43,5 @@ int backup_manifest_parse(const char *text, BackupManifest *out) {
         }
         line = end ? end + 1 : NULL;
     }
-    return out->format == BACKUP_FORMAT ? 0 : -1;
+    return out->format >= BACKUP_FORMAT_OLDEST && out->format <= BACKUP_FORMAT ? 0 : -1;
 }

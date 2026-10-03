@@ -203,11 +203,49 @@ static void check_screensaver(Tally *t, const DoctorInputs *in) {
     line(t, found ? OK : WARN, "command", buf, "install it, or pick another command under Settings, Screensaver");
 }
 
+/* One account's login folder: whether a number is linked there. */
+static void account_line(Tally *t, const char *label, const char *auth_dir) {
+    char detail[700];
+    int linked = 0;
+    DIR *d = opendir(auth_dir);
+    if (d) {
+        struct dirent *e;
+        while ((e = readdir(d)) != NULL) if (e->d_name[0] != '.') linked = 1;
+        closedir(d);
+    }
+    snprintf(detail, sizeof(detail), "%s (%s)", auth_dir, linked ? "linked" : "not linked yet");
+    line(t, OK, label, detail, NULL);
+}
+
+/* The accounts, as their login folders show them. Labels and agent access are
+ * kept in the database, which this check leaves alone: Settings, Account, Accounts shows those. */
+static void check_accounts(Tally *t, const DoctorInputs *in) {
+    section("Accounts");
+    char path[600];
+    path_join(path, sizeof(path), in->settings->data_dir, "auth");
+    account_line(t, "account 1", path);
+    char accounts[600];
+    path_join(accounts, sizeof(accounts), in->settings->data_dir, "accounts");
+    DIR *d = opendir(accounts);
+    if (!d) return;
+    struct dirent *e;
+    while ((e = readdir(d)) != NULL) {
+        int id = atoi(e->d_name);
+        if (id <= 1) continue;
+        char label[32], auth[900];
+        snprintf(label, sizeof(label), "account %d", id);
+        snprintf(auth, sizeof(auth), "%s/%s/auth", accounts, e->d_name);
+        if (is_dir(auth)) account_line(t, label, auth);
+    }
+    closedir(d);
+}
+
 int doctor_run(const DoctorInputs *in) {
     Tally t = { 0, 0 };
     printf("%s %s setup check\n", APP_NAME, APP_VERSION);
     check_terminal(&t);
     check_files(&t, in);
+    check_accounts(&t, in);
     check_backend(&t, in);
     check_media(&t, in);
     check_screensaver(&t, in);

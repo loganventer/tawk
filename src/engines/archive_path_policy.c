@@ -3,7 +3,7 @@
 #include <string.h>
 
 static const char *const FILES[] = { "manifest.txt", "tawk.db", "tawk.db-wal", "config.ini" };
-static const char *const FOLDERS[] = { "themes", "media", "auth" };
+static const char *const FOLDERS[] = { "themes", "media", "auth", "accounts" };
 
 /* True when a path component is "..". */
 static int climbs(const char *name) {
