@@ -6,10 +6,12 @@
 #include <stdio.h>
 #include <string.h>
 
-/* Colours a theme already has, so the badges suit whichever theme is on. */
+/* Colours a theme already has, so the badges suit whichever theme is on. The
+ * first three are the ones themes keep apart, so two or three accounts, the
+ * usual number, are told apart by colour as well as by letter. */
 static const ThemeSlot COLOURS[ACCOUNT_COLOURS] = {
-    THEME_SLOT_ACCENT, THEME_SLOT_OK, THEME_SLOT_WARN, THEME_SLOT_BADGE,
-    THEME_SLOT_MEDIA, THEME_SLOT_SENDER, THEME_SLOT_UNREAD, THEME_SLOT_BLINK,
+    THEME_SLOT_ACCENT, THEME_SLOT_MEDIA, THEME_SLOT_WARN, THEME_SLOT_SENDER,
+    THEME_SLOT_OK, THEME_SLOT_UNREAD, THEME_SLOT_BADGE, THEME_SLOT_BLINK,
 };
 
 void account_badge_make(AccountBadge *badge, const Account *account) {

@@ -6,6 +6,8 @@
  *
  * PICTURE_DIR holds avatar.png, landscape.png and webcam.png (render.py
  * makes them). */
+#include "clients/tui/account_badge.h"
+#include "clients/tui/accounts_dialog.h"
 #include "clients/tui/agents_panel.h"
 #include "clients/tui/approval_queue.h"
 #include "clients/tui/attach_menu.h"
@@ -85,6 +87,11 @@ static void make_chats(void) {
     qsort(s_chats, (size_t)s_chat_count, sizeof(Chat), chat_compare);
 }
 
+/* With several accounts: the header's account chip and the badges on the rows. The accounts scenes set these. */
+static const char  *s_account_chip = "";
+static AccountBadge s_badges[ACCOUNT_MAX];
+static int          s_badge_count;
+
 /* What the header says about agents: the Agents scenes set these. */
 static int s_agents_waiting, s_agents_high, s_agents_connected, s_agents_tab;
 
@@ -99,7 +106,7 @@ static void draw_app(const char *footer) {
     HeaderModel m = { .user_name = "Alex", .status = "\xF0\x9F\x9F\xA2", .tally = "\xF0\x9F\x92\xAC 2", .use_24h = 1,
                       .sidebar_open = 1, .show_post = 1, .unseen_statuses = 3,
                       .show_tabs = 1, .agents_tab_active = s_agents_tab, .agents_waiting = s_agents_waiting,
-                      .agents_high = s_agents_high, .agents_connected = s_agents_connected };
+                      .agents_high = s_agents_high, .agents_connected = s_agents_connected, .account = s_account_chip };
     HeaderHits hits;
     header_bar_render((UiRect){ 0, 0, 1, COLS }, &m, &hits);
     static ChatListView list;
@@ -108,7 +115,9 @@ static void draw_app(const char *footer) {
     list.portraits = &portraits;
     list.thumbs = s_thumbs;
     list.spacing = 1;
-    BlinkState blink = { "", 0 };
+    memcpy(list.badges, s_badges, sizeof(list.badges));
+    list.badge_count = s_badge_count;
+    BlinkState blink = { "", ACCOUNT_ID_NONE, 0 };
     chat_list_view_render(&list, (UiRect){ 1, 0, ROWS - 2, SIDEBAR - 1 }, s_chats, s_chat_count, 0, 1, &blink, now);
     tui_vline(1, SIDEBAR - 1, ROWS - 2, tui_palette_attr(THEME_SLOT_BORDER));
     tui_fill((UiRect){ 1, SIDEBAR, ROWS - 2, COLS - SIDEBAR }, tui_palette_attr(THEME_SLOT_CHAT));
@@ -587,11 +596,103 @@ static void scheduled_scene(void) {
     save("scheduled");
 }
 
+/* ---- several accounts ------------------------------------------------------ */
+
+static Account an_account(AccountId id, const char *label, const char *jid, int colour, int primary, AccountAgentAccess access) {
+    Account a;
+    memset(&a, 0, sizeof(a));
+    a.id = id;
+    str_copy(a.label, sizeof(a.label), label);
+    str_copy(a.jid, sizeof(a.jid), jid);
+    str_copy(a.name, sizeof(a.name), "Alex");
+    a.colour = colour;
+    a.is_primary = primary;
+    a.agent_access = access;
+    return a;
+}
+
+/* Two numbers in one tawk: the chat list with a badge on each row, the list of
+ * accounts, and one person's two chats shown as one conversation. */
+static void accounts_scenes(void) {
+    Account main_account = an_account(1, "main", "27821234567@s.whatsapp.net", 0, 1, ACCOUNT_AGENT_FOLLOW);
+    Account work = an_account(2, "work", "27825550100@s.whatsapp.net", 1, 0, ACCOUNT_AGENT_READ);
+    Account side = an_account(3, "side", "", 2, 0, ACCOUNT_AGENT_OFF);
+    side.name[0] = '\0';                                  /* not linked yet: no name is known */
+    account_badge_make(&s_badges[0], &main_account);
+    account_badge_make(&s_badges[1], &work);
+    s_badge_count = 2;
+    s_account_chip = "All";
+    /* Mom writes to both numbers and is one row; the team and Nadia are on the work number. */
+    for (int i = 0; i < s_chat_count; i++) {
+        Chat *c = &s_chats[i];
+        int at_work = !strcmp(c->name, "Dev team") || !strcmp(c->name, "Nadia");
+        c->account = at_work ? work.id : main_account.id;
+        c->accounts = !strcmp(c->name, "Mom") ? 3u : at_work ? 2u : 1u;
+    }
+    draw_app("type to search \xC2\xB7 Enter open \xC2\xB7 Alt+O options \xC2\xB7 F2");
+    save("accounts-chats");
+
+    static AccountsDialog dialog;
+    accounts_dialog_open(&dialog);
+    AccountsDialogRow rows[3] = {
+        { main_account, AUTH_STATE_CONNECTED, 1, 1 },
+        { work, AUTH_STATE_CONNECTED, 0, 1 },
+        { side, AUTH_STATE_NEEDS_LOGIN, 0, 0 },
+    };
+    accounts_dialog_render(&dialog, body(), rows, 3);
+    save("accounts-list");
+
+    /* The same person on both numbers, as one conversation. */
+    Message msgs[8];
+    AccountId owners[8];
+    int n = 0;
+    const char *mom = "27820000001@s.whatsapp.net", *me = "27821234567@s.whatsapp.net";
+    add_message(msgs, &n, "A1", mom, 0, 190, "Are you coming on Sunday?", NULL);                 owners[n - 1] = main_account.id;
+    add_message(msgs, &n, "A2", me, 1, 185, "Yes, we will be there by 12", NULL);                owners[n - 1] = main_account.id;
+    add_message(msgs, &n, "A3", mom, 0, 44, "Is this your work number? The invoice is here", NULL); owners[n - 1] = work.id;
+    add_message(msgs, &n, "A4", me, 1, 41, "It is, thanks. I will send it on tonight", NULL);    owners[n - 1] = work.id;
+    add_message(msgs, &n, "A5", mom, 0, 6, "Bring the big pot please \xF0\x9F\x8D\xB2", NULL); owners[n - 1] = main_account.id;
+    for (int i = 0; i < n; i++) str_copy(msgs[i].chat_jid, sizeof(msgs[i].chat_jid), mom);
+    NameResolver names = { NULL, resolve };
+    MessageViewContext ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.title = "Mom";
+    ctx.status = "";
+    ctx.use_24h = 1;
+    ctx.playing_path = "";
+    ctx.names = &names;
+    ctx.thumbs = s_thumbs;
+    ctx.subtitle = "on main and work";
+    ctx.activity = "";
+    ctx.jid = mom;
+    static const MessageFormatter formatter = { NULL, format_directly, preview_directly };
+    ctx.formatter = &formatter;
+    ctx.owners = owners;
+    ctx.badges = s_badges;
+    ctx.badge_count = s_badge_count;
+    static MessageView view;
+    message_view_init(&view);
+    draw_app(INPUT_HINTS);
+    message_view_render(&view, chat_area(), msgs, n, &ctx);
+    static ComposerView composer;
+    composer_view_init(&composer);
+    str_copy(composer.sending_as, sizeof(composer.sending_as), "as main (Alt+A changes)");
+    composer_view_render(&composer, (UiRect){ ROWS - 3, SIDEBAR, 2, COLS - SIDEBAR }, 1, 1, -1, 1, "");
+    save("accounts-merged");
+    for (int i = 0; i < n; i++) message_dispose(&msgs[i]);
+
+    /* The scenes after this one show a tawk with one account again. */
+    s_badge_count = 0;
+    s_account_chip = "";
+    for (int i = 0; i < s_chat_count; i++) { s_chats[i].account = ACCOUNT_ID_NONE; s_chats[i].accounts = 0; }
+}
+
 /* ---- the Agents tab ------------------------------------------------------- */
 
 #define AGENTS_NOW_MS 3600000LL                         /* the panel's clock: any monotonic time */
 
-static void agents_chat_name(void *ctx, const char *jid, char *out, size_t size) {
+static void agents_chat_name(void *ctx, AccountId account, const char *jid, char *out, size_t size) {
+    (void)account;
     if (strcmp(jid, "120363000000000003@g.us") == 0) { str_copy(out, size, "Old group"); return; }
     chat_title(ctx, jid, out, size);
 }
@@ -681,7 +782,7 @@ static void agents_scenes(void) {
         log_entry(88, CONTROL_ORIGIN_MCP, "tawk-mcp", "send_message", sarah, "Can you send me the address again?", AUTOMATION_OUTCOME_RATE_LIMITED),
         log_entry(95, CONTROL_ORIGIN_MCP, "tawk-mcp", "hello", "", "tawk-mcp 0.3 acting for a model", AUTOMATION_OUTCOME_CONNECTED),
     };
-    AgentsPanelModel m = { q, &status, log, (int)(sizeof(log) / sizeof(log[0])), &settings, AGENTS_NOW_MS, agents_chat_name, NULL };
+    AgentsPanelModel m = { q, &status, log, (int)(sizeof(log) / sizeof(log[0])), &settings, AGENTS_NOW_MS, agents_chat_name, NULL, NULL, NULL };
 
     s_agents_waiting = approval_queue_count(q);
     s_agents_high = approval_queue_high_count(q);
@@ -842,6 +943,7 @@ int main(int argc, char **argv) {
     settings_scene(themes, (const int[]){ 7, 9 }, 2, "settings-self-approval");
     scheduled_scene();
     agents_scenes();
+    accounts_scenes();
     splash_scene();
 
     thumbnail_cache_destroy(s_thumbs);

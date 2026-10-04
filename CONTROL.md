@@ -319,7 +319,9 @@ An account whose level is *off* is not listed and cannot be named. Naming it ans
 
 **`list_accounts`** is a read operation with no arguments. It answers `{"accounts":[...],"default":id}` with the same objects as `hello`, read afresh, since you can open or close an account while a client stays connected.
 
-**Notifications** `message`, `read`, `reaction`, `edit`, `delete`, `scheduled_sent` and `chat` carry `"account":{"id":2,"label":"work"}`. A message that reaches an account closed to agents is not pushed.
+**Notifications** `message`, `read`, `reaction`, `edit`, `delete`, `scheduled_sent` and `chat` carry `"account":{"id":2,"label":"work"}`. A message that reaches an account closed to agents is not pushed. A subscription follows a chat by its JID in every account the client may use, and unread counts are watched in each of them. An account that is opened to agents while a client is connected starts from that moment: nothing from before is replayed.
+
+**`ambiguous`** candidates carry the same `account` object, beside `jid` and `name`.
 
 **A request that waits for an answer** belongs to the account it was asked of. It is carried out by that account whatever was served meanwhile, `approve` is judged by that account's rules, and it is refused with `not_allowed` if the account was closed to agents while it waited. The automation log records the account of every entry.
 

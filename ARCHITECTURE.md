@@ -402,6 +402,7 @@ tawk holds several WhatsApp accounts in one process. The rule that keeps this si
 | `IAccountStore`, `IChatPrefsStore` | `contracts` | The roster of accounts, and what is kept per contact whichever account it is on |
 | `AccountRosterManager` | `managers` | Adding, renaming, removing and ordering accounts, the primary account, agent access and self-approval chats |
 | `AccountRuntime` | `composition` | Everything one account needs to run: its gateway, event queue, bound stores and its seven managers |
+| `IGatewayFactory`, `GatewayParts` | `contracts` | Makes one account's connection to WhatsApp. `BackendGatewayFactory` in `composition` is the real one and the only code that chooses between whatsmeow and the Node.js bridge; a test hands the runtime a factory whose gateways play WhatsApp |
 | `AccountHost` | `composition` | Owns the runtimes and starts and stops them. It implements `IAccountDirectory` |
 | `IAccountDirectory`, `AccountServices` | `clients` | What a client is given: the accounts that are running, and the managers of each |
 | `AccountLabelValidator`, `ChatMergePolicy`, `ReplyAccountPolicy`, `AccountAgentPolicy` | `engines` | The rules: which labels are allowed, when two chats show as one, which number a message goes out from, and what agents may do with an account |
@@ -422,6 +423,8 @@ flowchart TD
 `src/composition/` is part of the composition root: it is the only other place that names concrete stores and gateways, and nothing outside `main.c` includes it. The managers are unchanged by accounts. A `MessagingManager` still knows one gateway and one set of stores; there are simply several of them.
 
 The clients compose across accounts. The terminal client keeps one account in view and swaps the managers it talks to when you open a chat of another (`tui_accounts.c`), builds the one chat list from every account's chats (`UnifiedChatList`), and builds a merged conversation from the chats of one person (`MergedMessageWindow`). The control client serves each request from the account it names (`control_accounts.c`), and `AutomationManager` is told which account it is serving so the existing rules in `automation_policy` are applied with that account's level.
+
+One `tawk.log` serves every account. The logger keeps a label per thread (`log_context_set`), set where an account is ticked or served, so a line written while an account is worked on starts with its label. `tawk --doctor` reads the accounts through `sqlite_account_roster_read`, which opens the database read-only and never upgrades it.
 
 The whatsmeow bridge keeps a session per account, keyed by a handle the gateway passes with every call, so one linked library carries all of them.
 

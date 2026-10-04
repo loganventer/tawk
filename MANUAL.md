@@ -916,6 +916,8 @@ tawk can hold more than one WhatsApp number at once. Every account is connected 
 
 Settings, Account, Accounts… opens the list. Each row shows the account's label, its number once linked, whether it is connected, and what agents may do with it.
 
+![The accounts list with three accounts](docs/images/accounts-list.png)
+
 | Key | What it does |
 |---|---|
 | a | Add an account. Type a label (`work`, `personal`), then link the number with the usual wizard |
@@ -933,7 +935,11 @@ A second number carries the same risk as the first. tawk is an unofficial client
 
 ### One chat list
 
-The chat list shows the chats of every account together, newest first. A chat that belongs to an account other than the first carries a small coloured badge with that account's label. The chip in the header shows which accounts are listed: click it to step through all accounts and each one alone.
+The chat list shows the chats of every account together, newest first. With more than one account, each row carries a small coloured badge with the first letter of its account's label, and a row that stands for two accounts carries both. The first accounts get colours that differ in every bundled theme but one. The chip in the header shows which accounts are listed: click it to step through all accounts and each one alone.
+
+![One chat list for two accounts, each row with its badge](docs/images/accounts-chats.png)
+
+A new message blinks the row of the account it reached, so someone on two of your numbers who is not merged blinks only where the message is.
 
 Opening a chat brings its account into view.
 
@@ -944,6 +950,8 @@ Someone who writes to two of your numbers has a chat in each. With `merge_accoun
 You can decide for one contact as well. Open the contact card (click the name, Alt+I or `/info`) and step **Merge across my numbers** through *follow the setting*, *always* and *never*.
 
 ### Which number a message is sent from
+
+![Someone on two numbers shown as one conversation, each message marked with its account](docs/images/accounts-merged.png)
 
 In a merged chat the input shows `as <label>` beside it: the account your next message goes out from. tawk picks, in this order, the number you chose for this contact, the account the last message in the conversation arrived on, and the primary account.
 
@@ -969,7 +977,7 @@ Each account has its own level for agents, set with g in the accounts list:
 
 On the contact card, **Agents answer by themselves here** switches a chat on or off for the account it belongs to. It takes effect only while that account's level is admin. A chat switched on for one account stays off for your others.
 
-When an agent asks to send something, the question in the Agentic tab names the account in square brackets before the chat, so you can see which number it would go out from.
+When an agent asks to send something, the Agentic tab names the account in brackets after the chat, in the queue, in the detail and in the log, so you can see which number it would go out from.
 
 ### What happens when you update
 
@@ -1195,7 +1203,7 @@ See `man tawk` after installing.
 
 ## Checking your setup
 
-`tawk --doctor` checks everything tawk needs without opening the chat database, writing any file or connecting to WhatsApp, and says how to fix what is missing. It does not need an interactive terminal, so it also works in scripts. The installer runs it at the end.
+`tawk --doctor` checks everything tawk needs without changing the chat database, writing any file or connecting to WhatsApp, and says how to fix what is missing. It does not need an interactive terminal, so it also works in scripts. The installer runs it at the end.
 
 ![Output of tawk --doctor with every check passing except clipboard pictures](docs/images/doctor.png)
 
@@ -1203,6 +1211,7 @@ See `man tawk` after installing.
 |---|---|
 | Terminal | `TERM` is set and not `dumb`, the locale is UTF-8, and the terminal offers 256 or true colours |
 | Files | The config file and whether it is private, the data folder is writable, the database and log paths, the bundled themes, the emoji list, and the notification sound when sound is on |
+| Accounts | Each account's label and number, its login folder and whether a number is linked there. The labels are read from the database as it is, without upgrading it; with an encrypted database, or one from before accounts, only the ids are shown |
 | WhatsApp backend | Whether whatsmeow is built in, the Baileys sidecar and Node.js when they are needed, and which backend will run |
 | Voice notes and media | ffmpeg, the audio system's recording and playback tools, a program to open media (`open`, `wslview`, Windows Explorer, `xdg-open`, `gio` or `cygstart`), a clipboard tool for pasting pictures (`wl-paste`, `xclip`, `pngpaste` or PowerShell), and poppler's `pdftoppm` and `pdfinfo` for PDF pages |
 | Screensaver | Whether the screensaver command is installed |
