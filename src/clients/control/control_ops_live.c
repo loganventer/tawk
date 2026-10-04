@@ -17,17 +17,30 @@ static const Chat *find_chat(ControlServer *s, const char *jid) {
 }
 
 /* Remembers the unread counts the client has now, so only changes are sent. */
+/* What a session was last told about the unread counts of the chats it
+ * follows, in every account it may use. Each account is served while its
+ * chats are looked at. */
 static void snapshot(ControlServer *s, ControlSession *session) {
-    int n = 0;
-    const Chat *all = messaging_manager_chats(s->deps.messaging, &n);
     free(session->watches);
-    session->watches = n ? calloc((size_t)n, sizeof(ControlWatch)) : NULL;
+    session->watches = NULL;
     session->watch_count = 0;
-    for (int i = 0; i < n && session->watches; i++) {
-        if (!control_session_follows(session, all[i].jid) || !automation_manager_chat_allowed(s->deps.automation, &all[i])) continue;
-        ControlWatch *w = &session->watches[session->watch_count++];
-        str_copy(w->jid, sizeof(w->jid), all[i].jid);
-        w->unread = all[i].unread;
+    int accounts = control_account_count(s);
+    for (int a = 0; a < accounts; a++) {
+        if (control_serve_account(s, control_account_at(s, a)) != 0) continue;
+        int n = 0;
+        const Chat *all = messaging_manager_chats(s->deps.messaging, &n);
+        if (n == 0) continue;
+        ControlWatch *grown = realloc(session->watches, (size_t)(session->watch_count + n) * sizeof(ControlWatch));
+        if (!grown) return;
+        session->watches = grown;
+        for (int i = 0; i < n; i++) {
+            if (!control_session_follows(session, all[i].jid) || !automation_manager_chat_allowed(s->deps.automation, &all[i])) continue;
+            ControlWatch *w = &session->watches[session->watch_count++];
+            memset(w, 0, sizeof(*w));
+            str_copy(w->jid, sizeof(w->jid), all[i].jid);
+            w->account = s->account;
+            w->unread = all[i].unread;
+        }
     }
 }
 
@@ -145,13 +158,17 @@ static void send_activity(ControlServer *s, const LiveMessageRef *ref) {
     }
 }
 
-static void send_unread_changes(ControlServer *s, ControlSession *session) {
+/* Tells a session about unread counts that changed in the account being served.
+ * Returns 1 when it met a chat the session had not seen, and the watches are stale. */
+static int send_unread_changes(ControlServer *s, ControlSession *session) {
     int n = 0;
     const Chat *all = messaging_manager_chats(s->deps.messaging, &n);
     for (int i = 0; i < n; i++) {
         if (!control_session_follows(session, all[i].jid)) continue;
         ControlWatch *w = NULL;
-        for (int k = 0; k < session->watch_count && !w; k++) if (!strcmp(session->watches[k].jid, all[i].jid)) w = &session->watches[k];
+        for (int k = 0; k < session->watch_count && !w; k++) {
+            if (session->watches[k].account == s->account && !strcmp(session->watches[k].jid, all[i].jid)) w = &session->watches[k];
+        }
         int allowed = automation_manager_chat_allowed(s->deps.automation, &all[i]);
         if (!allowed) continue;
         if (w && w->unread == all[i].unread) continue;
@@ -160,9 +177,10 @@ static void send_unread_changes(ControlServer *s, ControlSession *session) {
         cJSON_AddItemToObject(evt, "chat", control_codec_chat(&all[i]));
         control_tag_account(s, evt);
         control_reply(s, session->conn, control_codec_event("chat", evt));
-        if (!w) { snapshot(s, session); return; }         /* a chat it had not seen: start over */
+        if (!w) return 1;
         w->unread = all[i].unread;
     }
+    return 0;
 }
 
 /* How far the live messages of the account being served were sent. Each
@@ -175,8 +193,9 @@ static uint64_t *live_cursor(ControlServer *s) {
         if (free_slot < 0 && s->live_accounts[i] == ACCOUNT_ID_NONE) free_slot = i;
     }
     if (free_slot < 0) free_slot = 0;                        /* an account that is gone gives up its place */
+    /* An account met for the first time starts from now: what happened before a client could hear it is not replayed. */
     s->live_accounts[free_slot] = s->account;
-    s->live_seqs[free_slot] = 0;
+    s->live_seqs[free_slot] = messaging_manager_live_last(s->deps.messaging);
     return &s->live_seqs[free_slot];
 }
 
@@ -200,9 +219,14 @@ void control_live_tick(ControlServer *s, int check_unread) {
         push_live(s);
     }
     if (!check_unread) return;
-    /* Unread counts are watched for the default account, the one a client is on when it names none. */
-    if (control_serve_account(s, control_default_account(s)) != 0) return;
     for (int i = 0; i < s->session_count; i++) {
-        if (s->sessions[i].greeted && s->sessions[i].subscribed) send_unread_changes(s, &s->sessions[i]);
+        ControlSession *session = &s->sessions[i];
+        if (!session->greeted || !session->subscribed) continue;
+        int stale = 0;
+        for (int a = 0; a < accounts; a++) {
+            if (control_serve_account(s, control_account_at(s, a)) != 0) continue;
+            stale |= send_unread_changes(s, session);
+        }
+        if (stale) snapshot(s, session);                    /* a chat it had not seen: start over */
     }
 }

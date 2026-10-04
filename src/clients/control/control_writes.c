@@ -68,21 +68,21 @@ static void carry_out(ControlServer *s, ControlPending *p, AutomationOutcome don
     finish(s, p, done);
 }
 
-/* The chat's name as you are shown it. With more than one account open to
- * agents it starts with the account, so you see which number is being asked of. */
 static void chat_name(ControlServer *s, const char *jid, char *out, size_t size) {
     out[0] = '\0';
     if (!jid[0]) return;
-    char name[128] = "";
     const Chat *c = control_visible_chat(s, jid);
-    if (c) str_copy(name, sizeof(name), c->name);
-    else messaging_manager_display_name(s->deps.messaging, jid, name, sizeof(name));
-    Account account;
-    if (control_account_count(s) > 1 && s->deps.roster && account_roster_manager_get(s->deps.roster, s->account, &account) == 0) {
-        snprintf(out, size, "[%s] %s", account.label, name);
-    } else {
-        str_copy(out, size, name);
-    }
+    if (c) str_copy(out, size, c->name);
+    else messaging_manager_display_name(s->deps.messaging, jid, out, size);
+}
+
+/* The chat as a notice names it: with the account, when agents may use more than one. */
+static void chat_place(ControlServer *s, const char *jid, char *out, size_t size) {
+    char name[128], label[ACCOUNT_LABEL_SIZE];
+    chat_name(s, jid, name, sizeof(name));
+    control_account_label(s, label, sizeof(label));
+    if (label[0] && name[0]) snprintf(out, size, "%s (%s)", name, label);
+    else str_copy(out, size, name);
 }
 
 /* Moves `p` to the list waiting for your answer, and asks. */
@@ -104,6 +104,8 @@ static void ask(ControlServer *s, ControlPending *p) {
     str_copy(req.op, sizeof(req.op), p->op);
     str_copy(req.chat_jid, sizeof(req.chat_jid), p->chat_jid);
     chat_name(s, p->chat_jid, req.chat_name, sizeof(req.chat_name));
+    req.account = p->account;
+    control_account_label(s, req.account_label, sizeof(req.account_label));
     str_copy(req.action, sizeof(req.action), p->action);
     req.text = p->text;
     req.editable = p->editable;
@@ -138,7 +140,7 @@ static void hold(ControlServer *s, ControlPending *p) {
     c->expires_ms = clock_now_ms() + CONTROL_CONFIRM_MS;
     s->confirmation_count++;
     char name[128], summary[300];
-    chat_name(s, p->chat_jid, name, sizeof(name));
+    chat_place(s, p->chat_jid, name, sizeof(name));
     if (name[0]) snprintf(summary, sizeof(summary), "%s: %s", name, p->action);
     else str_copy(summary, sizeof(summary), p->action);
     if (summary[0] >= 'a' && summary[0] <= 'z') summary[0] = (char)(summary[0] - 'a' + 'A');
@@ -291,7 +293,7 @@ void control_op_approve(ControlServer *s, ControlSession *session, const Control
     }
     if (s->deps.approvals) s->deps.approvals->withdraw(s->deps.approvals, p->approval_id);
     char name[128], notice[256];
-    chat_name(s, p->chat_jid, name, sizeof(name));
+    chat_place(s, p->chat_jid, name, sizeof(name));
     snprintf(notice, sizeof(notice), "\xF0\x9F\xA4\x96 %s answered its own request to %s%s%s", p->client, p->action, name[0] ? " in " : "", name);
     automation_manager_notice(s->deps.automation, notice);
     carry_out(s, p, AUTOMATION_OUTCOME_SELF_APPROVED);            /* the waiting request gets its own answer */

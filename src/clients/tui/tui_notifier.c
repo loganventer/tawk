@@ -17,6 +17,7 @@ static void tn_notify(INotifier *self, const Notification *n) {
     int64_t now = clock_now_ms();
     if (t->settings->blink) {
         str_copy(t->blink->jid, sizeof(t->blink->jid), n->chat_jid);
+        t->blink->account = n->account;
         t->blink->until_ms = now + (int64_t)t->settings->blink_seconds * 1000;
     }
     if (t->settings->title_flash) title_flasher_start(t->flasher, now);

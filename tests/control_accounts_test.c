@@ -354,7 +354,8 @@ static void test_each_access_level(void) {
     say(conn, "{\"id\":\"s2\",\"op\":\"send_message\",\"args\":{\"chat\":\"" MOM "\",\"text\":\"hi from main\"}}");
     CHECK(approval_queue_count(queue) == 1, "an account at send asks you first");
     const ApprovalRequest *asked = approval_queue_at(queue, 0);
-    CHECK(asked && strstr(asked->chat_name, "[main]"), "what you are asked names the account");
+    CHECK(asked && asked->account == ACCOUNT_ID_FIRST && !strcmp(asked->account_label, "main") && !strcmp(asked->chat_name, "Mom"),
+          "what you are asked says which account it is for");
     answer_first(1);
     cJSON *s2 = reply("s2");
     CHECK(ok(s2) && main_world->texts == 1 && work_world->texts == 0 && !strcmp(main_world->last_text, "hi from main"),
@@ -443,6 +444,14 @@ static void test_events_say_whose(AccountId work, AccountId closed) {
     cJSON_Delete(e);
     clear_outbox();
 
+    /* Its unread count changed too, which is told once the counts are next looked at. */
+    usleep(1100 * 1000);
+    tick();
+    e = event("chat");
+    CHECK(e && account_id_of(e) == work, "an unread count that changes in another account than the default is told, marked with that account");
+    cJSON_Delete(e);
+    clear_outbox();
+
     incoming(&worlds[0], "M9", MOM, "supper?");
     tick();
     e = event("message");
@@ -522,8 +531,13 @@ int main(void) {
     AutomationManagerDeps automation_deps = { log, settings_manager_current(settings_mgr), &admin_tokens };
     automation = automation_manager_create(&automation_deps);
     queue = approval_queue_create();
+    /* The server looks for its socket file now and then; an ordinary file stands in for it. */
+    char socket_path[600];
+    snprintf(socket_path, sizeof(socket_path), "%s/control.sock", dir);
+    FILE *stand_in = fopen(socket_path, "w");
+    if (stand_in) fclose(stand_in);
     ControlServerDeps control_deps = { &transport, approval_queue_prompt(queue), worlds[0].messaging, NULL, worlds[0].scheduling, NULL,
-                                       automation, settings_mgr, NULL, NULL, NULL, "test", "/tmp/unused.sock", &directory, roster };
+                                       automation, settings_mgr, NULL, NULL, NULL, "test", socket_path, &directory, roster };
     server = control_server_create(&control_deps);
     tick();
     tick();

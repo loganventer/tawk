@@ -1,4 +1,5 @@
 #include "clients/tui/agents_panel.h"
+#include "core/account.h"
 #include "clients/tui/toggle_switch.h"
 #include "clients/tui/tui_draw.h"
 #include "clients/tui/tui_palette.h"
@@ -16,6 +17,13 @@
 #define DOT       " \xC2\xB7 "
 #define MAX_LOG   512
 #define EDIT_MAX  TEXT_FIELD_CAPACITY
+
+/* Where a request would act: the chat, and the account when agents may use more than one. */
+static void request_place(const ApprovalRequest *r, char *out, size_t size) {
+    if (r->account_label[0] && r->chat_name[0]) snprintf(out, size, "%s (%s)", r->chat_name, r->account_label);
+    else if (r->account_label[0]) snprintf(out, size, "(%s)", r->account_label);
+    else str_copy(out, size, r->chat_name);
+}
 
 static const char *const TAB_NAMES[AGENTS_VIEW_COUNT] = { "Queue", "Agents", "Log", "Permissions" };
 static const char *const PERMISSION_KEYS[] = { "control_socket", "access", "chats", "confirm_cli", "writes_per_minute", "ai_disclaimer", "ai_disclaimer_text", "push_received", "push_sent", "push_read", "push_reactions", "push_edits", "push_scheduled", "self_approval_chats", "self_approvals_per_hour" };
@@ -393,8 +401,10 @@ static void draw_queue(AgentsPanel *p, const AgentsPanelModel *m, UiRect list, U
         int x = list.x + tui_text(list.y + row, list.x, 10, tag, sel ? attr | ATTR_BOLD : risk_attr(r->risk));
         minutes(m->now_ms - r->asked_ms, age, sizeof(age));
         minutes(r->expires_ms - m->now_ms, left, sizeof(left));
+        char place[200];
+        request_place(r, place, sizeof(place));
         snprintf(line, sizeof(line), " %s %s %s", column(who, sizeof(who), r->client, 12),
-                 column(what, sizeof(what), r->action, 30), column(where, sizeof(where), r->chat_name, 18));
+                 column(what, sizeof(what), r->action, 30), column(where, sizeof(where), place, 24));
         tui_text(list.y + row, x, list.w - 24 - (x - list.x), line, attr);
         char times[96];
         snprintf(times, sizeof(times), "%s ago  %s left ", age, left);
@@ -403,10 +413,11 @@ static void draw_queue(AgentsPanel *p, const AgentsPanelModel *m, UiRect list, U
     }
     const ApprovalRequest *r = selected_request(p, m);
     if (!r || detail.h <= 0) return;
-    char head[400];
+    char head[600], place[200];
+    request_place(r, place, sizeof(place));
     snprintf(head, sizeof(head), "%s %s" DOT "%s (%s)" DOT "wants to %s%s%s", approval_risk_mark(r->risk), approval_risk_label(r->risk),
              r->client, r->origin == CONTROL_ORIGIN_MCP ? "acting for a model" : "your shell", r->action,
-             r->chat_name[0] ? " in " : "", r->chat_name);
+             place[0] ? " in " : "", place);
     tui_text(detail.y, detail.x, detail.w, head, risk_attr(r->risk));
     UiRect body = { detail.y + 1, detail.x + 2, detail.h - 1, detail.w - 2 };
     if (p->editing) {
@@ -469,10 +480,17 @@ static void draw_log(AgentsPanel *p, const AgentsPanelModel *m, UiRect list, UiR
         tui_fill((UiRect){ list.y + row, list.x, 1, list.w }, attr);
         char when[32], who[128] = "", line[600];
         clock_format_short(e->at, m->settings->use_24h_clock, when, sizeof(when));
-        if (e->chat_jid[0] && m->name_of) m->name_of(m->ctx, e->chat_jid, who, sizeof(who));
+        if (e->chat_jid[0] && m->name_of) m->name_of(m->ctx, e->account, e->chat_jid, who, sizeof(who));
+        char label[ACCOUNT_LABEL_SIZE] = "";
+        if (m->label_of) m->label_of(m->ctx, e->account, label, sizeof(label));
+        if (label[0]) {                                     /* which of your numbers it was about */
+            char both[128];
+            snprintf(both, sizeof(both), "%.60s (%.40s)", who, label);
+            str_copy(who, sizeof(who), both);
+        }
         char client[64], chat[160];
         snprintf(line, sizeof(line), "%-10s %s %-16.16s %s %-23.23s %s", when, column(client, sizeof(client), e->client, 12),
-                 e->op, column(chat, sizeof(chat), who, 16), automation_outcome_name(e->outcome), e->summary);
+                 e->op, column(chat, sizeof(chat), who, label[0] ? 24 : 16), automation_outcome_name(e->outcome), e->summary);
         int bad = e->outcome == AUTOMATION_OUTCOME_DECLINED || e->outcome == AUTOMATION_OUTCOME_REFUSED || e->outcome == AUTOMATION_OUTCOME_FAILED;
         tui_text(list.y + row, list.x, list.w, line, bad && i != p->selected[2] ? attr | ATTR_DIM : attr);
     }
@@ -523,8 +541,10 @@ static void draw_confirm(AgentsPanel *p, const AgentsPanelModel *m, UiRect box) 
     int warn = tui_palette_attr(THEME_SLOT_WARN) | ATTR_BOLD;
     tui_fill(c, tui_palette_attr(THEME_SLOT_BASE));
     tui_box(c, " !! HIGH risk ", warn);
-    char line[300];
-    snprintf(line, sizeof(line), "%s wants to %s%s%s.", r->client, r->action, r->chat_name[0] ? ": " : "", r->chat_name);
+    char line[520];
+    char place[200];
+    request_place(r, place, sizeof(place));
+    snprintf(line, sizeof(line), "%s wants to %s%s%s.", r->client, r->action, place[0] ? ": " : "", place);
     draw_wrapped((UiRect){ c.y + 2, c.x + 3, 3, c.w - 6 }, line, warn);
     tui_text(c.y + 5, c.x + 3, c.w - 6, "This cannot be undone. Press Y to allow it.", tui_palette_attr(THEME_SLOT_WARN));   /* on the box's colours */
     const char *keep = "  Keep  ", *act = "  Allow  ";

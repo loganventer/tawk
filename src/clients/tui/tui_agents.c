@@ -21,8 +21,18 @@
 
 static const Settings *settings(TuiApp *app) { return settings_manager_current(app->deps.settings); }
 
-static void chat_name(void *ctx, const char *jid, char *out, size_t size) {
-    messaging_manager_display_name(((TuiApp *)ctx)->deps.messaging, jid, out, size);
+/* A chat's name as the account it is in knows it; the account in view answers for an account that is gone. */
+static void chat_name(void *ctx, AccountId account, const char *jid, char *out, size_t size) {
+    TuiApp *app = ctx;
+    const AccountServices *sv = app->deps.directory ? app->deps.directory->find(app->deps.directory, account) : NULL;
+    messaging_manager_display_name(sv ? sv->messaging : app->deps.messaging, jid, out, size);
+}
+
+static void account_label(void *ctx, AccountId account, char *out, size_t size) {
+    TuiApp *app = ctx;
+    out[0] = '\0';
+    const AccountServices *sv = app->deps.directory ? app->deps.directory->find(app->deps.directory, account) : NULL;
+    if (sv && sv->label && app->deps.directory->count(app->deps.directory) > 1) str_copy(out, size, sv->label);
 }
 
 static AutomationEntry *load_log(TuiApp *app, int *count) {
@@ -39,7 +49,7 @@ static AgentsPanelModel model_of(TuiApp *app, const AutomationEntry *log, int lo
     return (AgentsPanelModel){
         app->deps.approvals,
         app->deps.automation ? automation_manager_status(app->deps.automation) : &none,
-        log, log_count, settings(app), clock_now_ms(), chat_name, app, self_chats
+        log, log_count, settings(app), clock_now_ms(), chat_name, account_label, app, self_chats
     };
 }
 
@@ -212,9 +222,10 @@ static void notice_requests(TuiApp *app) {
     app->agents_notice = 0;
     if (n == 0) return;
     const ApprovalRequest *last = approval_queue_at(app->deps.approvals, n - 1);
-    char msg[400];
-    snprintf(msg, sizeof(msg), "\xF0\x9F\xA4\x96 %s asks to %s%s%s: F3 to answer", last->client, last->action,
-             last->chat_name[0] ? " in " : "", last->chat_name);
+    char msg[480];
+    snprintf(msg, sizeof(msg), "\xF0\x9F\xA4\x96 %s asks to %s%s%s%s%s%s: F3 to answer", last->client, last->action,
+             last->chat_name[0] ? " in " : "", last->chat_name,
+             last->account_label[0] ? " (" : "", last->account_label, last->account_label[0] ? ")" : "");
     tui_app_toast(app, msg, last->risk == APPROVAL_RISK_HIGH);
 }
 

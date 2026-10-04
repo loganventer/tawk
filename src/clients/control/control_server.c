@@ -291,6 +291,7 @@ static void follow_setting(ControlServer *s, int64_t now) {
     if (s->deps.transport->listen(s->deps.transport, s->deps.socket_path, s->error, sizeof(s->error)) == 0) {
         s->listening = 1;
         s->live_seq = messaging_manager_live_last(s->deps.messaging);
+        memset(s->live_accounts, 0, sizeof(s->live_accounts));   /* each account starts from now again */
     } else {
         LOG_WARN("control socket: %s", s->error);
         s->next_listen_ms = now + RETRY_LISTEN_MS;

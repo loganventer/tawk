@@ -431,7 +431,9 @@ void chat_list_view_render(ChatListView *v, UiRect r, const Chat *chats, int cou
         int is_open = c && is_open_row(v, c);
         int unread = c && c->unread > 0 && !is_open;
         int attr = base;
-        if (c && blink_state_on(blink, c->jid, now_ms)) attr = tui_palette_attr(THEME_SLOT_BLINK);
+        /* A row with one bit set belongs to one account; a merged row stands for several. */
+        int one_account = c && (c->accounts & (c->accounts - 1)) == 0;
+        if (c && blink_state_on_row(blink, c->jid, one_account ? c->account : ACCOUNT_ID_NONE, now_ms)) attr = tui_palette_attr(THEME_SLOT_BLINK);
         else if (selected && focused) attr = tui_palette_attr(THEME_SLOT_SIDEBAR_SELECTED) | ATTR_BOLD;
         else if (selected || is_open) attr = tui_palette_attr(THEME_SLOT_SIDEBAR_SELECTED);
         else if (unread) attr = tui_palette_attr(c->is_muted ? THEME_SLOT_SIDEBAR_SELECTED : THEME_SLOT_UNREAD) | ATTR_BOLD;

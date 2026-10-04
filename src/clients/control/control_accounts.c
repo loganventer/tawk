@@ -36,6 +36,13 @@ AccountId control_account_at(ControlServer *s, int index) {
     return index >= 0 && index < n ? seen[index].id : ACCOUNT_ID_NONE;
 }
 
+void control_account_label(ControlServer *s, char *out, size_t size) {
+    out[0] = '\0';
+    Account account;
+    if (control_account_count(s) < 2 || account_roster_manager_get(s->deps.roster, s->account, &account) != 0) return;
+    str_copy(out, size, account.label);
+}
+
 int control_any_admin(ControlServer *s) {
     if (!several(s)) return strcmp(control_settings(s)->automation_access, "admin") == 0;
     Account seen[ACCOUNT_MAX];

@@ -17,7 +17,9 @@ typedef struct AgentsPanelModel {
     int                     log_count;
     const Settings         *settings;
     int64_t                 now_ms;       /* monotonic, as the requests' times */
-    void                  (*name_of)(void *ctx, const char *jid, char *out, size_t size);
+    /* The name of a chat in one of your accounts, and that account's label ("" with one account). */
+    void                  (*name_of)(void *ctx, AccountId account, const char *jid, char *out, size_t size);
+    void                  (*label_of)(void *ctx, AccountId account, char *out, size_t size);
     void                   *ctx;
     const char             *self_chats;   /* how many chats an admin agent answers for itself, in words */
 } AgentsPanelModel;

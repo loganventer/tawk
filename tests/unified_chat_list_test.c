@@ -1,6 +1,7 @@
 /* Several accounts' chats as one list: which chats of one contact show as
  * one, what a merged row says, which account sends, and the list of one
  * account alone. */
+#include "clients/tui/blink_state.h"
 #include "clients/tui/unified_chat_list.h"
 #include "engines/chat_merge_policy.h"
 #include "engines/reply_account_policy.h"
@@ -144,9 +145,21 @@ static void test_list(void) {
     unified_chat_list_free(&list);
 }
 
+/* A new message blinks the row of the account it reached. */
+static void test_blink(void) {
+    BlinkState blink = { "mom@s.whatsapp.net", 2, 10000 };
+    CHECK(blink_state_on_row(&blink, "mom@s.whatsapp.net", 2, 0), "the row of the account the message reached blinks");
+    CHECK(!blink_state_on_row(&blink, "mom@s.whatsapp.net", 1, 0), "the same person's row on another account does not");
+    CHECK(blink_state_on_row(&blink, "mom@s.whatsapp.net", ACCOUNT_ID_NONE, 0), "a merged row, which stands for both, does");
+    CHECK(!blink_state_on_row(&blink, "boss@s.whatsapp.net", 2, 0), "another chat of that account does not");
+    blink.account = ACCOUNT_ID_NONE;
+    CHECK(blink_state_on_row(&blink, "mom@s.whatsapp.net", 1, 0), "a message that names no account blinks by its chat alone");
+}
+
 int main(void) {
     test_policies();
     test_list();
+    test_blink();
     if (failures == 0) printf("ok: several accounts' chats are listed together, a contact on more than one merges or stays apart as chosen, and the right account sends\n");
     return failures != 0;
 }

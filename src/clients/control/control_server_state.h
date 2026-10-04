@@ -59,6 +59,8 @@ void  control_tag_account(ControlServer *server, cJSON *object);
 /* How many accounts agents may use, and the n-th of them. */
 int   control_account_count(ControlServer *server);
 AccountId control_account_at(ControlServer *server, int index);
+/* The label of the account being served, or "" while agents may use one account only. */
+void  control_account_label(ControlServer *server, char *out, size_t size);
 /* Whether any account lets an agent answer its own requests. */
 int   control_any_admin(ControlServer *server);
 void  control_op_list_accounts(ControlServer *server, ControlSession *session, const ControlRequest *req);
