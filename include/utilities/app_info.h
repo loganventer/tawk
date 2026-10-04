@@ -9,7 +9,7 @@
 #endif
 
 #ifndef APP_VERSION
-#define APP_VERSION "0.8.0"
+#define APP_VERSION "0.8.1"
 #endif
 
 /* The git commit of this build ("" when built outside a checkout). */
