@@ -14,6 +14,7 @@
 #include "clients/tui/tui_app.h"
 #include "clients/tui/tui_notifier.h"
 #include "composition/account_host.h"
+#include "composition/backend_gateway_factory.h"
 #include "infrastructure/audio/audio_backend_factory.h"
 #include "infrastructure/composite_notifier.h"
 #include "infrastructure/ffmpeg_camera.h"
@@ -438,7 +439,9 @@ int main(int argc, char **argv) {
 
     /* The accounts: each gets its gateway, its stores over the one database
      * and its managers. The clients start with the primary one in view. */
-    AccountRuntimeParams runtime_params = { db, s, notifier, exporter, backend, sidecar_dir, state_dir, opt.debug };
+    BackendGatewayOptions gateway_options = { s, backend, sidecar_dir, state_dir, opt.debug };
+    IGatewayFactory *gateways = backend_gateway_factory_create(&gateway_options);
+    AccountRuntimeParams runtime_params = { db, s, notifier, exporter, gateways };
     AccountHost *host = account_host_create(&runtime_params, account_store);
     IAccountDirectory *directory = host ? account_host_directory(host) : NULL;
     const AccountServices *active = directory ? directory->find(directory, account_roster_manager_primary(roster)) : NULL;
@@ -497,6 +500,7 @@ int main(int argc, char **argv) {
     if (automation_log) automation_log->destroy(automation_log);
     media_manager_destroy(media);
     account_host_destroy(host);
+    if (gateways) gateways->destroy(gateways);
     notifier->destroy(notifier);
     title->destroy(title);
     clipboard->destroy(clipboard);

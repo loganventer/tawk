@@ -384,6 +384,53 @@ static void test_each_access_level(void) {
     clear_outbox();
 }
 
+/* A chat an agent may answer by itself in is switched on for one account, and stays off for the same person on another. */
+static void test_self_approval_is_per_account(void) {
+    World *main_world = &worlds[0], *work_world = &worlds[1];
+    account_roster_manager_set_agent_access(roster, main_world->id, ACCOUNT_AGENT_ADMIN);
+    account_roster_manager_set_agent_access(roster, work_world->id, ACCOUNT_AGENT_ADMIN);
+    account_roster_manager_set_self_approval_chats(roster, work_world->id, "Mom");
+    int conn = open_client();
+    CHECK(strlen(admin_token) >= 64, "an account at admin is enough for the admin token to be written");
+    char token[128], line[400];
+    str_copy(token, sizeof(token), admin_token);
+    clear_outbox();
+    int main_sent = main_world->texts, work_sent = work_world->texts;
+
+    say(conn, "{\"id\":\"m1\",\"op\":\"send_message\",\"args\":{\"chat\":\"" MOM "\",\"text\":\"by itself, from main\"}}");
+    snprintf(line, sizeof(line), "{\"id\":\"am\",\"op\":\"approve\",\"args\":{\"id\":\"m1\",\"admin_token\":\"%s\"}}", token);
+    say(conn, line);
+    cJSON *am = reply("am");
+    CHECK(am && !ok(am) && !strcmp(error_code(am), "not_allowed") && main_world->texts == main_sent && approval_queue_count(queue) == 1,
+          "a chat switched on for another account is not one an agent may answer by itself in here, and the send waits for you");
+    cJSON_Delete(am);
+    answer_first(0);
+
+    say(conn, "{\"id\":\"w1\",\"op\":\"send_message\",\"args\":{\"chat\":\"" MOM "\",\"text\":\"by itself, from work\",\"account\":\"work\"}}");
+    /* The approval names no account: it is judged by the rules of the account the send was asked of. */
+    snprintf(line, sizeof(line), "{\"id\":\"aw\",\"op\":\"approve\",\"args\":{\"id\":\"w1\",\"admin_token\":\"%s\"}}", token);
+    say(conn, line);
+    cJSON *aw = reply("aw"), *w1 = reply("w1");
+    CHECK(ok(aw) && ok(w1) && work_world->texts == work_sent + 1 && main_world->texts == main_sent,
+          "in the account it is switched on for, the agent's own answer sends it, through that account");
+    cJSON_Delete(aw);
+    cJSON_Delete(w1);
+    AutomationEntry *log = NULL;
+    int n = 0;
+    automation_manager_recent(automation, 1, &log, &n);
+    CHECK(n == 1 && log[0].outcome == AUTOMATION_OUTCOME_SELF_APPROVED && log[0].account == work_world->id, "and the log says which account it was");
+    free(log);
+
+    account_roster_manager_set_self_approval_chats(roster, work_world->id, "");
+    account_roster_manager_set_agent_access(roster, main_world->id, ACCOUNT_AGENT_FOLLOW);
+    account_roster_manager_set_agent_access(roster, work_world->id, ACCOUNT_AGENT_READ);
+    tick();
+    CHECK(!admin_token[0], "with no account at admin any more the token is taken away");
+    char notice[256];
+    while (automation_manager_take_notice(automation, notice, sizeof(notice))) { }
+    clear_outbox();
+}
+
 static void test_events_say_whose(AccountId work, AccountId closed) {
     int conn = open_client();
     say(conn, "{\"id\":\"sub\",\"op\":\"subscribe\",\"args\":{\"chats\":\"all\"}}");
@@ -485,6 +532,7 @@ int main(void) {
     test_who_is_seen(work, closed);
     test_served_by_the_named_account(work);
     test_each_access_level();
+    test_self_approval_is_per_account();
     test_events_say_whose(work, closed);
     test_no_account_open();
 

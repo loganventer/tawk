@@ -3,8 +3,6 @@
 #include "managers/composite_event_observer.h"
 #include "resource_access/caching_contact_store.h"
 #include "resource_access/caching_message_store.h"
-#include "resource_access/gateway_options.h"
-#include "resource_access/sidecar_gateway.h"
 #include "resource_access/sqlite_chat_store.h"
 #include "resource_access/sqlite_contact_store.h"
 #include "resource_access/sqlite_jid_alias_store.h"
@@ -14,7 +12,6 @@
 #include "resource_access/sqlite_receipt_store.h"
 #include "resource_access/sqlite_scheduled_message_store.h"
 #include "resource_access/sqlite_status_store.h"
-#include "resource_access/whatsmeow_gateway.h"
 #include "utilities/event_queue.h"
 #include "utilities/log.h"
 #include "utilities/path_util.h"
@@ -62,56 +59,6 @@ void account_runtime_auth_dir(const Settings *settings, AccountId id, char *out,
     path_join(out, size, own, "auth");
 }
 
-/* The backend log of one account: the first keeps the file it always had. */
-static void sidecar_log_path(const AccountRuntimeParams *p, AccountId id, char *out, size_t size) {
-    char name[48];
-    if (id <= ACCOUNT_ID_FIRST) str_copy(name, sizeof(name), "sidecar.log");
-    else snprintf(name, sizeof(name), "sidecar-%d.log", id);
-    path_join(out, size, p->state_dir, name);
-}
-
-/* Makes the gateway `backend` asks for, falling back to the Node.js bridge
- * on a build without whatsmeow. The views it hands out belong to it. */
-static IMessageGateway *create_gateway(const AccountRuntimeParams *p, AccountId id, EventQueue *events, const char **backend_name,
-                                       IProfileEditor **editor, IStatusPublisher **publisher, IStatusLiker **liker) {
-    GatewayOptions options;
-    memset(&options, 0, sizeof(options));
-    account_runtime_auth_dir(p->settings, id, options.auth_dir, sizeof(options.auth_dir));
-    path_mkdir_p(options.auth_dir, 0700);
-    str_copy(options.media_dir, sizeof(options.media_dir), p->settings->media_dir);
-    str_copy(options.node_binary, sizeof(options.node_binary), p->settings->node_binary);
-    sidecar_log_path(p, id, options.log_path, sizeof(options.log_path));
-    str_copy(options.log_dir, sizeof(options.log_dir), p->state_dir);
-    str_copy(options.sidecar_dir, sizeof(options.sidecar_dir), p->sidecar_dir);
-    options.debug = p->debug;
-
-    *editor = NULL;
-    *publisher = NULL;                     /* stays NULL on Baileys: it cannot post statuses */
-    *liker = NULL;                         /* only Baileys can like a status privately */
-    IMessageGateway *gateway = NULL;
-    if (strcmp(p->backend, "baileys") != 0) {
-        gateway = whatsmeow_gateway_create(&options, events);
-        if (gateway) {
-            *backend_name = "whatsmeow (in-process)";
-            *editor = whatsmeow_gateway_profile_editor(gateway);
-            *publisher = whatsmeow_gateway_status_publisher(gateway);
-            return gateway;
-        }
-        LOG_WARN("built without whatsmeow; using the Node.js sidecar");
-    }
-    /* Baileys keeps its login in its own folder: its logout clears that
-     * folder, which must never touch the whatsmeow login beside it. */
-    GatewayOptions sidecar = options;
-    path_join(sidecar.auth_dir, sizeof(sidecar.auth_dir), options.auth_dir, "baileys");
-    path_mkdir_p(sidecar.auth_dir, 0700);
-    gateway = sidecar_gateway_create(&sidecar, events);
-    if (!gateway) return NULL;
-    *backend_name = "baileys (Node.js sidecar)";
-    *editor = sidecar_gateway_profile_editor(gateway);
-    *liker = sidecar_gateway_status_liker(gateway);
-    return gateway;
-}
-
 AccountRuntime *account_runtime_create(const AccountRuntimeParams *p, const Account *account) {
     AccountRuntime *rt = calloc(1, sizeof(*rt));
     if (!rt) return NULL;
@@ -132,11 +79,14 @@ AccountRuntime *account_runtime_create(const AccountRuntimeParams *p, const Acco
     rt->scheduled_store = sqlite_scheduled_message_store_create(p->db, id);
 
     rt->events = event_queue_create(EVENT_QUEUE_SIZE);
-    IProfileEditor *editor = NULL;
-    IStatusPublisher *publisher = NULL;
-    IStatusLiker *liker = NULL;
-    rt->services.backend_name = "";
-    rt->gateway = rt->events ? create_gateway(p, id, rt->events, &rt->services.backend_name, &editor, &publisher, &liker) : NULL;
+    GatewayParts parts;
+    memset(&parts, 0, sizeof(parts));
+    if (rt->events && p->gateways->create(p->gateways, id, rt->events, &parts) != 0) parts.gateway = NULL;
+    rt->gateway = parts.gateway;
+    rt->services.backend_name = parts.backend_name ? parts.backend_name : "";
+    IProfileEditor *editor = parts.editor;
+    IStatusPublisher *publisher = parts.publisher;
+    IStatusLiker *liker = parts.liker;
     if (!rt->messages || !rt->chats || !rt->contacts || !rt->aliases || !rt->reactions || !rt->receipts || !rt->profile_store ||
         !rt->status_store || !rt->scheduled_store || !rt->gateway) {
         LOG_ERROR("account %d could not be started", id);
