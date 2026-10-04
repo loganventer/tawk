@@ -259,7 +259,8 @@ TESTS := $(BUILD)/tests/pty_idle_action_test $(BUILD)/tests/ncurses_mouse_queue_
          $(BUILD)/tests/chat_toggle_test $(BUILD)/tests/account_store_test \
          $(BUILD)/tests/whatsmeow_sessions_test $(BUILD)/tests/unified_chat_list_test \
          $(BUILD)/tests/accounts_dialog_test $(BUILD)/tests/merged_message_window_test \
-         $(BUILD)/tests/control_accounts_test $(BUILD)/tests/two_accounts_test
+         $(BUILD)/tests/control_accounts_test $(BUILD)/tests/two_accounts_test \
+         $(BUILD)/tests/tab_title_test
 
 test: $(TESTS)
 	$(call say,Running tests)
@@ -367,6 +368,10 @@ $(BUILD)/tests/accounts_dialog_test: $(BUILD)/tests/accounts_dialog_test.o $(fil
 	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
 
 $(BUILD)/tests/unified_chat_list_test: $(BUILD)/tests/unified_chat_list_test.o $(filter-out $(BUILD)/src/main.o,$(OBJ)) $(LINK_WM)
+	$(call step,LD,$@)
+	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
+
+$(BUILD)/tests/tab_title_test: $(BUILD)/tests/tab_title_test.o $(filter-out $(BUILD)/src/main.o,$(OBJ)) $(LINK_WM)
 	$(call step,LD,$@)
 	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
 

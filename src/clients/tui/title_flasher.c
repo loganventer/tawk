@@ -25,10 +25,12 @@ void title_flasher_start(TitleFlasher *f, int64_t now_ms) {
 
 void title_flasher_acknowledge(TitleFlasher *f) { f->flashing_since_ms = 0; }
 
-/* A braille spinner, one frame per animation tick, while something is under way. */
+/* A braille spinner, one frame per animation tick, while something is under way.
+ * No frame has a byte from 0x80 to 0x9F: a terminal or multiplexer that reads those as
+ * control codes ends the title there and prints the rest of it on the screen. */
 static const char *const SPINNER[] = {
-    "\xE2\xA0\x8B", "\xE2\xA0\x99", "\xE2\xA0\xB9", "\xE2\xA0\xB8", "\xE2\xA0\xBC",
-    "\xE2\xA0\xB4", "\xE2\xA0\xA6", "\xE2\xA0\xA7", "\xE2\xA0\x87", "\xE2\xA0\x8F",
+    "\xE2\xA3\xBE", "\xE2\xA3\xBD", "\xE2\xA3\xBB", "\xE2\xA2\xBF",   /* ⣾ ⣽ ⣻ ⢿ */
+    "\xE2\xA1\xBF", "\xE2\xA3\xAF", "\xE2\xA3\xB7",                    /* ⡿ ⣯ ⣷ */
 };
 #define SPINNER_FRAMES ((int64_t)(sizeof(SPINNER) / sizeof(SPINNER[0])))
 
@@ -47,7 +49,7 @@ static void typing_head(char *out, size_t size, const char *activity, const char
 }
 
 /* The tab title follows what is going on, most useful part first:
- *   "⠼ Loading older messages · Dev team · 💬 3"
+ *   "⣾ Loading older messages · Dev team · 💬 3"
  *   "🟢 tawk · Mom · 💬 3  📷 1"
  * with do not disturb, recording and playing flags, and a flash between
  * the counts and "✉ 3 new" while new messages wait. */
