@@ -53,6 +53,7 @@ static void finish(ControlServer *s, const ControlPending *p, AutomationOutcome 
         cJSON_AddStringToObject(r, "text", p->text ? p->text : "");
     }
     record(s, p, done);
+    control_tag_account(s, r);
     control_reply(s, p->conn, control_codec_ok(p->request_id, r));
 }
 
@@ -119,6 +120,7 @@ static void ask(ControlServer *s, ControlPending *p) {
     cJSON *evt = cJSON_CreateObject();
     cJSON_AddStringToObject(evt, "id", p->request_id);
     cJSON_AddStringToObject(evt, "state", "waiting");
+    control_tag_account(s, evt);
     control_reply(s, p->conn, control_codec_event("approval", evt));
 }
 

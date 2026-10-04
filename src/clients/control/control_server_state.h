@@ -65,6 +65,12 @@ void  control_account_label(ControlServer *server, char *out, size_t size);
 int   control_any_admin(ControlServer *server);
 void  control_op_list_accounts(ControlServer *server, ControlSession *session, const ControlRequest *req);
 
+/* ---- the sending number (control_sender.c) ---- */
+/* For a request that starts a new message and names no account: serves the
+ * account you send to that contact from. Returns -1, having answered, when
+ * that account is closed to agents. */
+int   control_follow_sender(ControlServer *server, const ControlSession *session, const ControlRequest *req);
+
 /* ---- helpers (control_server.c) ---- */
 const Settings *control_settings(ControlServer *server);
 ControlSession *control_session_of(ControlServer *server, int conn);

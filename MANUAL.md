@@ -977,6 +977,8 @@ Each account has its own level for agents, set with g in the accounts list:
 
 On the contact card, **Agents answer by themselves here** switches a chat on or off for the account it belongs to. It takes effect only while that account's level is admin. A chat switched on for one account stays off for your others.
 
+An agent's new message follows the same rule as yours: unless you tell the agent which number to use, it goes out from the contact's sending number, and a reply goes out from the account the quoted message is in. If the contact's sending number is an account that is off for agents, the agent is refused and nothing is sent from another number. Open that account to *send* to let agents write to them.
+
 When an agent asks to send something, the Agentic tab names the account in brackets after the chat, in the queue, in the detail and in the log, so you can see which number it would go out from.
 
 ### What happens when you update
@@ -1163,7 +1165,7 @@ The safest way for an agent to help you write is a draft: it puts the text in th
 
 ### Shell commands
 
-With agent access on, these talk to the tawk that is running. With several accounts, add `--account NAME` (a label or an id) to pick one. Without it, `send` uses the default account, `tail` shows every account open to agents and names each, and `unread` and `status-line` count across all of them.
+With agent access on, these talk to the tawk that is running. With several accounts, add `--account NAME` (a label or an id) to pick one. Without it, `send` goes from the contact's sending number (the default account when they have none), `tail` shows every account open to agents and names each, and `unread` and `status-line` count across all of them.
 
 ```
 tawk send CHAT TEXT...          send a message (or: tawk send CHAT - < file)

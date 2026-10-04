@@ -315,6 +315,8 @@ The single `account` object and the top-level `access` stay, and describe the de
 {"id":"7","op":"send_message","args":{"account":"work","chat":"Mom","text":"On my way"}}
 ```
 
+**A new message follows the contact.** `send_message`, `schedule_message` and `draft_message` that name no account are served by the account you send to that contact from, chosen as the chat list chooses it: the contact's own sending number, else the default account if it has the chat, else the account whose chat with them is newest. A `send_message` with `reply_to` goes from the account that holds the quoted message, as a reply does in tawk itself. Naming an `account` overrides all of this. When the contact's sending number is an account closed to agents the request answers `not_allowed`, and nothing is sent from another number. Every other operation that names no account is served by the default account. The result of a write, and its `approval` notification, carry the `account` object of the account that served it.
+
 An account whose level is *off* is not listed and cannot be named. Naming it answers `not_found` with `No such account`, exactly as a name no account has, so a client learns nothing about it. A request naming no account while none is open answers `not_allowed`.
 
 **`list_accounts`** is a read operation with no arguments. It answers `{"accounts":[...],"default":id}` with the same objects as `hello`, read afresh, since you can open or close an account while a client stays connected.

@@ -29,6 +29,12 @@ static int resolve(ControlServer *s, ControlSession *session, const ControlReque
     return 0;
 }
 
+/* The chat a new message is for, served by the account you send to that contact from. */
+static int resolve_recipient(ControlServer *s, ControlSession *session, const ControlRequest *req, char *jid, size_t size) {
+    if (control_follow_sender(s, session, req) != 0) return -1;
+    return resolve(s, session, req, jid, size);
+}
+
 /* ---- send_message ---- */
 
 static cJSON *do_send(ControlServer *s, const ControlPending *p, ControlFailure *f) {
@@ -60,7 +66,7 @@ static cJSON *do_send(ControlServer *s, const ControlPending *p, ControlFailure 
 
 void control_op_send_message(ControlServer *s, ControlSession *session, const ControlRequest *req) {
     char jid[128];
-    if (resolve(s, session, req, jid, sizeof(jid)) != 0) return;
+    if (resolve_recipient(s, session, req, jid, sizeof(jid)) != 0) return;
     const char *text = checked_text(s, session, req);
     if (!text) return;
     ControlPending p;
@@ -136,7 +142,7 @@ static cJSON *do_schedule(ControlServer *s, const ControlPending *p, ControlFail
 
 void control_op_schedule_message(ControlServer *s, ControlSession *session, const ControlRequest *req) {
     char jid[128];
-    if (resolve(s, session, req, jid, sizeof(jid)) != 0) return;
+    if (resolve_recipient(s, session, req, jid, sizeof(jid)) != 0) return;
     const char *text = checked_text(s, session, req);
     if (!text) return;
     int64_t due = 0;
@@ -178,7 +184,7 @@ void control_op_mark_read(ControlServer *s, ControlSession *session, const Contr
 
 void control_op_draft_message(ControlServer *s, ControlSession *session, const ControlRequest *req) {
     char jid[128];
-    if (resolve(s, session, req, jid, sizeof(jid)) != 0) return;
+    if (resolve_recipient(s, session, req, jid, sizeof(jid)) != 0) return;
     const char *text = checked_text(s, session, req);
     if (!text) return;
     ControlPending p;

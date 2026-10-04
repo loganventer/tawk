@@ -385,6 +385,75 @@ static void test_each_access_level(void) {
     clear_outbox();
 }
 
+/* A new message that names no account leaves from the number you chose for that contact. */
+static void test_a_send_follows_the_contact(AccountId work, AccountId closed) {
+    int conn = open_client();
+    clear_outbox();
+    World *main_world = &worlds[0], *work_world = &worlds[1], *closed_world = &worlds[2];
+    int main_before = main_world->texts, work_before = work_world->texts;
+    account_roster_manager_set_agent_access(roster, work, ACCOUNT_AGENT_SEND);
+
+    account_roster_manager_set_send_account(roster, MOM, work);
+    say(conn, "{\"id\":\"f1\",\"op\":\"send_message\",\"args\":{\"chat\":\"Mom\",\"text\":\"by her number\"}}");
+    const ApprovalRequest *asked = approval_queue_at(queue, 0);
+    CHECK(asked && asked->account == work && !strcmp(asked->account_label, "work"), "you are asked for the account the contact is sent to from");
+    cJSON *waiting = event("approval");
+    CHECK(waiting && account_id_of(waiting) == work, "and the client is told which one it waits on");
+    cJSON_Delete(waiting);
+    answer_first(1);
+    cJSON *f1 = reply("f1");
+    CHECK(ok(f1) && work_world->texts == work_before + 1 && main_world->texts == main_before && account_id_of(result(f1)) == work,
+          "a send that names no account goes out through the contact's sending account, and says so");
+    cJSON_Delete(f1);
+
+    say(conn, "{\"id\":\"f2\",\"op\":\"send_message\",\"args\":{\"chat\":\"" MOM "\",\"text\":\"named\",\"account\":\"main\"}}");
+    answer_first(1);
+    cJSON *f2 = reply("f2");
+    CHECK(ok(f2) && main_world->texts == main_before + 1 && work_world->texts == work_before + 1, "naming an account still wins");
+    cJSON_Delete(f2);
+
+    /* Reading is not sending: the default account's chat is the one read. */
+    say(conn, "{\"id\":\"f3\",\"op\":\"read_messages\",\"args\":{\"chat\":\"" MOM "\"}}");
+    cJSON *f3 = reply("f3");
+    CHECK(ok(f3) && strstr(outbox[outbox_count - 1], "from main"), "a read that names no account stays with the default one");
+    cJSON_Delete(f3);
+
+    /* The number chosen for her is closed to agents: nothing leaves from another one instead. */
+    account_roster_manager_set_send_account(roster, MOM, closed);
+    say(conn, "{\"id\":\"f4\",\"op\":\"send_message\",\"args\":{\"chat\":\"" MOM "\",\"text\":\"wrong number\"}}");
+    cJSON *f4 = reply("f4");
+    CHECK(f4 && !ok(f4) && !strcmp(error_code(f4), "not_allowed") && approval_queue_count(queue) == 0 &&
+          main_world->texts == main_before + 1 && work_world->texts == work_before + 1 && closed_world->texts == 0,
+          "a contact sent to from a closed account is not sent to from another");
+    cJSON_Delete(f4);
+    say(conn, "{\"id\":\"f5\",\"op\":\"schedule_message\",\"args\":{\"chat\":\"" MOM "\",\"text\":\"later\",\"when\":\"tomorrow 09:00\"}}");
+    cJSON *f5 = reply("f5");
+    CHECK(f5 && !ok(f5) && !strcmp(error_code(f5), "not_allowed") && approval_queue_count(queue) == 0, "nor is a message for later");
+    cJSON_Delete(f5);
+
+    /* A reply leaves from the account that holds the message it quotes, whatever was chosen for her. */
+    account_roster_manager_set_send_account(roster, MOM, work);
+    say(conn, "{\"id\":\"f7\",\"op\":\"send_message\",\"args\":{\"chat\":\"" MOM "\",\"text\":\"answer\",\"reply_to\":\"M1\"}}");
+    answer_first(1);
+    cJSON *f7 = reply("f7");
+    CHECK(ok(f7) && main_world->texts == main_before + 2 && work_world->texts == work_before + 1 && account_id_of(result(f7)) == ACCOUNT_ID_FIRST,
+          "a reply goes out from the account the quoted message is in");
+    cJSON_Delete(f7);
+    account_roster_manager_set_send_account(roster, MOM, ACCOUNT_ID_NONE);
+    main_before++;
+
+    /* No number chosen, and only one account has the chat: that one sends. */
+    say(conn, "{\"id\":\"f6\",\"op\":\"send_message\",\"args\":{\"chat\":\"" BOSS "\",\"text\":\"report\"}}");
+    answer_first(1);
+    cJSON *f6 = reply("f6");
+    CHECK(ok(f6) && work_world->texts == work_before + 2 && main_world->texts == main_before + 1 && account_id_of(result(f6)) == work,
+          "a contact only one account has a chat with is sent to from that account");
+    cJSON_Delete(f6);
+
+    account_roster_manager_set_agent_access(roster, work, ACCOUNT_AGENT_READ);
+    clear_outbox();
+}
+
 /* A chat an agent may answer by itself in is switched on for one account, and stays off for the same person on another. */
 static void test_self_approval_is_per_account(void) {
     World *main_world = &worlds[0], *work_world = &worlds[1];
@@ -546,6 +615,7 @@ int main(void) {
     test_who_is_seen(work, closed);
     test_served_by_the_named_account(work);
     test_each_access_level();
+    test_a_send_follows_the_contact(work, closed);
     test_self_approval_is_per_account();
     test_events_say_whose(work, closed);
     test_no_account_open();
