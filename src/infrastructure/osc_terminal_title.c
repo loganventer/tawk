@@ -1,4 +1,5 @@
 #include "infrastructure/osc_terminal_title.h"
+#include "utilities/plain_title.h"
 #include "utilities/str_util.h"
 
 #include <fcntl.h>
@@ -10,6 +11,8 @@
 typedef struct OscTitle {
     int              fd;
     int              windows_terminal;
+    int              inside_screen;
+    char             last[512];          /* the title as last written */
     TerminalProgress last_progress;
 } OscTitle;
 
@@ -27,6 +30,16 @@ static void title_set(ITerminalTitle *self, const char *title) {
     char clean[512];
     str_copy(clean, sizeof(clean), title);
     str_strip_controls(clean);   /* remote text must never terminate the escape early */
+    /* GNU screen hands a title on to the terminal with each character cut down to its last byte. A
+     * braille dot or a letter of a chat's name then becomes a bell or an escape, the title ends there
+     * and the rest of it is printed in the window. Inside screen the title is plain ASCII. */
+    if (t->inside_screen) {
+        char plain[512];
+        plain_title(clean, plain, sizeof(plain));
+        str_copy(clean, sizeof(clean), plain);
+    }
+    if (strcmp(clean, t->last) == 0) return;
+    str_copy(t->last, sizeof(t->last), clean);
     char seq[600];
     int n = snprintf(seq, sizeof(seq), "\033]0;%s\007", clean);
     if (n > 0) write_all(t->fd, seq, (size_t)n < sizeof(seq) ? (size_t)n : sizeof(seq) - 1);
@@ -63,6 +76,8 @@ ITerminalTitle *osc_terminal_title_create(void) {
     if (!tt || !t) { free(tt); free(t); return NULL; }
     t->fd = open("/dev/tty", O_WRONLY | O_CLOEXEC | O_NOCTTY);
     t->windows_terminal = getenv("WT_SESSION") != NULL;
+    const char *screen = getenv("STY");
+    t->inside_screen = screen && *screen;
     write_all(t->fd, "\033[22;0t", 7);   /* push current title */
     tt->ctx = t;
     tt->set = title_set;
