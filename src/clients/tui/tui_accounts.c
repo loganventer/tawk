@@ -4,6 +4,7 @@
 #include "tui_app_state.h"
 #include "engines/account_agent_policy.h"
 #include "engines/jid_list.h"
+#include "utilities/log.h"
 #include "utilities/clock_util.h"
 #include "utilities/str_util.h"
 
@@ -33,11 +34,21 @@ void tui_app_accounts_start(TuiApp *app) {
     }
 }
 
+/* With several accounts, what is logged while one is worked on says which. */
+static void log_as(TuiApp *app, const AccountServices *sv) {
+    IAccountDirectory *dir = app->deps.directory;
+    log_context_set(sv && dir && dir->count(dir) > 1 ? sv->label : NULL);
+}
+
 void tui_app_accounts_tick(TuiApp *app) {
+    IAccountDirectory *dir = app->deps.directory;
+    const AccountServices *viewed = dir ? dir->find(dir, app->deps.active_account) : NULL;
+    log_as(app, viewed);                                    /* an account added or removed changes whether lines are marked */
     for (int i = 0; ; i++) {
         const AccountServices *sv = other(app, i);
         if (!sv) break;
         if (in_view(app, sv)) continue;
+        log_as(app, sv);
         ManagerChanges ch;
         messaging_manager_tick(sv->messaging, &ch);
         profile_manager_tick(sv->profiles);
@@ -47,6 +58,7 @@ void tui_app_accounts_tick(TuiApp *app) {
         tui_app_scheduling_report(app, sent, late);
         if (ch.chats || ch.messages || ch.auth || ch.notified) app->dirty = 1;
     }
+    log_as(app, viewed);                                    /* the rest of the frame is the account in view's */
 }
 
 void tui_app_accounts_set_active(TuiApp *app, int active) {

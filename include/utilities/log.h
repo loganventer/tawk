@@ -16,6 +16,11 @@ void     log_close(void);
  * keeping them open. Returns the bytes freed, or -1 when there is no log. */
 long long log_clear(void);
 LogLevel log_level_parse(const char *name);
+/* What this thread's lines are about, put in brackets before each one: the
+ * label of the account being worked on. NULL or "" takes it away. The text
+ * is copied. log_context_get gives what is set, so it can be put back. */
+void     log_context_set(const char *context);
+void     log_context_get(char *out, unsigned long size);
 void     log_write(LogLevel level, const char *fmt, ...)
     __attribute__((format(printf, 2, 3)));
 

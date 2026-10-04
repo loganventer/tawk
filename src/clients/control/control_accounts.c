@@ -4,6 +4,7 @@
 #include "control_server_state.h"
 #include "engines/account_agent_policy.h"
 #include "engines/account_label_validator.h"
+#include "utilities/log.h"
 #include "utilities/str_util.h"
 
 #include <stdlib.h>
@@ -78,6 +79,7 @@ int control_serve_account(ControlServer *s, AccountId id) {
     s->deps.calls = sv->calls;
     s->deps.backend_name = sv->backend_name;
     s->account = id;
+    log_context_set(control_account_count(s) > 1 ? account.label : NULL);
     char own[1024];
     account_roster_manager_self_approval_chats(s->deps.roster, id, own, sizeof(own));
     automation_manager_serve(s->deps.automation, id, account_agent_access_name(account_agent_policy_access(&account, settings)),

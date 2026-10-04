@@ -57,6 +57,16 @@ LogLevel log_level_parse(const char *name) {
     return LOG_LEVEL_INFO;
 }
 
+static _Thread_local char s_context[64];
+
+void log_context_set(const char *context) {
+    snprintf(s_context, sizeof(s_context), "%s", context ? context : "");
+}
+
+void log_context_get(char *out, unsigned long size) {
+    snprintf(out, size, "%s", s_context);
+}
+
 void log_write(LogLevel level, const char *fmt, ...) {
     pthread_mutex_lock(&s_mutex);
     if (s_file && level >= s_level) {
@@ -66,6 +76,7 @@ void log_write(LogLevel level, const char *fmt, ...) {
         localtime_r(&now, &tm_now);
         strftime(stamp, sizeof(stamp), "%Y-%m-%d %H:%M:%S", &tm_now);
         fprintf(s_file, "%s [%s] ", stamp, level_name(level));
+        if (s_context[0]) fprintf(s_file, "[%s] ", s_context);
         va_list args;
         va_start(args, fmt);
         vfprintf(s_file, fmt, args);

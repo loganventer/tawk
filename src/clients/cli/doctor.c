@@ -203,9 +203,25 @@ static void check_screensaver(Tally *t, const DoctorInputs *in) {
     line(t, found ? OK : WARN, "command", buf, "install it, or pick another command under Settings, Screensaver");
 }
 
-/* One account's login folder: whether a number is linked there. */
-static void account_line(Tally *t, const char *label, const char *auth_dir) {
-    char detail[700];
+/* The label and number the database has for an account, as "work, 27830000001", or "" when it is not known. */
+static void known_as(const DoctorInputs *in, int id, char *out, size_t size) {
+    out[0] = '\0';
+    for (int i = 0; i < in->account_count; i++) {
+        const Account *a = &in->accounts[i];
+        if (a->id != id) continue;
+        char number[64];
+        snprintf(number, sizeof(number), "%s", a->jid);
+        char *at = strchr(number, '@');
+        if (at) *at = '\0';
+        snprintf(out, size, "%s%s%s%s", a->label, number[0] ? ", " : "", number, a->is_primary ? ", primary" : "");
+    }
+}
+
+/* One account: what the database calls it, its login folder, and whether a number is linked there. */
+static void account_line(Tally *t, const DoctorInputs *in, int id, const char *auth_dir) {
+    char label[32], name[160], detail[900];
+    snprintf(label, sizeof(label), "account %d", id);
+    known_as(in, id, name, sizeof(name));
     int linked = 0;
     DIR *d = opendir(auth_dir);
     if (d) {
@@ -213,17 +229,17 @@ static void account_line(Tally *t, const char *label, const char *auth_dir) {
         while ((e = readdir(d)) != NULL) if (e->d_name[0] != '.') linked = 1;
         closedir(d);
     }
-    snprintf(detail, sizeof(detail), "%s (%s)", auth_dir, linked ? "linked" : "not linked yet");
+    snprintf(detail, sizeof(detail), "%s%s%s (%s)", name, name[0] ? ": " : "", auth_dir, linked ? "linked" : "not linked yet");
     line(t, OK, label, detail, NULL);
 }
 
-/* The accounts, as their login folders show them. Labels and agent access are
- * kept in the database, which this check leaves alone: Settings, Account, Accounts shows those. */
+/* The accounts, by their login folders. Their labels come from the database when it
+ * can be read as it is: it is never upgraded or changed here, and an encrypted one is left shut. */
 static void check_accounts(Tally *t, const DoctorInputs *in) {
     section("Accounts");
     char path[600];
     path_join(path, sizeof(path), in->settings->data_dir, "auth");
-    account_line(t, "account 1", path);
+    account_line(t, in, 1, path);
     char accounts[600];
     path_join(accounts, sizeof(accounts), in->settings->data_dir, "accounts");
     DIR *d = opendir(accounts);
@@ -232,10 +248,9 @@ static void check_accounts(Tally *t, const DoctorInputs *in) {
     while ((e = readdir(d)) != NULL) {
         int id = atoi(e->d_name);
         if (id <= 1) continue;
-        char label[32], auth[900];
-        snprintf(label, sizeof(label), "account %d", id);
+        char auth[900];
         snprintf(auth, sizeof(auth), "%s/%s/auth", accounts, e->d_name);
-        if (is_dir(auth)) account_line(t, label, auth);
+        if (is_dir(auth)) account_line(t, in, id, auth);
     }
     closedir(d);
 }

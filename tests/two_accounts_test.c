@@ -18,6 +18,7 @@
 #include "resource_access/sqlite_chat_prefs_store.h"
 #include "resource_access/sqlite_database.h"
 #include "resource_access/text_chat_exporter.h"
+#include "utilities/log.h"
 #include "utilities/str_util.h"
 
 #include <stdio.h>
@@ -329,6 +330,27 @@ static void test_one_goes_the_other_stays(void) {
     CHECK(rows("messages", ACCOUNT_ID_FIRST) == 3 && rows("chats", ACCOUNT_ID_FIRST) == 1, "while the other account's are untouched");
 }
 
+/* One log for every account: a line written while an account is worked on says which. */
+static void test_log_says_which_account(const char *dir) {
+    char path[600], text[2000] = "";
+    snprintf(path, sizeof(path), "%s/tawk.log", dir);
+    log_open(path, LOG_LEVEL_INFO);
+    log_context_set("work");
+    LOG_INFO("reconnecting");
+    char held[64];
+    log_context_get(held, sizeof(held));
+    log_context_set(NULL);
+    LOG_INFO("settings saved");
+    log_context_set(held);
+    LOG_INFO("connected");
+    log_context_set(NULL);
+    log_close();
+    FILE *f = fopen(path, "r");
+    if (f) { size_t n = fread(text, 1, sizeof(text) - 1, f); text[n] = '\0'; fclose(f); }
+    CHECK(strstr(text, "[INFO] [work] reconnecting") && strstr(text, "[INFO] settings saved") && strstr(text, "[INFO] [work] connected"),
+          "a log line carries the label of the account it is about, and a line about none carries nothing");
+}
+
 int main(void) {
     char dir[] = "/tmp/tawk-two-accounts-XXXXXX";
     if (!mkdtemp(dir)) return 1;
@@ -364,6 +386,7 @@ int main(void) {
     test_one_person_one_chat();
     test_sent_from_the_chosen_number();
     test_one_goes_the_other_stays();
+    test_log_says_which_account(dir);
 
     account_host_destroy(host);
     exporter->destroy(exporter);

@@ -103,6 +103,7 @@ int control_resolve_chat(ControlServer *s, const ControlSession *session, const 
             cJSON *c = cJSON_CreateObject();
             cJSON_AddStringToObject(c, "jid", chats[candidates[i]].jid);
             cJSON_AddStringToObject(c, "name", chats[candidates[i]].name);
+            control_tag_account(s, c);
             cJSON_AddItemToArray(list, c);
         }
         snprintf(why, sizeof(why), "\"%s\" matches more than one chat", ref);
@@ -346,6 +347,8 @@ static void obey(ControlServer *s) {
 
 int control_server_tick(ControlServer *s) {
     int64_t now = clock_now_ms();
+    char frame_context[64];
+    log_context_get(frame_context, sizeof(frame_context));  /* serving an account marks the log with it; put back at the end */
     s->changed = 0;
     follow_setting(s, now);
     automation_manager_admin_wanted(s->deps.automation, control_any_admin(s));
@@ -366,6 +369,7 @@ int control_server_tick(ControlServer *s) {
     }
     control_writes_tick(s, now);
     report_status(s);
+    log_context_set(frame_context);
     return s->changed;
 }
 

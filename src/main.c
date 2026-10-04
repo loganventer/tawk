@@ -14,6 +14,7 @@
 #include "clients/tui/tui_app.h"
 #include "clients/tui/tui_notifier.h"
 #include "composition/account_host.h"
+#include "resource_access/sqlite_account_roster_reader.h"
 #include "composition/backend_gateway_factory.h"
 #include "infrastructure/audio/audio_backend_factory.h"
 #include "infrastructure/composite_notifier.h"
@@ -245,7 +246,7 @@ static int run_update(const Options *opt, const char *argv0) {
     return updater_run(&u);
 }
 
-/* `tawk --doctor`: checks the setup without touching the database or the network. */
+/* `tawk --doctor`: checks the setup without changing the database or using the network. */
 static int run_doctor(const Options *opt, const Settings *s, SettingsManager *settings_mgr, ISettingsStore *store,
                       IThemeRepository *themes, IEmojiCatalog *emoji, const char *themes_dir,
                       const char *db_path, const char *log_path) {
@@ -260,8 +261,11 @@ static int run_doctor(const Options *opt, const Settings *s, SettingsManager *se
     DoctorInputs in = {
         s, opt->config_path ? opt->config_path : s->config_path, db_path, log_path, themes_dir, sidecar_dir,
         emoji, audio, whatsmeow_built, opt->backend ? opt->backend : s->backend,
-        sqlite_key_supported(), sqlite_database_is_encrypted(db_path),
+        sqlite_key_supported(), sqlite_database_is_encrypted(db_path), NULL, 0,
     };
+    Account known[ACCOUNT_MAX];
+    int count = sqlite_account_roster_read(db_path, known, ACCOUNT_MAX);
+    if (count > 0) { in.accounts = known; in.account_count = count; }
     int rc = doctor_run(&in);
     audio->destroy(audio);
     settings_manager_destroy(settings_mgr);
