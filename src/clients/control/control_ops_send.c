@@ -29,10 +29,12 @@ static int resolve(ControlServer *s, ControlSession *session, const ControlReque
     return 0;
 }
 
-/* The chat a new message is for, served by the account you send to that contact from. */
-static int resolve_recipient(ControlServer *s, ControlSession *session, const ControlRequest *req, char *jid, size_t size) {
+/* Who a new message is for, served by the account you send to that contact from: a chat, or
+ * someone with no chat yet, in which case *new_chat is set and the message starts the chat. */
+static int resolve_recipient(ControlServer *s, ControlSession *session, const ControlRequest *req, char *jid, size_t size,
+                             int *new_chat) {
     if (control_follow_sender(s, session, req) != 0) return -1;
-    return resolve(s, session, req, jid, size);
+    return control_resolve_recipient(s, session, req, "chat", jid, size, new_chat);
 }
 
 /* ---- send_message ---- */
@@ -66,12 +68,14 @@ static cJSON *do_send(ControlServer *s, const ControlPending *p, ControlFailure 
 
 void control_op_send_message(ControlServer *s, ControlSession *session, const ControlRequest *req) {
     char jid[128];
-    if (resolve_recipient(s, session, req, jid, sizeof(jid)) != 0) return;
+    int new_chat = 0;
+    if (resolve_recipient(s, session, req, jid, sizeof(jid), &new_chat) != 0) return;
     const char *text = checked_text(s, session, req);
     if (!text) return;
     ControlPending p;
     control_pending_init(&p, req->id, "send_message", WRITE_KIND_SEND, do_send);
     str_copy(p.chat_jid, sizeof(p.chat_jid), jid);
+    p.new_chat = new_chat;
     const char *reply_to = control_codec_string(req->args, "reply_to");
     if (reply_to && *reply_to) {
         Message answered;
@@ -88,7 +92,8 @@ void control_op_send_message(ControlServer *s, ControlSession *session, const Co
     p.text = str_dup(text);
     p.editable = 1;
     p.needs_connection = 1;
-    str_copy(p.action, sizeof(p.action), reply_to && *reply_to ? "send a reply" : "send a message");
+    str_copy(p.action, sizeof(p.action), new_chat ? "start a new chat with this message"
+                                                    : reply_to && *reply_to ? "send a reply" : "send a message");
     control_write(s, session, &p);
 }
 
@@ -142,7 +147,8 @@ static cJSON *do_schedule(ControlServer *s, const ControlPending *p, ControlFail
 
 void control_op_schedule_message(ControlServer *s, ControlSession *session, const ControlRequest *req) {
     char jid[128];
-    if (resolve_recipient(s, session, req, jid, sizeof(jid)) != 0) return;
+    int new_chat = 0;
+    if (resolve_recipient(s, session, req, jid, sizeof(jid), &new_chat) != 0) return;
     const char *text = checked_text(s, session, req);
     if (!text) return;
     int64_t due = 0;
@@ -153,12 +159,13 @@ void control_op_schedule_message(ControlServer *s, ControlSession *session, cons
     ControlPending p;
     control_pending_init(&p, req->id, "schedule_message", WRITE_KIND_SEND, do_schedule);
     str_copy(p.chat_jid, sizeof(p.chat_jid), jid);
+    p.new_chat = new_chat;
     cJSON_AddNumberToObject(p.args, "due_at", (double)due);
     p.text = str_dup(text);
     p.editable = 1;
     char when[48];
     clock_format_upcoming(due, control_settings(s)->use_24h_clock, when, sizeof(when));
-    snprintf(p.action, sizeof(p.action), "send later, %s", when);
+    snprintf(p.action, sizeof(p.action), new_chat ? "start a new chat later, %s" : "send later, %s", when);
     control_write(s, session, &p);
 }
 
@@ -184,7 +191,13 @@ void control_op_mark_read(ControlServer *s, ControlSession *session, const Contr
 
 void control_op_draft_message(ControlServer *s, ControlSession *session, const ControlRequest *req) {
     char jid[128];
-    if (resolve_recipient(s, session, req, jid, sizeof(jid)) != 0) return;
+    int new_chat = 0;
+    if (resolve_recipient(s, session, req, jid, sizeof(jid), &new_chat) != 0) return;
+    if (new_chat) {
+        control_fail(s, session->conn, req->id, "not_found",
+                     "Nobody has a chat with that person yet, and a draft needs one. send_message starts the chat");
+        return;
+    }
     const char *text = checked_text(s, session, req);
     if (!text) return;
     ControlPending p;

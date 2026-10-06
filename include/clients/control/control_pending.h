@@ -25,6 +25,7 @@ typedef struct ControlPending {
     char           client[64];
     char           op[32];
     char           chat_jid[128];     /* "" when it is about no chat */
+    int            new_chat;          /* nobody has this chat yet: the message starts it, and only you may allow that */
     AccountId      account;           /* the account it was asked of, and is carried out by */
     char           action[128];       /* what you are asked: "delete the chat", "change Theme to dracula" */
     char          *text;              /* owned, may be NULL: words to send or post */

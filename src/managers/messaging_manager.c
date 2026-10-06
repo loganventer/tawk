@@ -12,6 +12,7 @@
 #include "engines/mention_matcher.h"
 #include "engines/message_id_generator.h"
 #include "engines/notification_policy.h"
+#include "engines/recipient_reference_parser.h"
 #include "engines/url_finder.h"
 #include "engines/whatsapp_markup.h"
 #include "utilities/clock_util.h"
@@ -218,6 +219,17 @@ void messaging_manager_display_name(MessagingManager *m, const char *jid, char *
     Contact c;
     if (m->deps.contacts->get(m->deps.contacts, jid, &c) == 0) contact_display_name(&c, out, size);
     else contact_phone_from_jid(jid, out, size);
+}
+
+int messaging_manager_find_contacts(MessagingManager *m, const char *ref, Contact *out, int max) {
+    if (!ref || !*ref || !out || max <= 0) return 0;
+    char jid[128];
+    if (recipient_reference_parse(ref, jid, sizeof(jid)) == 0) {
+        return m->deps.contacts->get(m->deps.contacts, jid, &out[0]) == 0 ? 1 : 0;
+    }
+    if (!m->deps.contacts->find_by_name) return 0;
+    int n = m->deps.contacts->find_by_name(m->deps.contacts, ref, out, max);
+    return n > 0 ? n : 0;
 }
 
 /* The names mentions in `msg` show: yours as linked, anyone else's as saved. */

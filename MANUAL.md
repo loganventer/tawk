@@ -52,6 +52,7 @@ The screenshots in this manual were taken from tawk running on a demo account wi
   - [Letting an agent answer for itself](#letting-an-agent-answer-for-itself)
   - [Destructive requests](#destructive-requests)
   - [Drafts from agents](#drafts-from-agents)
+  - [Writing to someone new](#writing-to-someone-new)
   - [Shell commands](#shell-commands)
   - [tawk-mcp](#tawk-mcp)
 - [Command line](#command-line)
@@ -1177,6 +1178,16 @@ Deleting a message or a chat, clearing a chat, blocking someone, removing your p
 ### Drafts from agents
 
 The safest way for an agent to help you write is a draft: it puts the text in that chat's input box and sends nothing. When the chat is open the draft appears in the input (below anything you had typed); otherwise it waits with the chat and a line says so. Edit it and send it as usual. A draft already waiting is never overwritten.
+
+### Writing to someone new
+
+An agent can send, or schedule, a message to someone you have no chat with yet. It names them by phone number with its country code (`+27821234567`), by JID, or by the name of a contact, and the message starts the chat. A number written the local way (`082...`) is not found, because it names no country, and a name two contacts share is refused with both offered. Groups cannot be reached this way.
+
+You are asked about it as "start a new chat with this message", with the name you saved or the number. That first message is always yours to answer. Allowing a chat for the session does not cover it, and an agent holding the admin token cannot answer it for you, whichever chats you chose for that. Once the chat exists, later messages follow the usual rules.
+
+"Chats they may use" decides here too: with a list, only the people on it can be reached. Someone whose chat you locked is not found by their number either. tawk does not check that a number is on WhatsApp, so a message to one that is not is queued and then shows as failed. Reading, drafting and everything else still need a chat that is already there.
+
+`tawk send` reaches someone new the same way. It asks first when "Ask for shell commands too" is on.
 
 ### Shell commands
 

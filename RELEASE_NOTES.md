@@ -4,6 +4,13 @@ What changed in each version of tawk, newest first. `tawk --update` shows every 
 
 Each version has a section headed `## <version> (<date>)`, with one line for each change you would notice.
 
+## 0.10.0 (2026-10-06)
+
+- An agent, and `tawk send`, can write to someone you have no chat with yet. Name them by phone number with its country code (`+27821234567`), by JID, or by the name of a contact; the message starts the chat. A name two contacts share is refused and both are offered.
+- You are asked about such a message as "start a new chat with this message", and it is always yours to answer. An allowance for the session does not cover it, and an agent with an admin token cannot answer it for you.
+- The chats agents may use still decide who can be reached, and someone whose chat is locked is not found by number either.
+- Voice note transcription starts on `large-v3-turbo` in place of `tiny`, which could not follow Afrikaans or mixed languages.
+
 ## 0.9.1 (2026-10-06)
 
 - The Agents list gives each connected agent two lines: who it is on the first, and under it what the agent says it is working on.

@@ -43,6 +43,12 @@ static int cc_merge(IContactStore *self, const char *from, const char *to) {
     return c->inner->merge(c->inner, from, to);
 }
 
+/* A search is not kept: it is rare, and what it finds may change with every upsert. */
+static int cc_find_by_name(IContactStore *self, const char *text, Contact *out, int max) {
+    CachingContacts *c = self->ctx;
+    return c->inner->find_by_name ? c->inner->find_by_name(c->inner, text, out, max) : 0;
+}
+
 static void cc_destroy(IContactStore *self) {
     if (!self) return;
     CachingContacts *c = self->ctx;
@@ -65,5 +71,6 @@ IContactStore *caching_contact_store_create(IContactStore *inner, int capacity) 
     s->get = cc_get;
     s->merge = cc_merge;
     s->destroy = cc_destroy;
+    s->find_by_name = cc_find_by_name;
     return s;
 }

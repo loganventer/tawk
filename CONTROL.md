@@ -63,6 +63,10 @@ A notification, sent without a request:
 
 A **chat** is named in arguments by its JID or by its name. A name matches case-insensitively, first exactly and then as the start of a word; when several chats match, the answer is `ambiguous`.
 
+**Someone with no chat yet** can be named in `send_message` and `schedule_message`, and nowhere else. When `chat` matches no chat, it is read as a person: a phone number with its country code (`+27 82 123 4567`, `0027821234567` or `27821234567`; spaces, dashes, brackets and dots are ignored), a personal JID (`27821234567@s.whatsapp.net`), or the name of a contact, as you saved it or as they chose it, matched like a chat's name. A number written the local way, with a leading `0`, names no country and is `not_found`. A group, a broadcast and a channel are never found this way. A name that several such contacts share is `ambiguous`, and each candidate carries `"new_chat":true`. The chats agents may use (`chats` under `[automation]`) decide here as well: with a list, only people on it are reached. Someone whose chat exists and is hidden from agents is `not_found`, by name and by number.
+
+The message then starts the chat, and you are asked about it as "start a new chat with this message". That first message is always yours to answer: an allowance for the session does not cover it, and `approve` refuses it with `not_allowed` whatever the self-approval chats say. tawk does not check that the number is on WhatsApp: a message to one that is not is queued and then fails.
+
 A chat in answers:
 
 ```json
@@ -126,7 +130,7 @@ Result:
 ```json
 {
   "protocol": 1,
-  "tawk": "0.9.1",
+  "tawk": "0.10.0",
   "access": "read",
   "account": {"jid": "27830000000@s.whatsapp.net", "name": "Logan"},
   "connected": true
@@ -155,9 +159,9 @@ Writes need `access = send` (or `manage` or `admin`) in `[automation]`. Each is 
 
 | Operation | Arguments | Result |
 | --- | --- | --- |
-| `send_message` | `chat` (required), `text` (required, up to 65536 bytes), `reply_to` (a message id in that chat) | `{"id":"3EB0…"}`, the new message's id; it is queued and goes out as any message you send |
+| `send_message` | `chat` (required; a chat, or someone with no chat yet), `text` (required, up to 65536 bytes), `reply_to` (a message id in that chat) | `{"id":"3EB0…"}`, the new message's id; it is queued and goes out as any message you send |
 | `react` | `message_id` (required), `emoji` (required; an empty string removes your reaction) | `{}` |
-| `schedule_message` | `chat` (required), `when` (as `/later` takes it: `18:00`, `+30m`, `tomorrow 9:00`, `fri 17:30`, optionally followed by an adjustment in seconds such as `+37s` or `-12s`, which never moves it into the past), `text` (required) | `{"id":"…","due_at":ts}` |
+| `schedule_message` | `chat` (required; a chat, or someone with no chat yet), `when` (as `/later` takes it: `18:00`, `+30m`, `tomorrow 9:00`, `fri 17:30`, optionally followed by an adjustment in seconds such as `+37s` or `-12s`, which never moves it into the past), `text` (required) | `{"id":"…","due_at":ts}` |
 | `mark_read` | `chat` (required) | `{}`; sends read receipts when `send_read_receipts` is on |
 | `draft_message` | `chat` (required), `text` (required) | `{"drafted":true}`; the text waits in that chat's input box in tawk for you to edit and send. Nothing is sent and nothing is asked. Fails with `draft_exists` when the chat already has a draft |
 
@@ -289,8 +293,8 @@ Chats that are locked, hidden or outside `chats` never produce notifications.
 ## Example
 
 ```text
-→ {"id":"1","op":"hello","args":{"client":"tawk","version":"0.9.1","protocol":1,"origin":"cli"}}
-← {"id":"1","ok":true,"result":{"protocol":1,"tawk":"0.9.1","access":"send","account":{"jid":"27830000000@s.whatsapp.net","name":"Logan"},"connected":true}}
+→ {"id":"1","op":"hello","args":{"client":"tawk","version":"0.10.0","protocol":1,"origin":"cli"}}
+← {"id":"1","ok":true,"result":{"protocol":1,"tawk":"0.10.0","access":"send","account":{"jid":"27830000000@s.whatsapp.net","name":"Logan"},"connected":true}}
 → {"id":"2","op":"unread_summary"}
 ← {"id":"2","ok":true,"result":{"total":2,"mentions":0,"chats":[{"jid":"27820000000@s.whatsapp.net","name":"Mom","is_group":false,"unread":2,"unread_mention":false,"muted":false,"pinned":true,"archived":false,"last_ts":1790000000,"preview":"See you at 6"}]}}
 → {"id":"3","op":"send_message","args":{"chat":"Mom","text":"On my way"}}

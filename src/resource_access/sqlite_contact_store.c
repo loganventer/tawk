@@ -54,6 +54,40 @@ static int store_merge(IContactStore *self, const char *from, const char *to) {
     return rc == SQLITE_DONE ? 0 : -1;
 }
 
+/* `text` as a LIKE pattern that matches it anywhere, with LIKE's own wildcards taken literally. */
+static void like_pattern(const char *text, char *out, size_t size) {
+    size_t k = 0;
+    if (k + 1 < size) out[k++] = '%';
+    for (const char *p = text; *p && k + 3 < size; p++) {
+        if (*p == '%' || *p == '_' || *p == '\\') out[k++] = '\\';
+        out[k++] = *p;
+    }
+    if (k + 1 < size) out[k++] = '%';
+    out[k] = '\0';
+}
+
+static int store_find_by_name(IContactStore *self, const char *text, Contact *out, int max) {
+    if (!text || !*text || !out || max <= 0) return 0;
+    sqlite3_stmt *st = NULL;
+    const char *sql =
+        "SELECT jid, name, push_name FROM contacts WHERE account_id = {acct} AND jid LIKE '%@s.whatsapp.net' "
+        "AND (name LIKE ?1 ESCAPE '\\' OR push_name LIKE ?1 ESCAPE '\\') ORDER BY name, push_name, jid LIMIT ?2";
+    if (sqlite_account_scope_prepare(scope_of(self), sql, &st) != SQLITE_OK) return -1;
+    char pattern[300];
+    like_pattern(text, pattern, sizeof(pattern));
+    sqlite3_bind_text(st, 1, pattern, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(st, 2, max);
+    int n = 0;
+    while (n < max && sqlite3_step(st) == SQLITE_ROW) {
+        contact_init(&out[n], (const char *)sqlite3_column_text(st, 0));
+        str_copy(out[n].name, sizeof(out[n].name), (const char *)sqlite3_column_text(st, 1));
+        str_copy(out[n].push_name, sizeof(out[n].push_name), (const char *)sqlite3_column_text(st, 2));
+        n++;
+    }
+    sqlite3_finalize(st);
+    return n;
+}
+
 static void store_destroy(IContactStore *self) {
     if (!self) return;
     sqlite_account_scope_destroy(scope_of(self));
@@ -69,5 +103,6 @@ IContactStore *sqlite_contact_store_create(sqlite3 *db, AccountId account) {
     s->get = store_get;
     s->merge = store_merge;
     s->destroy = store_destroy;
+    s->find_by_name = store_find_by_name;
     return s;
 }

@@ -187,8 +187,8 @@ void control_write(ControlServer *s, ControlSession *session, ControlPending *p)
     } else if (p->kind == WRITE_KIND_DESTRUCTIVE) {
         hold(s, p);
         return;
-    } else if (v == AUTOMATION_VERDICT_ASK && !control_session_allows(session, p->op, key)) {
-        ask(s, p);
+    } else if (v == AUTOMATION_VERDICT_ASK && (p->new_chat || !control_session_allows(session, p->op, key))) {
+        ask(s, p);                                         /* a first message to someone is asked about whatever was allowed before */
         return;
     } else if (v == AUTOMATION_VERDICT_ASK) {
         carry_out(s, p, AUTOMATION_OUTCOME_ALLOWED);
@@ -277,6 +277,11 @@ void control_op_approve(ControlServer *s, ControlSession *session, const Control
     /* The rules that decide are those of the account the request was made of. */
     if (p->account != ACCOUNT_ID_NONE && control_serve_account(s, p->account) != 0) {
         control_fail(s, session->conn, req->id, "not_allowed", "That account is no longer open to agents");
+        return;
+    }
+    if (p->new_chat) {
+        control_fail(s, session->conn, req->id, "not_allowed",
+                     "The first message to someone is the user's to approve in tawk; this one waits for the user");
         return;
     }
     int retry = 0;

@@ -148,6 +148,10 @@ int            messaging_manager_fetch_media(MessagingManager *mgr, const char *
 const UnreadTally *messaging_manager_tally(MessagingManager *mgr);
 /* Display name for a JID (contact, push name, or +number). */
 void           messaging_manager_display_name(MessagingManager *mgr, const char *jid, char *out, unsigned long size);
+/* The contacts `ref` could mean, for finding someone who has no chat yet:
+ * the one with that phone number or JID when it is one, else those whose
+ * name holds `ref`. Up to `max`; returns how many. */
+int            messaging_manager_find_contacts(MessagingManager *mgr, const char *ref, Contact *out, int max);
 /* Who received, read and played a message you sent, with their names; returns how many. */
 int            messaging_manager_message_receipts(MessagingManager *mgr, const char *message_id, Receipt *out, int max);
 

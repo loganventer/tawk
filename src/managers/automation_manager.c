@@ -4,6 +4,7 @@
 #include "engines/confirmation_token.h"
 #include "engines/hourly_quota.h"
 #include "engines/rate_limiter.h"
+#include "engines/recipient_resolver.h"
 #include "utilities/log.h"
 #include "utilities/str_util.h"
 
@@ -84,6 +85,12 @@ int automation_manager_chat_allowed(AutomationManager *m, const Chat *chat) {
 ChatResolution automation_manager_resolve(AutomationManager *m, const Chat *chats, int count, const char *ref,
                                           int *found, int *candidates, int max, int *candidate_count) {
     return chat_reference_resolve(chats, count, eff(m), ref, found, candidates, max, candidate_count);
+}
+
+ChatResolution automation_manager_resolve_recipient(AutomationManager *m, const Chat *chats, int chat_count,
+                                                    const Contact *contacts, int contact_count, const char *ref,
+                                                    Recipient *found, Recipient *candidates, int max, int *candidate_count) {
+    return recipient_resolve(eff(m), chats, chat_count, contacts, contact_count, ref, found, candidates, max, candidate_count);
 }
 
 const char *automation_manager_access(AutomationManager *m) {

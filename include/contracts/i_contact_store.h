@@ -11,6 +11,9 @@ typedef struct IContactStore {
     /* Copies names known under `from` onto `to` where `to` has none. */
     int  (*merge)(struct IContactStore *self, const char *from, const char *to);
     void (*destroy)(struct IContactStore *self);
+    /* The people whose address-book name or chosen name holds `text`, in any
+     * case: up to `max` of them, by name. Returns how many, or -1. */
+    int  (*find_by_name)(struct IContactStore *self, const char *text, Contact *out, int max);
 } IContactStore;
 
 #endif

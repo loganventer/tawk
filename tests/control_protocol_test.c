@@ -118,6 +118,7 @@ static AutomationManager *automation;
 static EventQueue *events;
 static IMessageStore *messages;
 static IChatStore *chats;
+static IContactStore *people;
 
 static void tick(void) {
     ManagerChanges ch;
@@ -557,6 +558,123 @@ static void test_admin_answers_its_own(void) {
     clear_outbox();
 }
 
+#define STRANGER "27829990001@s.whatsapp.net"
+#define PIET     "27829990002@s.whatsapp.net"
+#define PIETER   "27829990003@s.whatsapp.net"
+
+static void add_contact(const char *jid, const char *name, const char *push) {
+    Contact c;
+    contact_init(&c, jid);
+    str_copy(c.name, sizeof(c.name), name);
+    str_copy(c.push_name, sizeof(c.push_name), push);
+    people->upsert(people, &c);
+}
+
+static void test_someone_with_no_chat_yet(void) {
+    int conn = open_client("mcp", "send");
+    int sent = texts;
+    add_contact(PIET, "Piet Pompies", "");
+    add_contact(PIETER, "", "Piet Skiet");
+    add_contact(WORK, "Work", "");
+
+    say(conn, "{\"id\":\"n1\",\"op\":\"send_message\",\"args\":{\"chat\":\"Nobody Atall\",\"text\":\"hi\"}}");
+    cJSON *r = reply("n1");
+    char *why = r ? cJSON_PrintUnformatted(r) : NULL;
+    CHECK(r && !strcmp(error_code(r), "not_found") && why && strstr(why, "country code") && approval_queue_count(queue) == 0,
+          "a name nobody has is not found, and the answer says how a number is written");
+    free(why);
+    cJSON_Delete(r);
+    say(conn, "{\"id\":\"n2\",\"op\":\"send_message\",\"args\":{\"chat\":\"0829990001\",\"text\":\"hi\"}}");
+    r = reply("n2");
+    CHECK(r && !strcmp(error_code(r), "not_found"), "a number without its country code is nobody");
+    cJSON_Delete(r);
+    say(conn, "{\"id\":\"n3\",\"op\":\"send_message\",\"args\":{\"chat\":\"+27 82 000 0002\",\"text\":\"hi\"}}");
+    r = reply("n3");
+    CHECK(r && !strcmp(error_code(r), "not_found") && approval_queue_count(queue) == 0, "a locked chat is not reached by its number either");
+    cJSON_Delete(r);
+
+    Chat c;
+    CHECK(chats->get(chats, STRANGER, &c) != 0, "there is no chat with the stranger yet");
+    say(conn, "{\"id\":\"n4\",\"op\":\"send_message\",\"args\":{\"chat\":\"+27 82 999 0001\",\"text\":\"Hello there\"}}");
+    const ApprovalRequest *asked = approval_queue_at(queue, 0);
+    CHECK(asked && !strcmp(asked->chat_jid, STRANGER) && !strcmp(asked->chat_name, "+27829990001") && strstr(asked->action, "new chat") &&
+          texts == sent, "a number with no chat is asked about as a new chat, by its number, and nothing goes before you answer");
+    answer_first(1, NULL, 1);
+    r = reply("n4");
+    CHECK(r && result(r) && texts == sent + 1 && chats->get(chats, STRANGER, &c) == 0, "once you allow it the message goes and the chat exists");
+    cJSON_Delete(r);
+    say(conn, "{\"id\":\"n5\",\"op\":\"send_message\",\"args\":{\"chat\":\"+27829990001\",\"text\":\"And again\"}}");
+    r = reply("n5");
+    CHECK(r && result(r) && texts == sent + 2 && approval_queue_count(queue) == 0,
+          "the next one is to a chat like any other, here one you allowed for the session");
+    cJSON_Delete(r);
+
+    say(conn, "{\"id\":\"n6\",\"op\":\"send_message\",\"args\":{\"chat\":\"pompies\",\"text\":\"Hi Piet\"}}");
+    asked = approval_queue_at(queue, 0);
+    CHECK(asked && !strcmp(asked->chat_jid, PIET) && !strcmp(asked->chat_name, "Piet Pompies") && strstr(asked->action, "new chat"),
+          "a contact's name finds them, and you are asked with the name you saved");
+    answer_first(0, NULL, 0);
+    r = reply("n6");
+    CHECK(r && !strcmp(error_code(r), "declined") && texts == sent + 2 && chats->get(chats, PIET, &c) != 0, "declined, nothing goes and no chat is made");
+    cJSON_Delete(r);
+    say(conn, "{\"id\":\"n7\",\"op\":\"send_message\",\"args\":{\"chat\":\"Piet\",\"text\":\"hi\"}}");
+    r = reply("n7");
+    why = r ? cJSON_PrintUnformatted(r) : NULL;
+    CHECK(r && !strcmp(error_code(r), "ambiguous") && why && strstr(why, PIET) && strstr(why, PIETER) && strstr(why, "Piet Skiet") &&
+          strstr(why, "new_chat") && approval_queue_count(queue) == 0, "a name two contacts share is ambiguous, and both are offered");
+    free(why);
+    cJSON_Delete(r);
+
+    say(conn, "{\"id\":\"n8\",\"op\":\"schedule_message\",\"args\":{\"chat\":\"Piet Skiet\",\"when\":\"+30m\",\"text\":\"Later\"}}");
+    asked = approval_queue_at(queue, 0);
+    CHECK(asked && !strcmp(asked->chat_jid, PIETER) && strstr(asked->action, "new chat later"), "a message for later to someone new is asked about the same way");
+    answer_first(0, NULL, 0);
+    say(conn, "{\"id\":\"n9\",\"op\":\"draft_message\",\"args\":{\"chat\":\"Piet Skiet\",\"text\":\"Draft\"}}");
+    r = reply("n9");
+    CHECK(r && !strcmp(error_code(r), "not_found"), "a draft needs a chat that is already there");
+    cJSON_Delete(r);
+    say(conn, "{\"id\":\"n10\",\"op\":\"read_messages\",\"args\":{\"chat\":\"Piet Skiet\"}}");
+    r = reply("n10");
+    CHECK(r && !strcmp(error_code(r), "not_found"), "and only sending reaches someone with no chat: there is nothing of theirs to read");
+    cJSON_Delete(r);
+
+    set_automation("admin", "*", 20);
+    char token[128];
+    str_copy(token, sizeof(token), admin_token);
+    say(conn, "{\"id\":\"n11\",\"op\":\"send_message\",\"args\":{\"chat\":\"Piet Pompies\",\"text\":\"On my own\"}}");
+    approve(conn, "p11", "n11", token);
+    r = reply("p11");
+    why = r ? cJSON_PrintUnformatted(r) : NULL;
+    CHECK(r && !strcmp(error_code(r), "not_allowed") && why && strstr(why, "first message") && texts == sent + 2 && approval_queue_count(queue) == 1,
+          "with every chat chosen for self-approval, the first message to someone still waits for you");
+    free(why);
+    cJSON_Delete(r);
+    answer_first(0, NULL, 0);
+    say(conn, "{\"id\":\"n12\",\"op\":\"send_message\",\"args\":{\"chat\":\"+27829990001\",\"text\":\"Third\"}}");
+    r = reply("n12");
+    CHECK(r && result(r) && texts == sent + 3, "while the stranger, who has a chat by now, is as before");
+    cJSON_Delete(r);
+    set_automation("send", "", 20);
+
+    Settings narrowed = *settings_manager_current(settings_mgr);
+    str_copy(narrowed.automation_chats, sizeof(narrowed.automation_chats), "Mom, Work");
+    settings_manager_apply(settings_mgr, &narrowed);
+    say(conn, "{\"id\":\"n13\",\"op\":\"send_message\",\"args\":{\"chat\":\"Piet Pompies\",\"text\":\"hi\"}}");
+    r = reply("n13");
+    cJSON *r2 = NULL;
+    say(conn, "{\"id\":\"n14\",\"op\":\"send_message\",\"args\":{\"chat\":\"+27829990007\",\"text\":\"hi\"}}");
+    r2 = reply("n14");
+    CHECK(r && !strcmp(error_code(r), "not_found") && r2 && !strcmp(error_code(r2), "not_found") && approval_queue_count(queue) == 0,
+          "with a list of chats agents may use, nobody off it is reached, by name or by number");
+    cJSON_Delete(r);
+    cJSON_Delete(r2);
+    narrowed.automation_chats[0] = '\0';
+    settings_manager_apply(settings_mgr, &narrowed);
+    char notice[256];
+    while (automation_manager_take_notice(automation, notice, sizeof(notice))) {}
+    clear_outbox();
+}
+
 static void test_rate(void) {
     int shell = open_client("cli", "send");
     cJSON *r;
@@ -827,6 +945,7 @@ int main(void) {
     messages = sqlite_message_store_create(db, ACCOUNT_ID_FIRST);
     chats = sqlite_chat_store_create(db, ACCOUNT_ID_FIRST);
     IContactStore *contacts = sqlite_contact_store_create(db, ACCOUNT_ID_FIRST);
+    people = contacts;
     IJidAliasStore *aliases = sqlite_jid_alias_store_create(db, ACCOUNT_ID_FIRST);
     IReactionStore *reaction_store = sqlite_reaction_store_create(db, ACCOUNT_ID_FIRST);
     IReceiptStore *receipts = sqlite_receipt_store_create(db, ACCOUNT_ID_FIRST);
@@ -869,6 +988,7 @@ int main(void) {
     test_live_and_log();
     test_disclaimer();
     test_admin_answers_its_own();
+    test_someone_with_no_chat_yet();
     test_rate();
 
     control_server_destroy(server);

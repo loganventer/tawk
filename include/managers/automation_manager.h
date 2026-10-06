@@ -11,8 +11,10 @@
 #include "core/automation_verdict.h"
 #include "core/chat.h"
 #include "core/chat_resolution.h"
+#include "core/contact.h"
 #include "core/control_origin.h"
 #include "core/live_kind.h"
+#include "core/recipient.h"
 #include "core/self_approval_verdict.h"
 #include "core/setting_field.h"
 #include "core/write_kind.h"
@@ -41,6 +43,10 @@ int               automation_manager_chat_allowed(AutomationManager *mgr, const 
 /* The one chat `ref` names among `chats`; see chat_reference_resolve. */
 ChatResolution    automation_manager_resolve(AutomationManager *mgr, const Chat *chats, int count, const char *ref,
                                              int *found, int *candidates, int max, int *candidate_count);
+/* The one person `ref` names who has no chat yet, among `contacts`; see recipient_resolve. */
+ChatResolution    automation_manager_resolve_recipient(AutomationManager *mgr, const Chat *chats, int chat_count,
+                                                       const Contact *contacts, int contact_count, const char *ref,
+                                                       Recipient *found, Recipient *candidates, int max, int *candidate_count);
 /* Whether a write may go ahead; each allowed or asked write counts against
  * the rate. *retry_after_s is set when RATE_LIMITED. */
 AutomationVerdict automation_manager_check_write(AutomationManager *mgr, ControlOrigin origin, WriteKind kind,

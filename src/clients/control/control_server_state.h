@@ -80,6 +80,12 @@ void            control_fail(ControlServer *server, int conn, const char *id, co
  * missing or not found; returns its index in `chats`, or -1. */
 int             control_resolve_chat(ControlServer *server, const ControlSession *session, const ControlRequest *req,
                                      const char *name, const Chat *chats, int count);
+/* Who a new message is for, named by args[`name`]: a chat as above, or, when
+ * no chat matches, a person named by phone number, JID or contact name who
+ * has no chat yet (control_recipient.c). Writes their JID and whether the
+ * message would start the chat; returns -1, having answered, otherwise. */
+int             control_resolve_recipient(ControlServer *server, const ControlSession *session, const ControlRequest *req,
+                                          const char *name, char *jid, size_t size, int *new_chat);
 /* The visible chat a JID belongs to, or NULL. */
 const Chat     *control_visible_chat(ControlServer *server, const char *jid);
 /* A message by id, answering not_found itself unless its chat is visible. */
