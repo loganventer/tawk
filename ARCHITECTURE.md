@@ -261,6 +261,7 @@ The TUI is split into widgets that each draw one part of the screen and turn key
 | `command_suggestions` | `/command` suggestions above the input |
 | `emoji_suggestions` | The strip of emoji matching a `(word` shortcode above the input; scrolls sideways and takes clicks |
 | `typing_indicator` | The "typing" or "recording audio" bubble with animated dots on the last row of the conversation |
+| `chat_subtitle` | The dim line under the open chat's name: "online" or "last seen" for one person when known and switched on, else the about text or member count |
 | `message_info_panel` | Who received, read and played a message you sent, and when, from the receipts handed in at each draw |
 | `message_menu` | Right-click menu of `message_action` entries for a message; the same widget shows the delete choice and the save or open offer for unknown files |
 | `scheduled_list_dialog` | `/scheduled`: every message waiting to be sent later, soonest first, with Send now, Change time (a `text_field` for the new time) and Cancel; `tui_scheduling.c` carries them out through `SchedulingManager` and, each pass of the loop, sends what is due through the messaging manager |

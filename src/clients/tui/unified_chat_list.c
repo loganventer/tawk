@@ -36,6 +36,13 @@ static int by_jid(const void *a, const void *b) {
 }
 
 /* Folds rows[from..to), the chats of one contact, into rows[from]. */
+/* Online on any account is online; otherwise the most recent time they were seen. */
+static void merge_presence(Chat *merged, const Chat *c) {
+    if (c->presence == PRESENCE_ONLINE) merged->presence = PRESENCE_ONLINE;
+    else if (c->presence == PRESENCE_OFFLINE && merged->presence == PRESENCE_UNKNOWN) merged->presence = PRESENCE_OFFLINE;
+    if (c->last_seen > merged->last_seen) merged->last_seen = c->last_seen;
+}
+
 static void merge_run(Chat *rows, int from, int to, const ChatSource *sources, int source_count, const UnifiedChatRules *rules,
                       AccountId for_contact) {
     ReplyAccountCandidate candidates[ACCOUNT_MAX];
@@ -70,6 +77,7 @@ static void merge_run(Chat *rows, int from, int to, const ChatSource *sources, i
         merged.is_archived = merged.is_archived == 1 && c->is_archived == 1;   /* archived only when it is so on every account */
         merged.is_muted = merged.is_muted && c->is_muted;      /* muted only when no account would notify */
         if (!merged.typing[0]) str_copy(merged.typing, sizeof(merged.typing), c->typing);
+        merge_presence(&merged, c);
     }
     AccountId send = reply_account_policy_choose(ACCOUNT_ID_NONE, for_contact, rules->primary, candidates, n);
     if (send != ACCOUNT_ID_NONE) merged.account = send;

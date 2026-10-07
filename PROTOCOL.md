@@ -92,6 +92,7 @@ In both cases the C side sees the same lines. The difference is the transport: p
 | `removed` | `id`, `chat` | Message `id` was deleted for this account on another device (the phone or another linked device); tawk removes it from the database |
 | `reaction` | `id`, `chat`, `sender`, `emoji` | `sender` reacted to message `id`; an empty `emoji` means the reaction was removed |
 | `typing` | `chat`, `sender`, `state` | Someone's chat state: `composing`, `recording` or `paused` |
+| `presence` | `jid`, `state`, `last_seen` | A contact you subscribed to came online or left: `state` is `online` or `offline`, and `last_seen` is when they were last here in Unix seconds, 0 when they do not share it |
 | `alias` | `lid`, `pn` | The hidden id `lid` (…@lid) belongs to the phone number JID `pn` (…@s.whatsapp.net) |
 | `chat_removed` | `jid` | The whole chat was deleted on another device |
 | `contact` | `jid`, `name`, `push_name` | Contact names |
@@ -160,6 +161,8 @@ WhatsApp can address the same person by phone number (`27821234567@s.whatsapp.ne
 ## Typing and presence
 
 tawk sends `presence` with `available` true after connecting when "Appear online" is on and you are active, and `false` after two idle minutes, while the screensaver runs, and on exit. WhatsApp only delivers other people's `typing` events to a device that is online, and only for contacts it has been asked about, so tawk sends `subscribe` whenever a one-to-one chat is opened and again after each reconnect. While you type, tawk sends `typing` with `composing` at most every 7 seconds, `recording` while you record a voice note, and `paused` when you stop, send, switch chats or go idle. An incoming `typing` notice is shown for 8 seconds unless it is refreshed.
+
+The same subscription brings the `presence` event: WhatsApp answers a `subscribe` with the contact's state at once, and sends another whenever they come online or leave. A contact who hides their online status sends nothing, and one who hides their last seen leaves `last_seen` at 0. tawk keeps the state while it is connected and shown as online itself, and forgets it otherwise, since WhatsApp stops sending it then.
 
 ## Limits enforced by tawk
 

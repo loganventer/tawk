@@ -78,6 +78,10 @@ static void test_list(void) {
     main_chats[0].is_pinned = 1;
     main_chats[2].is_muted = 1;
     work_chats[1].unread_mention = 1;
+    main_chats[0].presence = PRESENCE_OFFLINE;
+    main_chats[0].last_seen = 900;
+    work_chats[0].presence = PRESENCE_ONLINE;
+    work_chats[0].last_seen = 700;
     ChatSource sources[] = { { MAIN, main_chats, 3 }, { WORK, work_chats, 2 } };
     UnifiedChatRules rules = { ACCOUNT_ID_NONE, 1, MAIN, prefs, NULL };
     UnifiedChatList list;
@@ -92,6 +96,7 @@ static void test_list(void) {
     CHECK(mom && mom->accounts == 3u && mom->unread == 5 && mom->last_ts == 400 && strcmp(mom->preview, "at 400") == 0,
           "the row says both accounts have it, adds their unread counts and shows the newest message");
     CHECK(mom && strcmp(mom->name, "Mom") == 0 && mom->is_pinned, "it keeps a name and is pinned when either is");
+    CHECK(mom && mom->presence == PRESENCE_ONLINE && mom->last_seen == 900, "online on either account is online, and the latest time seen is kept");
     CHECK(mom && mom->account == MAIN, "it acts through the primary account");
     const Chat *fam = row(&list, FAM, ACCOUNT_ID_NONE);
     CHECK(fam && fam->unread == 5 && fam->unread_mention && !fam->is_muted, "a mention on either account shows, and a chat muted on one account only still notifies");

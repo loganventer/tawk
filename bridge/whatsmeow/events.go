@@ -39,6 +39,16 @@ func (s *Session) onEvent(raw any) {
 			}
 		}
 		s.emit(map[string]any{"evt": "typing", "chat": s.phoneJID(evt.Chat), "sender": s.phoneJID(evt.Sender), "state": state})
+	case *events.Presence:
+		state := "online"
+		if evt.Unavailable {
+			state = "offline"
+		}
+		lastSeen := int64(0)
+		if !evt.LastSeen.IsZero() {
+			lastSeen = evt.LastSeen.Unix()
+		}
+		s.emit(map[string]any{"evt": "presence", "jid": s.phoneJID(evt.From), "state": state, "last_seen": lastSeen})
 	case *events.CallOffer:
 		s.emitCallOffer(evt)
 	case *events.CallOfferNotice:

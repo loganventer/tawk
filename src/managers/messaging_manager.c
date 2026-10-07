@@ -12,6 +12,7 @@
 #include "engines/mention_matcher.h"
 #include "engines/message_id_generator.h"
 #include "engines/notification_policy.h"
+#include "engines/presence_tracker.h"
 #include "engines/recipient_reference_parser.h"
 #include "engines/url_finder.h"
 #include "engines/whatsapp_markup.h"
@@ -64,6 +65,8 @@ struct MessagingManager {
     /* Who is typing where (incoming) */
     struct { char chat[128]; char sender[128]; TypingState state; int64_t until_ms; } typers[MAX_TYPERS];
     int       typer_count;
+    PresenceTracker presence;           /* who is online, among the people whose chat was opened */
+    int       presence_known;           /* 1 while WhatsApp tells us: connected and shown as online ourselves */
 
     /* Our own chat state and presence (outgoing) */
     TypingState my_typing;
@@ -286,6 +289,13 @@ static void typing_text(MessagingManager *m, const Chat *c, char *out, size_t si
     }
 }
 
+/* Whether the other person is online, where WhatsApp has told us. */
+static void fill_presence(MessagingManager *m, Chat *c) {
+    const ContactPresence *p = c->is_group || !m->presence_known ? NULL : presence_tracker_find(&m->presence, c->jid);
+    c->presence = p ? p->state : PRESENCE_UNKNOWN;
+    c->last_seen = p ? p->last_seen : 0;
+}
+
 static void rebuild_chats(MessagingManager *m) {
     free(m->chats);
     m->chats = NULL;
@@ -299,6 +309,7 @@ static void rebuild_chats(MessagingManager *m) {
     for (int i = 0; i < m->chat_count; i++) {
         Chat *c = &m->chats[i];
         typing_text(m, c, c->typing, sizeof(c->typing));
+        fill_presence(m, c);
         if (c->name[0]) continue;
         if (c->is_group) str_copy(c->name, sizeof(c->name), "Group");
         else messaging_manager_display_name(m, c->jid, c->name, sizeof(c->name));
@@ -535,6 +546,7 @@ static void normalise(MessagingManager *m, Event *e) {
             break;
         case EVENT_REACTION:
         case EVENT_TYPING:
+        case EVENT_PRESENCE:
             canonical(m, e->chat.jid, sizeof(e->chat.jid));
             canonical(m, e->jid, sizeof(e->jid));
             break;
@@ -559,6 +571,25 @@ static void on_typing(MessagingManager *m, const Event *e) {
         m->typers[slot].state = state;
         m->typers[slot].until_ms = clock_now_ms() + TYPING_SHOW_MS;
     }
+    m->chats_dirty = 1;
+}
+
+/* Someone whose chat was opened came online or left. Those who follow along
+ * hear of it only when it is a change, so a repeated notice says nothing twice. */
+static void on_presence(MessagingManager *m, const Event *e) {
+    PresenceState state = presence_state_parse(e->state);
+    if (chat_jid_is_group(e->jid) || !presence_tracker_note(&m->presence, e->jid, state, e->at)) return;
+    m->chats_dirty = 1;
+    live_message_ring_note(&m->live, LIVE_KIND_PRESENCE, "", e->jid, e->jid, presence_state_name(state), e->at);
+}
+
+/* WhatsApp only says who is online while we are connected and shown as online
+ * ourselves. Outside that nothing heard earlier still holds, so it is dropped. */
+static void watch_presence(MessagingManager *m) {
+    int known = m->auth == AUTH_STATE_CONNECTED && m->presence_sent == 1;
+    if (known == m->presence_known) return;
+    m->presence_known = known;
+    if (!known) presence_tracker_reset(&m->presence);
     m->chats_dirty = 1;
 }
 
@@ -603,7 +634,8 @@ static const char *event_chat(const Event *e) {
         case EVENT_CHAT_REMOVED:    return e->chat.jid;
         case EVENT_CHAT_UPDATE:
         case EVENT_REACTION:
-        case EVENT_TYPING:         return e->chat.jid;
+        case EVENT_TYPING:
+        case EVENT_PRESENCE:       return e->chat.jid;
         default:                   return NULL;
     }
 }
@@ -668,6 +700,9 @@ static void handle_event(MessagingManager *m, Event *e, ManagerChanges *ch) {
             break;
         case EVENT_TYPING:
             on_typing(m, e);
+            break;
+        case EVENT_PRESENCE:
+            on_presence(m, e);
             break;
         case EVENT_MESSAGE_UPSERT:
             on_message(m, e, ch);
@@ -801,6 +836,7 @@ MessagingManager *messaging_manager_create(const MessagingManagerDeps *deps) {
     if (!m) return NULL;
     m->deps = *deps;
     live_message_ring_init(&m->live);
+    presence_tracker_init(&m->presence);
     m->auth = AUTH_STATE_STARTING;
     m->active = 1;
     m->presence_sent = -1;
@@ -838,6 +874,7 @@ void messaging_manager_tick(MessagingManager *m, ManagerChanges *ch) {
     watch_network(m, ch);
     run_supervisor(m, ch);
     run_connect_watchdog(m, ch);
+    watch_presence(m);
     expire_typers(m);
     if (m->history_until_ms && clock_now_ms() > m->history_until_ms) {
         m->history_until_ms = 0;

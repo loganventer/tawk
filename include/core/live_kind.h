@@ -9,7 +9,8 @@ typedef enum LiveKind {
     LIVE_KIND_EDIT,            /* someone changed the words of one they sent */
     LIVE_KIND_DELETE,          /* someone deleted one they sent, for everyone */
     LIVE_KIND_SCHEDULED_SENT,  /* one you scheduled went out; the id is the scheduled message's */
-    LIVE_KIND_MEDIA_READY      /* its photo, voice note or file finished downloading */
+    LIVE_KIND_MEDIA_READY,     /* its photo, voice note or file finished downloading */
+    LIVE_KIND_PRESENCE         /* the person in a chat came online or left; there is no message id */
 } LiveKind;
 
 #endif

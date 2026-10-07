@@ -19,14 +19,14 @@ typedef struct Event {
     char          id[64];       /* MESSAGE_STATUS, MEDIA_READY */
     MessageStatus status;       /* MESSAGE_STATUS */
     ReceiptKind   receipt;      /* MESSAGE_RECEIPT */
-    int64_t       at;           /* MESSAGE_RECEIPT: when, epoch seconds */
+    int64_t       at;           /* MESSAGE_RECEIPT: when, epoch seconds; PRESENCE: last seen */
     char          path[512];    /* MEDIA_READY */
     char          code[32];     /* AUTH_PAIRING_CODE */
     char         *qr_ascii;     /* AUTH_QR, owned */
-    char          jid[128];     /* AUTH_CONNECTED; JID_ALIAS: the phone-number JID; MESSAGE_RECEIPT: who */
+    char          jid[128];     /* AUTH_CONNECTED; JID_ALIAS: the phone-number JID; MESSAGE_RECEIPT: who; PRESENCE: the contact */
     char          lid[128];     /* JID_ALIAS: the hidden-user (LID) JID */
     char          emoji[32];    /* REACTION: the emoji, "" when removed */
-    char          state[16];    /* TYPING: composing, recording or paused */
+    char          state[16];    /* TYPING: composing, recording or paused; PRESENCE: online or offline */
     char          name[128];    /* AUTH_CONNECTED */
     char          detail[256];  /* CONNECTION_STATUS, ERROR: human readable reason */
     char          reason[32];   /* CONNECTION_STATUS: open, closed, restart_required, logged_out */

@@ -3,7 +3,7 @@
 # Run `make help` for every target and option.
 
 APP        ?= tawk
-VERSION    ?= 0.10.0
+VERSION    ?= 0.11.0
 # The commit this build comes from, so `tawk --update` can tell whether it is current.
 COMMIT     ?= $(shell git rev-parse HEAD 2>/dev/null)
 
@@ -253,7 +253,8 @@ TESTS := $(BUILD)/tests/pty_idle_action_test $(BUILD)/tests/ncurses_mouse_queue_
          $(BUILD)/tests/profile_status_test $(BUILD)/tests/account_dialogs_test $(BUILD)/tests/status_feed_test $(BUILD)/tests/migration_test \
          $(BUILD)/tests/markup_test $(BUILD)/tests/mentions_test $(BUILD)/tests/link_preview_test \
          $(BUILD)/tests/database_crypt_test $(BUILD)/tests/backup_test $(BUILD)/tests/forward_test $(BUILD)/tests/schedule_test \
-         $(BUILD)/tests/recipient_test \
+         $(BUILD)/tests/recipient_test $(BUILD)/tests/presence_tracker_test $(BUILD)/tests/presence_text_test \
+         $(BUILD)/tests/presence_event_test \
          $(BUILD)/tests/status_answer_test $(BUILD)/tests/message_search_test \
          $(BUILD)/tests/control_transport_test $(BUILD)/tests/control_protocol_test $(BUILD)/tests/status_photo_viewer_test \
          $(BUILD)/tests/status_auto_advance_test $(BUILD)/tests/message_window_test \
@@ -329,6 +330,18 @@ $(BUILD)/tests/schedule_test: $(BUILD)/tests/schedule_test.o $(filter-out $(BUIL
 	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
 
 $(BUILD)/tests/recipient_test: $(BUILD)/tests/recipient_test.o $(filter-out $(BUILD)/src/main.o,$(OBJ)) $(LINK_WM)
+	$(call step,LD,$@)
+	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
+
+$(BUILD)/tests/presence_tracker_test: $(BUILD)/tests/presence_tracker_test.o $(filter-out $(BUILD)/src/main.o,$(OBJ)) $(LINK_WM)
+	$(call step,LD,$@)
+	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
+
+$(BUILD)/tests/presence_text_test: $(BUILD)/tests/presence_text_test.o $(filter-out $(BUILD)/src/main.o,$(OBJ)) $(LINK_WM)
+	$(call step,LD,$@)
+	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
+
+$(BUILD)/tests/presence_event_test: $(BUILD)/tests/presence_event_test.o $(filter-out $(BUILD)/src/main.o,$(OBJ)) $(LINK_WM)
 	$(call step,LD,$@)
 	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
 

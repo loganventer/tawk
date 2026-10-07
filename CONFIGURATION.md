@@ -94,7 +94,8 @@ Some preferences are set per chat: mutes, pins, archiving, the notification tone
 | `convert_emoticons` | `true` | Turn emoticons such as `:)`, `<3`, `:D`, `;)` and `:P`, and shortcodes such as `:fire:` and `:tada:`, into emoji when you type a space or press Enter. Only a whole word is converted, so links are left alone. Also offers emoji for a word typed after a bracket, such as `(hu`, and replaces a closed `(pizza)` that fits only one |
 | `message_margin` | `50` | How many messages the chat view keeps in memory either side of what is on screen (20 to 500). The window slides as you scroll, so a long chat opens as fast as a short one |
 | `share_typing` | `true` | Show "typing…" (or recording audio) to the other person while you type or record |
-| `appear_online` | `true` | Show as online while tawk is in use; needed to see others typing |
+| `appear_online` | `true` | Show as online while tawk is in use; needed to see others typing and online |
+| `show_online` | `true` | Show "online" or "last seen" under the name of the open chat, for people who share it with you. Needs `appear_online` |
 | `reopen_last_chat` | `true` | When tawk starts, open the chat that was open when it last quit. Skipped when that chat was deleted or is in Locked chats |
 | `last_chat` | empty | The chat open when tawk last ran; kept up to date as you open chats and not shown in the settings panel |
 | `recent_emoji` | `👍 ❤️ 😂 😮 😢 🙏` | Space-separated, most recent first; kept up to date by the emoji picker (up to 24) and not shown in the settings panel |
@@ -171,6 +172,7 @@ What other programs reaching tawk through its control socket may do: tawk-mcp an
 | `push_reactions` | `off` | The same when someone reacts to a message you sent, or takes a reaction back |
 | `push_edits` | `off` | The same when someone changes or deletes a message they sent |
 | `push_scheduled` | `off` | The same when a message you scheduled goes out |
+| `push_presence` | `off` | The same when the person in a chat you have opened comes online or leaves. Only for chats the program may use; it cannot ask about anyone else |
 | `self_approval_chats` | empty | With `access = admin`: the chats a program may answer its own sends in, as JIDs separated by commas, or `*` for every chat it may use. Empty allows none. Set from Settings, Automation, Answering for itself, where each chat has a switch |
 | `transcribe_model` | `large-v3-turbo` | The Whisper model an agent's transcriber (tawk-mcp) uses for voice notes: `tiny`, `base`, `small`, `medium`, `large-v3-turbo` or `large-v3`. A list to choose from in the settings panel |
 | `transcribe_languages` | `auto` | The languages voice notes are written out in, as codes separated by commas (`af,en`), or `auto`. Each one gets its own transcription |

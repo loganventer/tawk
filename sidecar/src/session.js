@@ -165,8 +165,14 @@ export class Session {
 
         sock.ev.on('presence.update', ({ id, presences }) => {
             for (const [participant, p] of Object.entries(presences ?? {})) {
-                const state = p.lastKnownPresence === 'composing' ? 'composing'
-                    : p.lastKnownPresence === 'recording' ? 'recording' : 'paused';
+                const known = p.lastKnownPresence;
+                // Coming online or leaving is its own event; leaving also ends any typing notice.
+                if (known === 'available' || known === 'unavailable') {
+                    emit({ evt: 'presence', jid: jidNormalizedUser(participant),
+                           state: known === 'available' ? 'online' : 'offline', last_seen: Number(p.lastSeen) || 0 });
+                    if (known === 'available') continue;
+                }
+                const state = known === 'composing' ? 'composing' : known === 'recording' ? 'recording' : 'paused';
                 emit({ evt: 'typing', chat: chatJid({ remoteJid: id }), sender: jidNormalizedUser(participant), state });
             }
         });

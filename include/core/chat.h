@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "core/account_id.h"
+#include "core/presence_state.h"
 
 typedef struct Chat {
     char    jid[128];
@@ -22,6 +23,8 @@ typedef struct Chat {
     int     has_draft;
     int     soft_locked;    /* conversation hidden behind a blur until shown again; local only */
     char    typing[64];     /* "typing…", "Jan is typing…", filled by the manager */
+    PresenceState presence; /* whether the other person is online; filled by the manager, one-to-one chats only */
+    int64_t last_seen;      /* when they were last online, 0 when unknown; filled by the manager */
     int     unread_mention; /* an unread message mentions you */
     /* Filled only where several accounts' chats are listed together; a store leaves them 0. */
     AccountId account;      /* the account this row acts through: the only one that has the chat, or the one that sends */

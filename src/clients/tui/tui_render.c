@@ -1,6 +1,7 @@
 #include "core/icon_glyphs.h"
 #include "tui_app_state.h"
 
+#include "clients/tui/chat_subtitle.h"
 #include "clients/tui/footer_bar.h"
 #include "clients/tui/header_bar.h"
 #include "clients/tui/outage_overlay.h"
@@ -15,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #define DOT "\xC2\xB7"
 
@@ -152,6 +154,8 @@ void tui_render_frame(TuiApp *app, int64_t now) {
         char title[192] = "";
         if (chat) snprintf(title, sizeof(title), "%s%s%s", chat->soft_locked ? "\xF0\x9F\x99\x88 " : "", chat->name,
                            chat->is_muted ? "  \xF0\x9F\x94\x95" : "");
+        char subtitle[160];
+        chat_subtitle_text(s, chat, chat ? profile_manager_summary(app->deps.profiles, chat->jid) : "", (int64_t)time(NULL), subtitle, sizeof(subtitle));
         MessageViewContext ctx = {
             .title = title,
             .status = messaging_manager_history_pending(mm) ? "\xE2\x9F\xB3 loading older messages\xE2\x80\xA6" : "",
@@ -168,7 +172,7 @@ void tui_render_frame(TuiApp *app, int64_t now) {
             .veiled = chat && chat->soft_locked,
             .jid = chat && s->portraits ? chat->jid : NULL,
             .portrait = chat && s->portraits && !chat->soft_locked ? profile_manager_picture(app->deps.profiles, chat->jid) : NULL,
-            .subtitle = chat && !chat->soft_locked ? profile_manager_summary(app->deps.profiles, chat->jid) : "",
+            .subtitle = subtitle,
             .activity = chat && !chat->soft_locked ? chat->typing : "",
             .activity_phase = (int)(now / 300),
             .formatter = &app->formatter,

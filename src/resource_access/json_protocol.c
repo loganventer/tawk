@@ -323,6 +323,13 @@ int json_protocol_decode(const char *line, Event *e) {
         copy_line(e->jid, sizeof(e->jid), get_str(j, "sender"));
         copy_line(e->state, sizeof(e->state), get_str(j, "state"));
         ok = e->chat.jid[0] && e->state[0];
+    } else if (!strcmp(evt, "presence")) {
+        e->type = EVENT_PRESENCE;
+        copy_line(e->jid, sizeof(e->jid), get_str(j, "jid"));
+        copy_line(e->chat.jid, sizeof(e->chat.jid), e->jid);
+        copy_line(e->state, sizeof(e->state), get_str(j, "state"));
+        e->at = (int64_t)get_num(j, "last_seen", 0);
+        ok = e->jid[0] && e->state[0];
     } else if (!strcmp(evt, "alias")) {
         e->type = EVENT_JID_ALIAS;
         copy_line(e->lid, sizeof(e->lid), get_str(j, "lid"));

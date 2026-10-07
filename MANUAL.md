@@ -287,6 +287,10 @@ Each chat keeps its own draft. Whatever you have typed stays with the chat when 
 
 While you type in a chat, tawk tells the other person you are typing, and while you record a voice note it shows you as recording audio. When someone types to you, their chat's preview shows "typing…" (or "Name is typing…" in a group, or "recording audio…"), and in the open chat a small bubble on the last row, just above the input, says the same with three dots that light up in turn, as on the phone. Both directions can be turned off: "Share typing" (`share_typing`) stops tawk sending your state, and "Appear online" (`appear_online`) stops tawk showing you as online. WhatsApp only delivers other people's typing notices while you appear online. tawk shows you offline after two minutes without input, while the screensaver runs, and when it quits.
 
+Under the name of an open one-to-one chat, tawk says "online" when the other person is on WhatsApp, and otherwise when they were last seen: "last seen today at 14:32", "last seen yesterday at 9:10", a weekday within the week, or a date. The line appears a moment after you open the chat and follows them as they come and go. It needs "Appear online" on, since WhatsApp only tells you about others while you show as online yourself, and it shows only what the person shares: someone who hides their last seen shows "online" or nothing, and then their about text stays in that place as before. Groups have no online status, and a soft-locked chat shows none. "Show online status" (`show_online`) turns the line off.
+
+Agents are not told who is online unless you switch on "Push online status" under Settings, Automation, Agent events. With it on, an agent that listens hears when the person in a chat you opened comes online or leaves, for the chats it may use. It cannot ask about anyone else.
+
 ## Chat options
 
 Press Alt+O on a chat in the list or in the conversation, or right-click a chat. The menu shows what applies to that chat:
@@ -847,7 +851,7 @@ Press F2, click ⚙ or type `/settings`. The panel is a set of menus:
 | Menu | Contains |
 |---|---|
 | 👤 Account | Your name and number, connection status, reconnect, log out |
-| 💬 Chats | Enter is send, emoticons to emoji, reopen last chat, read receipts, share typing, appear online, history length, how long to keep statuses |
+| 💬 Chats | Enter is send, emoticons to emoji, reopen last chat, read receipts, share typing, appear online, show online status, history length, how long to keep statuses |
 | 🔔 Notifications | Alerts, Sound, Visual submenus, test buttons |
 | 🎨 Appearance | Theme picker; Layout with chat list style, space between chats, sidebar width and start collapsed, clock, photo previews, profile pictures, mouse and the startup splash |
 | 🖼 Media | Photos and videos, Voice notes |

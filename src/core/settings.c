@@ -39,6 +39,7 @@ void settings_set_defaults(Settings *s) {
     s->send_read_receipts = 1;
     s->share_typing = 1;
     s->appear_online = 1;
+    s->show_online = 1;
     str_copy(s->recent_emoji, sizeof(s->recent_emoji), "\xF0\x9F\x91\x8D \xE2\x9D\xA4\xEF\xB8\x8F \xF0\x9F\x98\x82 \xF0\x9F\x98\xAE \xF0\x9F\x98\xA2 \xF0\x9F\x99\x8F");
 
     s->notifications = 1;

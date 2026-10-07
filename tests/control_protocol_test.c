@@ -909,6 +909,76 @@ static void test_live_and_log(void) {
     clear_outbox();
 }
 
+/* The person in a chat coming online or leaving: agents hear it only when you
+ * switch it on, your own shell never does, and nothing is said about a chat
+ * agents may not see. Those listening are the agent and the shell above. */
+static int presence_lines(const char *about) {
+    int n = 0;
+    for (int i = 0; i < outbox_count; i++) n += strstr(outbox[i], "\"evt\":\"presence\"") != NULL && strstr(outbox[i], about) != NULL;
+    return n;
+}
+
+static void push_presence(const char *jid, const char *state, int64_t last_seen) {
+    Event e;
+    event_init(&e, EVENT_PRESENCE);
+    str_copy(e.jid, sizeof(e.jid), jid);
+    str_copy(e.chat.jid, sizeof(e.chat.jid), jid);
+    str_copy(e.state, sizeof(e.state), state);
+    e.at = last_seen;
+    event_queue_push(events, &e);
+    tick();
+    tick();
+}
+
+static void test_online_status(void) {
+    Settings push = *settings_manager_current(settings_mgr);
+    CHECK(push.automation_push_presence == 0, "telling agents who is online is off unless you switch it on");
+    clear_outbox();
+    push_presence(MOM, "online", 0);
+    CHECK(!saw_event("presence"), "so nobody is told when she comes online");
+    push.automation_push_presence = 1;
+    settings_manager_apply(settings_mgr, &push);
+    clear_outbox();
+    push_presence(MOM, "offline", 1791363900);
+    CHECK(presence_lines(MOM) == 1, "switched on, the agent hears that she left, once, and your shell does not");
+    int shaped = 0;
+    for (int i = 0; i < outbox_count; i++) {
+        cJSON *o = cJSON_Parse(outbox[i]);
+        const cJSON *evt = cJSON_GetObjectItemCaseSensitive(o, "evt");
+        if (cJSON_IsString(evt) && !strcmp(evt->valuestring, "presence")) {
+            const cJSON *chat = cJSON_GetObjectItemCaseSensitive(o, "chat"), *who = cJSON_GetObjectItemCaseSensitive(o, "who");
+            const cJSON *state = cJSON_GetObjectItemCaseSensitive(o, "state"), *seen = cJSON_GetObjectItemCaseSensitive(o, "last_seen");
+            const cJSON *jid = cJSON_GetObjectItemCaseSensitive(chat, "jid"), *who_jid = cJSON_GetObjectItemCaseSensitive(who, "jid");
+            shaped = cJSON_IsString(jid) && !strcmp(jid->valuestring, MOM) && cJSON_IsString(who_jid) && !strcmp(who_jid->valuestring, MOM) &&
+                     cJSON_IsString(state) && !strcmp(state->valuestring, "offline") && cJSON_IsNumber(seen) && seen->valuedouble == 1791363900.0 &&
+                     cJSON_IsNumber(cJSON_GetObjectItemCaseSensitive(o, "at")) && !cJSON_GetObjectItemCaseSensitive(o, "message_id");
+        }
+        cJSON_Delete(o);
+    }
+    CHECK(shaped, "it names the chat and the person, says offline and when she was last seen, and carries no message id");
+    clear_outbox();
+    push_presence(MOM, "offline", 1791363900);
+    CHECK(!saw_event("presence"), "hearing the same again tells nobody anything");
+    push_presence(MOM, "online", 0);
+    int said_online = 0;
+    for (int i = 0; i < outbox_count; i++) {
+        said_online |= strstr(outbox[i], "\"evt\":\"presence\"") != NULL && strstr(outbox[i], "\"state\":\"online\"") != NULL;
+    }
+    CHECK(said_online, "her coming back is told too");
+    clear_outbox();
+    push_presence(SECRET, "online", 0);
+    push_presence(HIDDEN, "online", 0);
+    CHECK(!saw_event("presence"), "nothing is said about a locked or soft-locked chat");
+    Settings narrowed = push;
+    str_copy(narrowed.automation_chats, sizeof(narrowed.automation_chats), "Work");
+    settings_manager_apply(settings_mgr, &narrowed);
+    push_presence(MOM, "offline", 1791364000);
+    CHECK(!saw_event("presence"), "nor about a chat outside the ones agents may use");
+    push.automation_push_presence = 0;
+    settings_manager_apply(settings_mgr, &push);
+    clear_outbox();
+}
+
 int main(void) {
     char dir[] = "/tmp/tawk-control-XXXXXX";
     if (!mkdtemp(dir)) return 1;
@@ -986,6 +1056,7 @@ int main(void) {
     test_writes_wait_for_you();
     test_destructive_and_manage();
     test_live_and_log();
+    test_online_status();
     test_disclaimer();
     test_admin_answers_its_own();
     test_someone_with_no_chat_yet();

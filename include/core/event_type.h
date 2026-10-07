@@ -29,6 +29,7 @@ typedef enum EventType {
     EVENT_STATUS_POSTED,    /* id, ok, detail: a status you posted went out or failed */
     EVENT_LINK_PREVIEW,     /* message.id, message.link, message.thumbnail: the card made for a message you sent */
     EVENT_TYPING,
+    EVENT_PRESENCE,         /* jid, state (online or offline), at (last seen, 0 when not shared) */
     EVENT_SIDECAR_EXITED,
     EVENT_ERROR
 } EventType;

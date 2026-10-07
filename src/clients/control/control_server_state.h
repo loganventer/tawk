@@ -94,6 +94,8 @@ int             control_load_message(ControlServer *server, const ControlSession
 /* A required string argument, answering bad_request itself when missing. */
 const char     *control_required(ControlServer *server, const ControlSession *session, const ControlRequest *req, const char *name);
 void            control_sender_name(ControlServer *server, const Message *msg, char *out, unsigned long size);
+/* control_presence.c: tells agents that the person in `chat` came online or left. */
+void            control_presence_send(ControlServer *server, const Chat *chat, const LiveMessageRef *ref);
 int             control_connected(ControlServer *server);
 
 /* ---- writes (control_writes.c): checks, confirmation, approval ---- */

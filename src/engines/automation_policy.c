@@ -97,6 +97,7 @@ int automation_policy_pushes_event(const Settings *s, ControlOrigin origin, Live
         case LIVE_KIND_EDIT:
         case LIVE_KIND_DELETE:         return s->automation_push_edits;
         case LIVE_KIND_SCHEDULED_SENT: return s->automation_push_scheduled;
+        case LIVE_KIND_PRESENCE:       return s->automation_push_presence;
         case LIVE_KIND_MEDIA_READY:    return 1;   /* the answer to a download it may have asked for */
         default:                       return 0;
     }

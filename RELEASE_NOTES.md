@@ -4,6 +4,13 @@ What changed in each version of tawk, newest first. `tawk --update` shows every 
 
 Each version has a section headed `## <version> (<date>)`, with one line for each change you would notice.
 
+## 0.11.0 (2026-10-07)
+
+- An open one-to-one chat says "online" under the person's name, or when they were last seen, for people who share that with you. It appears a moment after you open the chat and follows them as they come and go. "Show online status" under Settings, Chats turns it off.
+- It needs "Appear online" on, and it shows only what the other person shares. Groups and soft-locked chats show none.
+- For agents: a new `presence` event says when the person in a chat you opened comes online or leaves. It is off until you switch on "Push online status" under Settings, Automation, Agent events, it covers only the chats agents may use, and an agent cannot ask about anyone else. tawk-mcp 0.7.0 passes it on as a channel event with `--channel-presence on`.
+- With the Baileys backend, someone coming online no longer clears their typing notice.
+
 ## 0.10.0 (2026-10-06)
 
 - An agent, and `tawk send`, can write to someone you have no chat with yet. Name them by phone number with its country code (`+27821234567`), by JID, or by the name of a contact; the message starts the chat. A name two contacts share is refused and both are offered.

@@ -28,6 +28,7 @@ static const MenuNode CHATS[] = {
     FIELD(SETTING_CATEGORY_CHATS, "link_previews"),
     FIELD(SETTING_CATEGORY_CHATS, "share_typing"),
     FIELD(SETTING_CATEGORY_CHATS, "appear_online"),
+    FIELD(SETTING_CATEGORY_CHATS, "show_online"),
     FIELD(SETTING_CATEGORY_CHATS, "message_margin"),
     FIELD(SETTING_CATEGORY_CHATS, "status_keep_days"),
 };
@@ -146,6 +147,7 @@ static const MenuNode AGENT_EVENTS[] = {
     FIELD(SETTING_CATEGORY_AUTOMATION, "push_reactions"),
     FIELD(SETTING_CATEGORY_AUTOMATION, "push_edits"),
     FIELD(SETTING_CATEGORY_AUTOMATION, "push_scheduled"),
+    FIELD(SETTING_CATEGORY_AUTOMATION, "push_presence"),
     TEXT("An agent that listens (tawk-mcp's channel) hears each of these as it happens"),
     TEXT("Off, it still sees messages when it reads a chat"),
     TEXT("Your own tawk tail always shows messages, and none of the others"),

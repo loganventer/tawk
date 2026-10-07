@@ -222,6 +222,7 @@ static void push_live(ControlServer *s) {
     int n = messaging_manager_live_since(s->deps.messaging, *cursor, refs, LIVE_PER_TICK);
     for (int i = 0; i < n; i++) {
         if (refs[i].kind == LIVE_KIND_MESSAGE) send_message(s, &refs[i]);
+        else if (refs[i].kind == LIVE_KIND_PRESENCE) control_presence_send(s, find_chat(s, refs[i].chat_jid), &refs[i]);
         else send_activity(s, &refs[i]);
         *cursor = refs[i].seq;
     }
