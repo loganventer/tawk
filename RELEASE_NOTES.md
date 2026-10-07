@@ -4,6 +4,10 @@ What changed in each version of tawk, newest first. `tawk --update` shows every 
 
 Each version has a section headed `## <version> (<date>)`, with one line for each change you would notice.
 
+## 0.12.0 (2026-10-07)
+
+- For agents: a new `presence` operation answers whether the person in a chat is online and when they were last seen. It is off until you switch on "Look up online status" under Settings, Automation. It covers one person at a time, only in the chats agents may use, never a group or a locked chat, and it learns nothing while tawk shows you as offline. tawk-mcp 0.8.0 offers it as the `get_online_status` tool.
+
 ## 0.11.0 (2026-10-07)
 
 - An open one-to-one chat says "online" under the person's name, or when they were last seen, for people who share that with you. It appears a moment after you open the chat and follows them as they come and go. "Show online status" under Settings, Chats turns it off.

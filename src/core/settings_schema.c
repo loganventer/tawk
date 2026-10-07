@@ -96,6 +96,7 @@ static const SettingField FIELDS[] = {
     B(SETTING_CATEGORY_AUTOMATION, "push_edits", "Push edits and deletes", "Agents that listen hear when someone changes or deletes a message they sent", automation_push_edits),
     B(SETTING_CATEGORY_AUTOMATION, "push_scheduled", "Push scheduled sends", "Agents that listen hear when a message you scheduled goes out", automation_push_scheduled),
     B(SETTING_CATEGORY_AUTOMATION, "push_presence", "Push online status", "Agents that listen hear when the person in the chat you have open comes online or leaves; off, they are not told", automation_push_presence),
+    B(SETTING_CATEGORY_AUTOMATION, "presence_lookup", "Look up online status", "An agent may ask whether the person in a chat is online or when they were last seen, one person at a time, for the chats it may use; off, it cannot ask", automation_presence_lookup),
     I(SETTING_CATEGORY_AUTOMATION, "self_approvals_per_hour", "Self-approvals per hour", "With access admin: how many of its own requests a program may answer in an hour; past this they wait for you", automation_self_per_hour, 1, 240, 1, 0),
     { SETTING_CATEGORY_AUTOMATION, "transcribe_model", "Transcription model", "The Whisper model an agent's transcriber uses for voice notes: large-v3-turbo suits most languages, tiny is the quickest and lightest, larger ones are more accurate and slower",
       SETTING_KIND_CHOICE, offsetof(Settings, transcribe_model), sizeof(((Settings *)0)->transcribe_model), 0, 0, 0, "tiny|base|small|medium|large-v3-turbo|large-v3", 0 },

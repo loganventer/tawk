@@ -38,6 +38,8 @@ int               automation_policy_pushes(const Settings *settings, ControlOrig
  * message (a read, a reaction, an edit or delete, a scheduled send): only
  * programs acting for a model, and only with that kind's setting on. */
 int               automation_policy_pushes_event(const Settings *settings, ControlOrigin origin, LiveKind kind);
+/* Whether a client may ask if someone is online. Your own shell always may; an agent only when you switched it on. */
+int               automation_policy_presence_lookup(const Settings *settings, ControlOrigin origin);
 /* The line to add under a message of this operation from this origin, or
  * NULL for none: only what a program acting for a model sends, schedules or
  * answers a status with, and only with the disclaimer turned on. */

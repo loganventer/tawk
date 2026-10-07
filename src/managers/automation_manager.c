@@ -106,6 +106,10 @@ int automation_manager_pushes_event(AutomationManager *m, ControlOrigin origin, 
     return automation_policy_pushes_event(eff(m), origin, kind);
 }
 
+int automation_manager_presence_lookup(AutomationManager *m, ControlOrigin origin) {
+    return automation_policy_presence_lookup(eff(m), origin);
+}
+
 const char *automation_manager_disclaimer(AutomationManager *m, ControlOrigin origin, const char *op) {
     return automation_policy_disclaimer(eff(m), origin, op);
 }

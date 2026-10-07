@@ -26,7 +26,7 @@ static void request_place(const ApprovalRequest *r, char *out, size_t size) {
 }
 
 static const char *const TAB_NAMES[AGENTS_VIEW_COUNT] = { "Queue", "Agents", "Log", "Permissions" };
-static const char *const PERMISSION_KEYS[] = { "control_socket", "access", "chats", "confirm_cli", "writes_per_minute", "ai_disclaimer", "ai_disclaimer_text", "push_received", "push_sent", "push_read", "push_reactions", "push_edits", "push_scheduled", "push_presence", "self_approval_chats", "self_approvals_per_hour" };
+static const char *const PERMISSION_KEYS[] = { "control_socket", "access", "chats", "confirm_cli", "writes_per_minute", "ai_disclaimer", "ai_disclaimer_text", "push_received", "push_sent", "push_read", "push_reactions", "push_edits", "push_scheduled", "push_presence", "presence_lookup", "self_approval_chats", "self_approvals_per_hour" };
 #define AGENT_ROWS 2   /* lines an agent takes in the Agents list */
 #define PERMISSION_COUNT ((int)(sizeof(PERMISSION_KEYS) / sizeof(PERMISSION_KEYS[0])))
 static const char *const FILTER_NAMES[] = { "everything", "allowed", "declined or expired", "refused or failed" };

@@ -116,6 +116,7 @@ void control_op_read_messages(ControlServer *server, ControlSession *session, co
 void control_op_search_messages(ControlServer *server, ControlSession *session, const ControlRequest *req);
 void control_op_unread_summary(ControlServer *server, ControlSession *session, const ControlRequest *req);
 void control_op_chat_info(ControlServer *server, ControlSession *session, const ControlRequest *req);
+void control_op_presence(ControlServer *server, ControlSession *session, const ControlRequest *req);
 void control_op_list_statuses(ControlServer *server, ControlSession *session, const ControlRequest *req);
 void control_op_list_scheduled(ControlServer *server, ControlSession *session, const ControlRequest *req);
 /* control_ops_send.c */

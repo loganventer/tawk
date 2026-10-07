@@ -130,7 +130,7 @@ Result:
 ```json
 {
   "protocol": 1,
-  "tawk": "0.11.0",
+  "tawk": "0.12.0",
   "access": "read",
   "account": {"jid": "27830000000@s.whatsapp.net", "name": "Logan"},
   "connected": true
@@ -150,6 +150,7 @@ Reading never marks anything as read, never sends read receipts, and never chang
 | `search_messages` | `query` (required), `chat`, `limit` (1 to 100, default 20) | `{"messages":[message…]}`, newest first |
 | `unread_summary` | none | `{"total":5,"mentions":1,"chats":[chat…]}` with only the chats that have unread messages |
 | `chat_info` | `chat` (required) | `{"chat":chat,"about":"…","members":[{"jid","name","admin"}]}`; `members` only for groups |
+| `presence` | `chat` (required), a one-to-one chat | `{"chat":chat,"state":"online"\|"offline"\|"unknown","last_seen":ts,"watching":true}`. It answers with what tawk knows now and asks WhatsApp to keep telling it about that person, as opening the chat does, so the answer to a first call is usually `unknown` and a call a second later has it. `last_seen` is present only when they share it. `watching` is false while tawk is not shown as online itself, when nothing can be learnt. Origin `mcp` needs `presence_lookup` on, or it is `not_allowed`; a group is `bad_request` |
 | `list_statuses` | `include_archived` (bool) | `{"statuses":[{"id","author","author_name","from_me","type","text","ts","viewed"}]}` |
 | `list_scheduled` | `chat` | `{"scheduled":[{"id","chat","text","due_at"}]}` |
 
@@ -285,7 +286,7 @@ After `subscribe`, tawk sends:
 - `{"evt":"edit","chat":{…},"message_id":"…","who":{…},"message":message,"at":ts}` when someone changes a message they sent, with the message as it now reads, and `{"evt":"delete","chat":{…},"message_id":"…","who":{…},"at":ts}` when they delete one for everyone. Origin `mcp` with `push_edits` on.
 - `{"evt":"scheduled_sent","chat":{…},"message_id":"<the scheduled message's id>","at":ts}` when a message you scheduled goes out. Origin `mcp` with `push_scheduled` on.
 - `{"evt":"media_ready","chat":{…},"message_id":"…","path":"…","type":"audio","at":ts}` when a message's photo, voice note or file has finished downloading, whoever asked for it. `path` is the file in tawk's media folder and `type` the message's type. Origin `mcp`.
-- `{"evt":"presence","chat":{…},"who":{"jid","name"},"state":"online","last_seen":ts,"at":ts}` when the person in a subscribed one-to-one chat comes online or leaves. `state` is `online` or `offline`; `last_seen` is present only when they share it; there is no `message_id`. It is sent on a change, not on every notice. tawk only knows this for a chat the user has opened since connecting, and a client cannot ask for anyone else's. Origin `mcp` with `push_presence` on.
+- `{"evt":"presence","chat":{…},"who":{"jid","name"},"state":"online","last_seen":ts,"at":ts}` when the person in a subscribed one-to-one chat comes online or leaves. `state` is `online` or `offline`; `last_seen` is present only when they share it; there is no `message_id`. It is sent on a change, not on every notice. tawk only knows this for a chat the user has opened since connecting, or one a client asked about with `presence`. Origin `mcp` with `push_presence` on.
 - `{"evt":"chat","chat":chat}` when a subscribed chat's unread count changes.
 - `{"evt":"bye"}` just before tawk quits.
 
@@ -294,8 +295,8 @@ Chats that are locked, hidden or outside `chats` never produce notifications.
 ## Example
 
 ```text
-→ {"id":"1","op":"hello","args":{"client":"tawk","version":"0.11.0","protocol":1,"origin":"cli"}}
-← {"id":"1","ok":true,"result":{"protocol":1,"tawk":"0.11.0","access":"send","account":{"jid":"27830000000@s.whatsapp.net","name":"Logan"},"connected":true}}
+→ {"id":"1","op":"hello","args":{"client":"tawk","version":"0.12.0","protocol":1,"origin":"cli"}}
+← {"id":"1","ok":true,"result":{"protocol":1,"tawk":"0.12.0","access":"send","account":{"jid":"27830000000@s.whatsapp.net","name":"Logan"},"connected":true}}
 → {"id":"2","op":"unread_summary"}
 ← {"id":"2","ok":true,"result":{"total":2,"mentions":0,"chats":[{"jid":"27820000000@s.whatsapp.net","name":"Mom","is_group":false,"unread":2,"unread_mention":false,"muted":false,"pinned":true,"archived":false,"last_ts":1790000000,"preview":"See you at 6"}]}}
 → {"id":"3","op":"send_message","args":{"chat":"Mom","text":"On my way"}}

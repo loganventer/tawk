@@ -93,6 +93,7 @@ typedef struct Settings {
     int  automation_push_edits; /* and when someone edits or deletes one they sent */
     int  automation_push_scheduled; /* and when one you scheduled goes out */
     int  automation_push_presence; /* and when the person in the open chat comes online or leaves */
+    int  automation_presence_lookup; /* agents may ask whether someone is online, one person at a time */
     char automation_self_chats[1024]; /* access admin: the chats (JIDs, comma-separated) a client may answer its own requests in; empty: none */
     int  automation_self_per_hour; /* access admin: requests a client may answer itself in an hour */
     char transcribe_model[24];     /* the Whisper model an agent's transcriber uses for voice notes */

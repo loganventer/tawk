@@ -172,7 +172,8 @@ What other programs reaching tawk through its control socket may do: tawk-mcp an
 | `push_reactions` | `off` | The same when someone reacts to a message you sent, or takes a reaction back |
 | `push_edits` | `off` | The same when someone changes or deletes a message they sent |
 | `push_scheduled` | `off` | The same when a message you scheduled goes out |
-| `push_presence` | `off` | The same when the person in a chat you have opened comes online or leaves. Only for chats the program may use; it cannot ask about anyone else |
+| `push_presence` | `off` | The same when the person in a chat you have opened comes online or leaves. Only for chats the program may use, and only for a chat you opened or one it looked up |
+| `presence_lookup` | `off` | A program acting for a model may ask whether the person in a chat is online or when they were last seen, one person at a time and only for the chats it may use. Off, it cannot ask. Your own shell always may |
 | `self_approval_chats` | empty | With `access = admin`: the chats a program may answer its own sends in, as JIDs separated by commas, or `*` for every chat it may use. Empty allows none. Set from Settings, Automation, Answering for itself, where each chat has a switch |
 | `transcribe_model` | `large-v3-turbo` | The Whisper model an agent's transcriber (tawk-mcp) uses for voice notes: `tiny`, `base`, `small`, `medium`, `large-v3-turbo` or `large-v3`. A list to choose from in the settings panel |
 | `transcribe_languages` | `auto` | The languages voice notes are written out in, as codes separated by commas (`af,en`), or `auto`. Each one gets its own transcription |

@@ -1310,6 +1310,19 @@ void messaging_manager_set_active(MessagingManager *m, int active) {
     send_presence(m);
 }
 
+int messaging_manager_presence(MessagingManager *m, const char *jid, ContactPresence *out) {
+    const ContactPresence *p = m->presence_known ? presence_tracker_find(&m->presence, jid) : NULL;
+    if (!p) return 0;
+    if (out) *out = *p;
+    return 1;
+}
+
+int messaging_manager_watch_presence(MessagingManager *m, const char *jid) {
+    if (!jid || !jid[0] || chat_jid_is_group(jid) || !m->presence_known) return 0;
+    m->deps.gateway->subscribe(m->deps.gateway, jid);
+    return 1;
+}
+
 void messaging_manager_save_draft(MessagingManager *m, const char *jid, const char *text) {
     if (!jid || !jid[0]) return;
     char *old = m->deps.chats->get_draft(m->deps.chats, jid);

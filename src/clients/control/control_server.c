@@ -20,6 +20,7 @@ static const ControlOpEntry OPS[] = {
     { "search_messages",        control_op_search_messages, 1 },
     { "unread_summary",         control_op_unread_summary, 1 },
     { "chat_info",              control_op_chat_info, 1 },
+    { "presence",               control_op_presence, 1 },
     { "list_statuses",          control_op_list_statuses, 1 },
     { "list_scheduled",         control_op_list_scheduled, 1 },
     { "send_message",           control_op_send_message, 0 },

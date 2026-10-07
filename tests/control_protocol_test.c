@@ -92,6 +92,9 @@ static int gw_delete(IMessageGateway *self, const DeleteRequest *r) { (void)self
 static int gw_react(IMessageGateway *self, const ReactionTarget *t, const char *e) { (void)self; (void)t; (void)e; reactions_sent++; return 0; }
 static int gw_jid(IMessageGateway *self, const char *jid) { (void)self; (void)jid; return 0; }
 static int gw_picture(IMessageGateway *self, const char *jid, int full) { (void)self; (void)jid; (void)full; return 0; }
+static int watched;
+static char last_watched[128];
+static int gw_subscribe(IMessageGateway *self, const char *jid) { (void)self; watched++; str_copy(last_watched, sizeof(last_watched), jid); return 0; }
 static int gw_typing(IMessageGateway *self, const char *jid, const char *st) { (void)self; (void)jid; (void)st; return 0; }
 static int gw_presence(IMessageGateway *self, int on) { (void)self; (void)on; return 0; }
 static int gw_read(IMessageGateway *self, const ReadRequest *r) { (void)self; (void)r; return 0; }
@@ -979,6 +982,84 @@ static void test_online_status(void) {
     clear_outbox();
 }
 
+/* Asking whether someone is online: an agent may only when you switched it
+ * on, only about a person in a chat it may use, and it learns nothing while
+ * tawk is not shown as online itself. */
+static int presence_says(const cJSON *r, const char *state, int watching) {
+    const cJSON *st = cJSON_GetObjectItemCaseSensitive(result(r), "state");
+    const cJSON *w = cJSON_GetObjectItemCaseSensitive(result(r), "watching");
+    return cJSON_IsString(st) && !strcmp(st->valuestring, state) && cJSON_IsBool(w) && cJSON_IsTrue(w) == (watching != 0);
+}
+
+static void test_online_lookup(void) {
+    int agent = open_client("mcp", NULL);
+    Settings on = *settings_manager_current(settings_mgr);
+    CHECK(on.automation_presence_lookup == 0, "an agent may not ask who is online unless you switch it on");
+    say(agent, "{\"id\":\"p1\",\"op\":\"presence\",\"args\":{\"chat\":\"" MOM "\"}}");
+    cJSON *r = reply("p1");
+    CHECK(r && !strcmp(error_code(r), "not_allowed"), "so asking is refused");
+    cJSON_Delete(r);
+    int shell = open_client("cli", NULL);
+    messaging_manager_set_active(mm, 0);
+    tick();
+    watched = 0;
+    say(shell, "{\"id\":\"p2\",\"op\":\"presence\",\"args\":{\"chat\":\"" MOM "\"}}");
+    r = reply("p2");
+    CHECK(r && presence_says(r, "unknown", 0) && watched == 0, "your own shell may ask, and while tawk shows as offline nothing is known or asked for");
+    cJSON_Delete(r);
+
+    on.automation_presence_lookup = 1;
+    settings_manager_apply(settings_mgr, &on);
+    messaging_manager_set_active(mm, 1);
+    tick();
+    say(agent, "{\"id\":\"p3\",\"op\":\"presence\",\"args\":{\"chat\":\"" MOM "\"}}");
+    r = reply("p3");
+    CHECK(r && presence_says(r, "unknown", 1) && watched == 1 && !strcmp(last_watched, MOM),
+          "switched on, the first ask knows nothing yet and has WhatsApp tell tawk about her");
+    CHECK(r && !cJSON_GetObjectItemCaseSensitive(result(r), "last_seen"), "with no time to give");
+    cJSON_Delete(r);
+    push_presence(MOM, "offline", 1791363900);
+    say(agent, "{\"id\":\"p4\",\"op\":\"presence\",\"args\":{\"chat\":\"" MOM "\"}}");
+    r = reply("p4");
+    const cJSON *seen = r ? cJSON_GetObjectItemCaseSensitive(result(r), "last_seen") : NULL;
+    const cJSON *jid = r ? cJSON_GetObjectItemCaseSensitive(cJSON_GetObjectItemCaseSensitive(result(r), "chat"), "jid") : NULL;
+    CHECK(r && presence_says(r, "offline", 1) && cJSON_IsNumber(seen) && seen->valuedouble == 1791363900.0 && cJSON_IsString(jid) && !strcmp(jid->valuestring, MOM),
+          "the next one says she is offline and when she was last seen");
+    cJSON_Delete(r);
+    push_presence(MOM, "online", 0);
+    say(agent, "{\"id\":\"p5\",\"op\":\"presence\",\"args\":{\"chat\":\"" MOM "\"}}");
+    r = reply("p5");
+    CHECK(r && presence_says(r, "online", 1), "and that she is online once she is back");
+    cJSON_Delete(r);
+
+    watched = 0;
+    say(agent, "{\"id\":\"p6\",\"op\":\"presence\",\"args\":{\"chat\":\"" WORK "\"}}");
+    r = reply("p6");
+    CHECK(r && !strcmp(error_code(r), "bad_request") && watched == 0, "a group has no online status");
+    cJSON_Delete(r);
+    say(agent, "{\"id\":\"p7\",\"op\":\"presence\",\"args\":{\"chat\":\"" SECRET "\"}}");
+    r = reply("p7");
+    CHECK(r && error_code(r)[0] && watched == 0, "a locked chat is not found, and nobody is asked about");
+    cJSON_Delete(r);
+    say(agent, "{\"id\":\"p8\",\"op\":\"presence\",\"args\":{\"chat\":\"" HIDDEN "\"}}");
+    r = reply("p8");
+    CHECK(r && error_code(r)[0] && watched == 0, "nor is a soft-locked one");
+    cJSON_Delete(r);
+    Settings narrowed = on;
+    str_copy(narrowed.automation_chats, sizeof(narrowed.automation_chats), "Work");
+    settings_manager_apply(settings_mgr, &narrowed);
+    say(agent, "{\"id\":\"p9\",\"op\":\"presence\",\"args\":{\"chat\":\"" MOM "\"}}");
+    r = reply("p9");
+    CHECK(r && error_code(r)[0] && watched == 0, "nor someone outside the chats agents may use");
+    cJSON_Delete(r);
+    on.automation_presence_lookup = 0;
+    settings_manager_apply(settings_mgr, &on);
+    inbox[inbox_count++] = (ControlInbound){ CONTROL_INBOUND_CLOSED, agent, NULL };   /* leave room for the clients of later tests */
+    inbox[inbox_count++] = (ControlInbound){ CONTROL_INBOUND_CLOSED, shell, NULL };
+    tick();
+    clear_outbox();
+}
+
 int main(void) {
     char dir[] = "/tmp/tawk-control-XXXXXX";
     if (!mkdtemp(dir)) return 1;
@@ -1004,7 +1085,7 @@ int main(void) {
     gw.send_text = gw_text;
     gw.delete_message = gw_delete;
     gw.react = gw_react;
-    gw.subscribe = gw_jid;
+    gw.subscribe = gw_subscribe;
     gw.request_profile = gw_jid;
     gw.request_picture = gw_picture;
     gw.typing = gw_typing;
@@ -1057,6 +1138,7 @@ int main(void) {
     test_destructive_and_manage();
     test_live_and_log();
     test_online_status();
+    test_online_lookup();
     test_disclaimer();
     test_admin_answers_its_own();
     test_someone_with_no_chat_yet();

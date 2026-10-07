@@ -289,7 +289,9 @@ While you type in a chat, tawk tells the other person you are typing, and while 
 
 Under the name of an open one-to-one chat, tawk says "online" when the other person is on WhatsApp, and otherwise when they were last seen: "last seen today at 14:32", "last seen yesterday at 9:10", a weekday within the week, or a date. The line appears a moment after you open the chat and follows them as they come and go. It needs "Appear online" on, since WhatsApp only tells you about others while you show as online yourself, and it shows only what the person shares: someone who hides their last seen shows "online" or nothing, and then their about text stays in that place as before. Groups have no online status, and a soft-locked chat shows none. "Show online status" (`show_online`) turns the line off.
 
-Agents are not told who is online unless you switch on "Push online status" under Settings, Automation, Agent events. With it on, an agent that listens hears when the person in a chat you opened comes online or leaves, for the chats it may use. It cannot ask about anyone else.
+Agents are not told who is online unless you switch on "Push online status" under Settings, Automation, Agent events. With it on, an agent that listens hears when the person in a chat you opened comes online or leaves, for the chats it may use.
+
+An agent cannot ask whether someone is online unless you switch on "Look up online status" under Settings, Automation. With it on, it may ask about one person at a time, in a chat it may use; tawk then has WhatsApp tell it about that person, exactly as opening their chat does, and answers with what it knows. It learns nothing while tawk shows you as offline, nothing about groups or locked chats, and only what the person shares with you.
 
 ## Chat options
 

@@ -7,6 +7,7 @@
 #include "core/receipt.h"
 #include "core/auth_state.h"
 #include "core/chat.h"
+#include "core/contact_presence.h"
 #include "core/live_message_ref.h"
 #include "core/mention_candidate.h"
 #include "core/mention_pick.h"
@@ -90,6 +91,11 @@ int            messaging_manager_react(MessagingManager *mgr, const char *messag
 void           messaging_manager_set_typing(MessagingManager *mgr, TypingState state);
 /* Active while you use tawk; inactive when idle or in the screensaver. */
 void           messaging_manager_set_active(MessagingManager *mgr, int active);
+/* What is known about `jid` being online: 1 and `out` filled, or 0 when nothing is known. */
+int            messaging_manager_presence(MessagingManager *mgr, const char *jid, ContactPresence *out);
+/* Asks WhatsApp to tell us when `jid` comes online or leaves, as opening their chat does.
+ * Returns 0 when it cannot: a group, or we are not connected and shown as online ourselves. */
+int            messaging_manager_watch_presence(MessagingManager *mgr, const char *jid);
 /* Drafts are kept per chat in the database. */
 void           messaging_manager_save_draft(MessagingManager *mgr, const char *jid, const char *text);
 char          *messaging_manager_load_draft(MessagingManager *mgr, const char *jid);

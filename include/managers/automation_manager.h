@@ -57,6 +57,7 @@ const char       *automation_manager_access(AutomationManager *mgr);
 int               automation_manager_pushes(AutomationManager *mgr, ControlOrigin origin, int from_me);
 /* Whether a subscribed client of that origin is told about a read, a reaction, an edit or delete, or a scheduled send. */
 int               automation_manager_pushes_event(AutomationManager *mgr, ControlOrigin origin, LiveKind kind);
+int               automation_manager_presence_lookup(AutomationManager *mgr, ControlOrigin origin);
 /* The disclaimer to add under a message of this operation from this origin, or NULL for none. */
 const char       *automation_manager_disclaimer(AutomationManager *mgr, ControlOrigin origin, const char *op);
 int               automation_manager_setting_changeable(AutomationManager *mgr, const SettingField *field);

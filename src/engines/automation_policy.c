@@ -103,6 +103,10 @@ int automation_policy_pushes_event(const Settings *s, ControlOrigin origin, Live
     }
 }
 
+int automation_policy_presence_lookup(const Settings *s, ControlOrigin origin) {
+    return origin != CONTROL_ORIGIN_MCP || s->automation_presence_lookup;
+}
+
 const char *automation_policy_disclaimer(const Settings *s, ControlOrigin origin, const char *op) {
     if (origin != CONTROL_ORIGIN_MCP || !s->automation_disclaimer || !op) return NULL;
     if (strcmp(op, "send_message") != 0 && strcmp(op, "schedule_message") != 0 && strcmp(op, "reply_status") != 0) return NULL;

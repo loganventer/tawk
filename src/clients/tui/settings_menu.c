@@ -196,6 +196,7 @@ static const MenuNode AUTOMATION[] = {
     FIELD(SETTING_CATEGORY_AUTOMATION, "chats"),
     FIELD(SETTING_CATEGORY_AUTOMATION, "confirm_cli"),
     FIELD(SETTING_CATEGORY_AUTOMATION, "writes_per_minute"),
+    FIELD(SETTING_CATEGORY_AUTOMATION, "presence_lookup"),
     FIELD(SETTING_CATEGORY_AUTOMATION, "ai_disclaimer"),
     FIELD(SETTING_CATEGORY_AUTOMATION, "ai_disclaimer_text"),
     SUB("\xF0\x9F\x93\xA1", "Agent events", "What agents hear as it happens", AGENT_EVENTS),
