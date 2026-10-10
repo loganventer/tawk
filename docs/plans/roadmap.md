@@ -181,6 +181,8 @@ tawk-mcp still writes no transcript to disk and none to a log.
 
 ## 2. Safer at rest and safer to install
 
+Built on 2026-10-10 in tawk 0.18.0: backups that detect tampering and the passphrase lock. The lock asks the database crypt manager directly, so no `IPassphraseCheck` contract was added. The login in the keychain, the encrypted media cache, signed releases and sandboxed parsers are not built.
+
 | Feature | What the user gets | New parts | Notes |
 |---|---|---|---|
 | Backups that detect tampering | A changed or damaged backup is refused before anything is extracted | Infrastructure: `authenticated_file_cipher`, a decorator over `IFileCipher` that adds an HMAC-SHA256 tag over the encrypted file, with its key derived apart from the encryption key. Engines: the manifest codec learns format 3 | `openssl enc` cannot do an authenticated mode, which is why this wraps it. Formats 1 and 2 still restore, with a warning |

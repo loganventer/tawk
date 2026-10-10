@@ -176,7 +176,7 @@ flowchart TD
 | `IPassphrasePrompt` | `terminal_passphrase_prompt` (reads from `/dev/tty` with echo off; asks twice when confirming) |
 | `IDatabaseSnapshot` | `sqlite_file_snapshot` (copies `tawk.db` and its `-wal` for a backup while the instance lock keeps tawk from running) |
 | `IArchive` | `tar_archive` (gzipped tar with the system's tar; lists names and types before extracting) |
-| `IFileCipher` | `openssl_file_cipher` (`openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt`, passphrase on file descriptor 3) |
+| `IFileCipher` | `openssl_file_cipher` (`openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt`, passphrase on file descriptor 3), wrapped by `authenticated_file_cipher`, a decorator that puts a mark, a salt and an HMAC-SHA256 tag in front of what the other writes and refuses a file that does not match its tag before handing it on (`utilities/sha256` holds the hash, the HMAC and PBKDF2) |
 | `IControlTransport` | `unix_control_transport` (the control socket: 0600 in a 0700 folder, clients of the same user only, non-blocking, lines of at most 1 MiB, a socket left by a crashed tawk replaced) |
 | `IControlClient` | `unix_control_client` (the calling end, for `tawk send`, `tail`, `unread` and `status-line`) |
 | `IApprovalPrompt` | `approval_queue` in the terminal client (requests waiting in the Agentic tab; answers collected by polling) |

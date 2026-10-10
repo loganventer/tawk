@@ -147,6 +147,7 @@ Some preferences are set per chat: mutes, pins, archiving, the notification tone
 |---|---|---|
 | `enabled` | `true` | Run a command after a period of inactivity |
 | `idle_minutes` | `5` | Inactivity before the screensaver starts (1 to 240) |
+| `lock_minutes` | `0` | With encrypted chats: minutes without a key before tawk locks itself until their passphrase is typed (0 to 240). 0 locks only on Ctrl+L or `/lock`. An agent cannot change it |
 | `command` | `matrix-clock` | Shell command to run; any key stops it. Ctrl+L, `/screensaver` and `/lock` start it at once |
 | `wake_on_message` | `true` | Stop the screensaver when a message arrives |
 

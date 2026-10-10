@@ -45,6 +45,7 @@ The screenshots in this manual were taken from tawk running on a demo account wi
   - [Which number a message is sent from](#which-number-a-message-is-sent-from)
   - [Agents and accounts](#agents-and-accounts)
   - [What happens when you update](#what-happens-when-you-update)
+- [Locking tawk](#locking-tawk)
 - [Encrypting your chats](#encrypting-your-chats)
 - [Backups](#backups)
 - [Automation and MCP](#automation-and-mcp)
@@ -1089,6 +1090,17 @@ When an agent asks to send something, the Agentic tab names the account in brack
 
 The first time a tawk with accounts opens your database it upgrades it in place. A copy of the database as it was is kept beside it first. Your existing number becomes the account `main`, with all its chats, and nothing else changes until you add a second account.
 
+## Locking tawk
+
+With [encrypted chats](#encrypting-your-chats) you can lock tawk when you step away. Press Ctrl+L or type `/lock`: the screen goes blank except for a line asking for the passphrase of your chats, and the tab title stops naming the chat you had open. Type the passphrase and press Enter to carry on where you were.
+
+To have it lock by itself, set Settings, Screensaver, **Lock after (minutes)**. It is 0 to begin with, which never locks unless you ask.
+
+- Three wrong tries cost nothing. After that each one makes you wait, a second at first and doubling up to a minute.
+- tawk keeps running behind the lock. Messages arrive, sounds and system notifications follow your settings, scheduled messages go out and agents are served. A request waiting for your answer waits, or expires, as it would if you were away.
+- Without encrypted chats there is no passphrase to ask for, so Ctrl+L and `/lock` start the screensaver, as they always did. `/screensaver` starts it either way.
+- It keeps a passer-by out of your chats. It does not protect a computer someone else can log in to; the database's own encryption does that once tawk is closed.
+
 ## Encrypting your chats
 
 Your chats, messages, contacts and statuses live in one database file, `~/.local/share/tawk/tawk.db`. Only you can read it (it is created with owner-only permissions), but anyone who gets hold of the disk, a stolen laptop or a copied home folder, can. Encrypting it with a passphrase stops that:
@@ -1129,6 +1141,8 @@ tawk --backup ~/tawk-2026-09-30.backup
 tawk --backup ~/tawk-full.backup --with-media --with-login
 tawk --restore ~/tawk-2026-09-30.backup
 ```
+
+A backup made by tawk 0.18.0 or later also carries a check over every byte. If the file was changed or damaged after it was made, restoring it stops at once, before anything is decrypted or unpacked, and nothing of yours is touched. Backups from earlier versions still restore; tawk then says that it could not tell whether the file was altered, and a fresh backup fixes that. An older tawk cannot read a backup made by this one.
 
 **Making one.** tawk lists what goes in, asks for the backup's passphrase twice and writes the file (only you can read it, and it never replaces an existing file). The database is copied as it is, so encrypted chats stay encrypted inside the backup and still need their own passphrase after a restore.
 
