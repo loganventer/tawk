@@ -609,8 +609,8 @@ Voice notes show as `🔊 ▶ ●──────────── 0:14`: a p
 
 **Languages.** A voice note is written out in the language spoken, never translated. You say which languages those can be, and the transcriber works out which one each voice note is in:
 
-- **Settings, Chats, Voice note languages** and **Choose the languages…** opens a list of every language with a switch for each. These are the languages for every chat. Afrikaans and English are switched on to begin with.
-- On a chat's contact card, **Voice note languages…** opens the same list for that chat alone, and what you switch on there comes first. Its top switch puts the chat back on what Settings, Chats says.
+- **Settings, Chats, Voice note languages** and **Choose the languages…** opens a list of every language with a switch for each. These are the languages for every chat. English alone is switched on to begin with, so switch on the others you hear. The same list is under Settings, Automation, Voice note transcription.
+- On a chat's contact card, **Voice note languages…** opens the same list for that chat alone, and what you switch on there comes first. It opens with the languages that apply to the chat now switched on. Its top switch puts the chat back on what Settings, Chats says.
 - With no language switched on, the transcriber chooses among all of them, which goes wrong more often on short voice notes.
 
 In either list, type to find a language, Space or a click flips a switch, Enter saves and Esc leaves things as they were. A voice note that mixes a language with English is written in that language, with the English words left as they were said. The choice is made by tawk-mcp 0.10.2 or later; an older one writes one transcript for each language listed.
@@ -621,7 +621,7 @@ Three things decide what you see:
 - On a chat's [contact card](#contact-details), **Show transcripts** steps through *as the setting says*, *always* and *never* for that chat. **Alt+T** (Option+T on a Mac) and `/transcripts` step the same row for the open chat, and the conversation stays where it was.
 - On the same card, **Transcribe voice notes** switches transcribing off for that chat. From then on nothing in it is transcribed, whether as it arrives or because an agent asked, and tawk refuses a transcript handed to it for that chat. It looks forwards only: the transcripts the chat already has are kept, and still shown as its Show transcripts row says.
 
-Older voice notes are filled in as you look at them. While "Transcribe voice notes as they arrive" is on, a voice note from someone else that comes onto the screen without a transcript is handed to the transcriber, and its words appear when they are ready. tawk does not go through a whole chat by itself: only what you scroll to. A voice note WhatsApp no longer holds cannot be fetched, and stays as it is.
+With several agents connected, a voice note goes to the one running the newest tawk-mcp. Older voice notes are filled in as you look at them. While "Transcribe voice notes as they arrive" is on, a voice note from someone else that comes onto the screen without a transcript is handed to the transcriber, and its words appear when they are ready. tawk does not go through a whole chat by itself: only what you scroll to. A voice note WhatsApp no longer holds cannot be fetched, and stays as it is.
 
 Hiding transcripts removes nothing, and "Show transcript" in the message menu works whether they are shown or not. A transcript is removed with its message: when you delete it, when the sender deletes it for everyone, and when you clear or delete the chat. A soft-locked chat shows the shape of a transcript only, and takes no new ones while it is locked.
 
@@ -645,6 +645,7 @@ A message that has no summary yet shows in full, as it always did, and changes t
 
 - The agent you chose writes the summaries while it is connected.
 - With none chosen, or the chosen one away, the only agent connected that can write summaries is used. An agent running an older tawk-mcp is passed over and does not count.
+- An agent that is asked and hands nothing back is passed over too: after two requests that go unanswered for a minute and a half each, tawk stops asking it, says so in a notice, and gives those messages to another agent. This is what happens with a session that takes no channel events. Two sessions started in the same folder have the same label, so choosing one as default agent chooses both; the one that answers is the one that ends up writing.
 - With several connected and none chosen, tawk asks you on WhatsApp. It sends a numbered list of the agents to your own "message yourself" chat, on the number the TL;DR chat is on, and you answer there with the number. tawk confirms in the same chat, and that agent is your default agent from then on. Messages wait meanwhile. The question is asked once, and again after ten minutes if summaries are still waiting and nobody is chosen. This is the only message tawk sends by itself, and it reaches nobody but you.
 
 A summary is removed with its message, and when the message is edited. Switching TL;DR off for a chat hides its summaries and keeps them. A summary is a model's reading of the message: unfold it when the details matter.
@@ -1148,7 +1149,7 @@ Settings, Automation has a submenu, **Voice note transcription**. tawk does not 
 | Setting | What it does |
 |---|---|
 | Transcription model | A list of Whisper models to choose from. `large-v3-turbo` is the default: close to the largest in accuracy and several times quicker. `tiny` is the quickest and lightest, for a slow computer |
-| Transcription languages | The languages voice notes are spoken in, as codes separated by commas, such as `af,en` (the default), or `auto` for any. It is the same setting as Settings, Chats, Voice note languages, where it is a list of switches. Each voice note is written once, in whichever of them is spoken; a chat's own languages on its contact card come first |
+| Transcription languages | The languages voice notes are spoken in, as codes separated by commas, such as `af,en`, or `auto` for any; `en` to begin with. It is the same setting as Settings, Chats, Voice note languages, where it is a list of switches. Each voice note is written once, in whichever of them is spoken; a chat's own languages on its contact card come first |
 | Transcribe voice notes as they arrive | On, every voice note other people send is written out without being asked. Off, only the ones an agent asks for |
 
 An agent can read these and cannot change them.
