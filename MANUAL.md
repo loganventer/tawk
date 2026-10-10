@@ -147,6 +147,8 @@ Input:
 | Ctrl+S | Send (useful when Enter adds new lines) |
 | Ctrl+End | Go to the end of the text; press it again to scroll the chat to the newest message |
 | ← → Home End | Move the cursor (Ctrl+A also moves to the start) |
+| Ctrl, Alt or Shift with ← → | Step a word at a time (Option with the arrows on a Mac) |
+| Ctrl, Alt or Shift with ↑ ↓ | Go to the start or the end of what you typed |
 | ↑ ↓ | Move between lines; ↑ on the first line selects the newest message |
 | ↑ in an empty input | Edit your last message, when it is the newest in the chat and still editable |
 | Ctrl+W | Delete the previous word |
@@ -236,7 +238,7 @@ Commands that act on "this chat" need an open chat.
 - Click the picture in the conversation title bar to see it full size, and the name to open the [contact details](#contact-details).
 - Scroll the conversation with the wheel. Scrolling past the oldest message loads older ones.
 - Click the `↓ newer` badge at the bottom right of the conversation to jump to the newest message. It appears whenever you have scrolled up.
-- Click the input to type, and use the wheel to scroll a long message in it.
+- Click the input to type, and use the wheel to scroll a long message in it. A click anywhere in the conversation also leaves the cursor in the input, ready to type; a click on a message still opens, plays or unfolds it first.
 - Click 😀 to insert an emoji, ➕ to attach a file and ➤ to send.
 - Click ✕, which appears beside them once you have typed something, to clear the input. tawk asks "Clear what you typed?" first, with Cancel selected, so a stray click loses nothing.
 
@@ -378,6 +380,7 @@ Above the actions the card lists the chat's own settings. Enter on one steps it 
 | Agents answer by themselves here | On or off, for the account in view (see [Agents and accounts](#agents-and-accounts)) |
 | Show transcripts | As the setting says, always, never (see [Voice notes](#voice-notes)) |
 | Transcribe voice notes | On or off. Off leaves this chat's voice notes untranscribed from now on and keeps the transcripts it has |
+| Voice note languages… | Opens a list of languages with a switch for each: the ones this chat's voice notes are spoken in |
 | TL;DR | On or off. On, this chat's long messages show as a summary that unfolds to the original (see [TL;DR mode](#tldr-mode)) |
 
 Every action that removes or blocks something shows a confirmation with Cancel selected first. An export never replaces an existing file; a second export becomes `tawk chat with NAME (1).txt`. Only the messages stored on this computer are exported.
@@ -602,7 +605,15 @@ Typing in the chat list (or Ctrl+F) is different: it narrows the chat list by ch
 
 Voice notes show as `🔊 ▶ ●──────────── 0:14`: a play button, a progress bar and the length. Selecting one (Enter or a click) plays it in the background: the button turns into ■, the dot moves along the bar and the time counts down to 0:00 as it plays. Selecting it again stops it, and the bar resets when it ends. The terminal tab shows 🎧 while something plays.
 
-**Transcripts.** When a voice note has been transcribed, its words show in the voice note's own bubble, under the play line, in grey italics (grey alone where the terminal has no italics). The voice note itself looks as it always did; the bubble only grows to hold the words. tawk does not transcribe anything itself: an agent's transcriber does, as set under [Voice note transcription](#voice-note-transcription), and hands the words to tawk, which keeps them in its database. A long transcript shows its first six lines (Settings, Chats, Transcript lines, `transcript_lines`) and ends on `…`; choose **Show transcript** in the message menu for all of it. A transcript is what a model heard, so read it as a guide and play the voice note when it matters.
+**Transcripts.** When a voice note has been transcribed, its words show in the voice note's own bubble, under the play line, in grey italics (grey alone where the terminal has no italics). The voice note itself looks as it always did; the bubble only grows to hold the words. tawk does not transcribe anything itself: an agent's transcriber does, as set under [Voice note transcription](#voice-note-transcription), and hands the words to tawk, which keeps them in its database. A transcript is always shown whole, however long. **Show transcript** in the message menu opens it in the reader, with each language it was written in. A transcript is what a model heard, so read it as a guide and play the voice note when it matters.
+
+**Languages.** A voice note is written out in the language spoken, never translated. You say which languages those can be, and the transcriber works out which one each voice note is in:
+
+- **Settings, Chats, Voice note languages** and **Choose the languages…** opens a list of every language with a switch for each. These are the languages for every chat. Afrikaans and English are switched on to begin with.
+- On a chat's contact card, **Voice note languages…** opens the same list for that chat alone, and what you switch on there comes first. Its top switch puts the chat back on what Settings, Chats says.
+- With no language switched on, the transcriber chooses among all of them, which goes wrong more often on short voice notes.
+
+In either list, type to find a language, Space or a click flips a switch, Enter saves and Esc leaves things as they were. A voice note that mixes a language with English is written in that language, with the English words left as they were said. The choice is made by tawk-mcp 0.10.2 or later; an older one writes one transcript for each language listed.
 
 Three things decide what you see:
 
@@ -624,7 +635,7 @@ Some chats are full of long messages. Put one in TL;DR mode and each long messag
 
 **Switching it on.** Open the chat's [contact card](#contact-details) and press Enter on **TL;DR (summarise long messages)**. It is a setting of that chat alone: there is no switch for every chat, and every chat starts with it off.
 
-**What you see.** Every message from someone else is summarised, and one whose summary is shorter than the message shows `▸ TL;DR` and under it the summary, in place of its text. A short message whose summary would be no shorter shows as it is. To summarise only longer messages, raise Settings, Chats, TL;DR from (`tldr_min_chars`) from 0 to a number of characters. Press **Enter** on the message, or click it, and it unfolds: the line turns to `▾ TL;DR · original` and the full text shows. Enter again folds it back. Each message folds by itself, and what you unfolded stays unfolded while tawk runs. The message menu has the same as **TL;DR: original / summary**, and its **Read in full** still opens the original in the reader. Copy text, replies, forwarding and search always work on the original, never on the summary.
+**What you see.** Every message from someone else is summarised, and one whose summary is shorter than the message shows `▸ TL;DR` and under it the summary, in place of its text. A short message whose summary would be no shorter shows as it is. To summarise only longer messages, raise Settings, Chats, TL;DR from (`tldr_from_chars`) from 0 to a number of characters. Press **Enter** on the message, or click it, and it unfolds: the line turns to `▾ TL;DR · original` and the full text shows. Enter again folds it back. Each message folds by itself, and what you unfolded stays unfolded while tawk runs. The message menu has the same as **TL;DR: original / summary**, and its **Read in full** still opens the original in the reader. Copy text, replies, forwarding and search always work on the original, never on the summary.
 
 A message that has no summary yet shows in full, as it always did, and changes to its summary when one arrives. Older messages are filled in too: when you switch TL;DR on for a chat, and the first time you open such a chat after starting tawk, its messages of the last 30 days (Settings, Chats, TL;DR back, `tldr_back_days`) are handed to the agent, newest first, a few at a time. Anything older is summarised when you scroll to it. Set the days to 0 to have only what you look at summarised. Your own messages, voice notes and pictures are never summarised.
 
@@ -1137,7 +1148,7 @@ Settings, Automation has a submenu, **Voice note transcription**. tawk does not 
 | Setting | What it does |
 |---|---|
 | Transcription model | A list of Whisper models to choose from. `large-v3-turbo` is the default: close to the largest in accuracy and several times quicker. `tiny` is the quickest and lightest, for a slow computer |
-| Transcription languages | Language codes separated by commas, such as `af,en`, or `auto` to let the model detect one. Each language gets its own transcription, which helps with voice notes that mix languages |
+| Transcription languages | The languages voice notes are spoken in, as codes separated by commas, such as `af,en` (the default), or `auto` for any. It is the same setting as Settings, Chats, Voice note languages, where it is a list of switches. Each voice note is written once, in whichever of them is spoken; a chat's own languages on its contact card come first |
 | Transcribe voice notes as they arrive | On, every voice note other people send is written out without being asked. Off, only the ones an agent asks for |
 
 An agent can read these and cannot change them.

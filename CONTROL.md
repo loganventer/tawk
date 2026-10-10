@@ -167,7 +167,9 @@ tawk transcribes nothing. A transcriber hands the words of a voice note over, ta
 
 | Operation | Arguments | Result |
 | --- | --- | --- |
-| `set_transcript` | `message_id` (required), `text` (required, at most 16 KB), `language` (a short code such as `af`; leave out or `auto` when not known), `model` | `{}`. Replaces the transcript the message already has in that language |
+| `set_transcript` | `message_id` (required), `text` (required, at most 16 KB), `language` (a short code such as `af`; leave out or `auto` when not known), `model`, `replace` (bool) | `{}`. Replaces the transcript the message already has in that language, or all of them with `replace` |
+
+`replace` (a boolean, optional) makes the transcript take the place of every one the message has, in whatever language: a voice note written out again. Without it only the transcript in the same language is replaced.
 
 `set_transcript` changes only this computer and sends nothing to WhatsApp, so it is not asked about, needs no more than `read`, and does not count against `writes_per_minute`; each one is written to the automation log. It is answered `bad_request` for anything that is not a voice note or other audio, `not_found` for a message in a chat the client may not see (a locked or soft-locked one included), and `transcripts_off` for a chat whose voice notes are not transcribed. Control characters in the text are replaced, and the text is shown as plain text, never formatted. A client cannot change a chat's transcript choices: they are set on its contact card.
 
@@ -183,7 +185,7 @@ In a chat you put in TL;DR mode, tawk shows a long message as a short summary. t
 
 tawk asks with an event, sent to one client only whether or not it subscribed:
 
-- `{"evt":"summary_wanted","chat":{"jid","name"},"message":message,"max_chars":400}` for a text message from someone else (every one while `tldr_min_chars` is 0, else those at least that many characters long), in a chat in TL;DR mode that the client may see. It is sent when the message arrives, for the chat's long messages of the last `tldr_back_days` days when its TL;DR is switched on or it is first shown, and for an older one when you look at it in tawk; once for each message while tawk runs, four at once and then one every second and a half.
+- `{"evt":"summary_wanted","chat":{"jid","name"},"message":message,"max_chars":400}` for a text message from someone else (every one while `tldr_from_chars` is 0, else those at least that many characters long), in a chat in TL;DR mode that the client may see. It is sent when the message arrives, for the chat's long messages of the last `tldr_back_days` days when its TL;DR is switched on or it is first shown, and for an older one when you look at it in tawk; once for each message while tawk runs, four at once and then one every second and a half.
 
 Which client that is: the one you made your default agent in the Agents list while it is connected; else the only client connected with origin `mcp` that named `summaries` and is not paused; else, with several such and none chosen, nobody until you choose. A client that did not name the feature is never asked and does not count. tawk then asks you in the "message yourself" chat of the account the chat is in, and the number you answer with chooses. The choice is kept in `default_agent` under `[automation]`, as the client's `label` with any ", pid N" taken out, so a client that wants to be recognised again keeps its label the same.
 
@@ -321,6 +323,7 @@ After `subscribe`, tawk sends:
 - `{"evt":"media_ready","chat":{…},"message_id":"…","path":"…","type":"audio","at":ts}` when a message's photo, voice note or file has finished downloading, whoever asked for it. `path` is the file in tawk's media folder and `type` the message's type. Origin `mcp`.
 - `{"evt":"presence","chat":{…},"who":{"jid","name"},"state":"online","last_seen":ts,"at":ts}` when the person in a subscribed one-to-one chat comes online or leaves. `state` is `online` or `offline`; `last_seen` is present only when they share it; there is no `message_id`. It is sent on a change, not on every notice. tawk only knows this for a chat the user has opened since connecting, or one a client asked about with `presence`. Origin `mcp` with `push_presence` on.
 - `{"evt":"transcript_wanted","chat":{"jid","name"},"message_id":"…"}` for an older voice note you looked at in tawk that has no transcript, sent to one client with origin `mcp` that named `transcripts`, whether or not it subscribed, and once for each voice note while tawk runs. Only while `transcribe_auto` is on, only for someone else's voice note, and only in a chat that is transcribed and shows transcripts. The client transcribes it as it does one that arrives.
+- `chat_info`, `download_media` and the `message`, `media_ready` and `transcript_wanted` events carry `"languages":["af","en"]` when you named the languages that chat's voice notes are spoken in, for the transcriber to choose among. Without it the transcriber uses `transcribe_languages` from the settings.
 - A `message` event for a voice note, and a `media_ready` event for audio, carry `"transcribe":false` when the chat's voice notes are not to be transcribed, so a transcriber knows before it starts.
 - `{"evt":"chat","chat":chat}` when a subscribed chat's unread count changes.
 - `{"evt":"bye"}` just before tawk quits.

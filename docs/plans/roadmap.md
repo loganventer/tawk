@@ -1,6 +1,6 @@
 # Plan: the next features for tawk and tawk-mcp
 
-Status: section 1 (transcripts in the conversation) and TL;DR mode are built and merged in both repositories, with tests, as tawk 0.13.0 and 0.14.0 (pull request 11) and tawk-mcp 0.9.0 and 0.10.0 (pull request 15). Everything else is proposed. This is the one plan for both repositories, written against tawk 0.12.0 (`f169989`) and tawk-mcp 0.8.1 (`c6724f0`), the newest `main` of each on 10 October 2026. The first feature, voice note transcripts shown in the conversation, is planned in full. The rest are planned to the level of what each adds, where its parts go and what has to be decided first.
+Status: section 1 (transcripts in the conversation) and TL;DR mode are built and merged in both repositories, with tests, as tawk 0.13.0 to 0.14.2 (pull requests 11, 13 and 14) and tawk-mcp 0.9.0 to 0.10.2 (pull requests 15, 17 and 18). Everything else is proposed. This is the one plan for both repositories, written against tawk 0.12.0 (`f169989`) and tawk-mcp 0.8.1 (`c6724f0`), the newest `main` of each on 10 October 2026. The first feature, voice note transcripts shown in the conversation, is planned in full. The rest are planned to the level of what each adds, where its parts go and what has to be decided first.
 
 ## Table of Contents
 
@@ -106,6 +106,8 @@ flowchart LR
     TP --> CTL
     CARD["contact_panel<br/>This chat"] --> PREFS
 ```
+
+Changed in 0.14.2, the same day, after the first transcripts on real chats: a transcript is shown whole (the line limit and `transcript_lines` are gone); the languages a voice note may be in are chosen from a list of switches, for every chat under Settings, Chats (Afrikaans and English to begin with) and for one chat on its contact card; the transcriber works out which is spoken and writes the note once, in it, preferring the other language over English when both are heard, so that a mixed note is not turned into an English translation; and the transcripts written before were dropped by migration 20 to be written again.
 
 ### Parts by layer
 

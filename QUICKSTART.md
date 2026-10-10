@@ -86,7 +86,7 @@ If something does not work, run `tawk --doctor`. It checks the terminal, your fi
 - **⭕** in the header (or **/statuses**) shows your contacts' statuses; the number next to it counts people with statuses you have not seen. **+** left of the clock (or **/status**) posts your own: text, photo, video or link. Posting needs the whatsmeow backend.
 - Click a chat's name in the title bar (or press **Alt+I**, or type **/info**) for its details: about text, group members, block, clear, delete or export the chat. Click its picture to see it full size.
 - **Alt+L** (Option+L on a Mac, or **Ctrl+Shift+L** where the terminal reports it) soft-locks a chat: its conversation is blurred until you press it again.
-- **Shift+Enter** (or Alt+Enter) starts a new line in a message; Enter sends it.
+- **Shift+Enter** (or Alt+Enter) starts a new line in a message; Enter sends it. Ctrl, Alt or Shift with ← and → steps through what you typed a word at a time.
 - Pinned chats have their own group at the top of the list. Enter on a group header, or ← and →, folds and unfolds it.
 - **Ctrl+R** records a voice note in the open chat; Enter sends it.
 - With an agent connected through [tawk-mcp](https://github.com/loganventer/tawk-mcp), voice notes show their words under them (**Alt+T** steps this for the open chat), and a chat's contact card has **TL;DR** to show long messages as a short summary; Enter unfolds one.

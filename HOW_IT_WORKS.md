@@ -683,12 +683,12 @@ sequenceDiagram
     participant T as tawk
     participant M as tawk-mcp
     WA->>T: a voice note arrives
-    T->>M: message event ("transcribe":false when the chat is switched off)
+    T->>M: message event ("transcribe":false when the chat is switched off,<br/>"languages" when you named the chat's)
     Note over M: skipped when switched off, or when automatic transcription is off
     M->>T: download_media
     T-->>M: the file's path
-    Note over M: Whisper, one pass for each language
-    M->>T: set_transcript (message_id, language, text, model)
+    Note over M: the language is worked out among those named,<br/>then Whisper writes the note once, in it
+    M->>T: set_transcript (message_id, language, text, model, replace)
     Note over T: transcription_policy and transcript_validator,<br/>then the transcripts table
     T-->>M: {} or transcripts_off
     Note over T: the next frame draws the words under the play line
@@ -706,7 +706,7 @@ sequenceDiagram
     participant T as tawk
     participant A as the default agent
     U->>T: TL;DR on, on the contact card
-    Note over T: summary_policy: text, from someone else,<br/>every one, or those at least tldr_min_chars long
+    Note over T: summary_policy: text, from someone else,<br/>every one, or those at least tldr_from_chars long
     Note over T: the last tldr_back_days days go on the waiting list,<br/>newest first; new arrivals and what you scroll to follow
     T->>A: summary_wanted (the message, max_chars)
     Note over A: its model writes one paragraph
