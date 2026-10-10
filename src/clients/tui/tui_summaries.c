@@ -22,7 +22,7 @@ static SummaryManager *manager_of(TuiApp *app, AccountId owner) {
 static int find_summary(void *ctx, const Message *message, AccountId owner, Summary *out) {
     TuiApp *app = ctx;
     SummaryManager *mgr = manager_of(app, owner);
-    if (!mgr || message->from_me) return -1;
+    if (!mgr) return -1;                                    /* both sides of the chat: yours as well as theirs */
     if (summary_manager_find(mgr, message->id, out) == 0) {
         if (summary_policy_shorter(message->text, out->text)) return 0;
         summary_dispose(out);                               /* no shorter than the message: the message shows as it is */

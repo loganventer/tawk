@@ -36,8 +36,8 @@ int  summary_manager_wants(SummaryManager *mgr, const Message *message, const Ch
  * has a summary, is already waiting or was asked for a while ago is left out. */
 void summary_manager_want(SummaryManager *mgr, const Message *message, const Chat *chat);
 /* Puts the older long messages of a TL;DR chat on the waiting list, newest
- * first: those of the last `tldr_back_days` days, from other people, that
- * have no summary. Done once for a chat while tawk runs, and again after its
+ * first: those of the last `tldr_back_days` days, yours and other
+ * people's, that have no summary. Done once for a chat while tawk runs, and again after its
  * TL;DR is switched on. Returns how many were added. */
 int  summary_manager_backfill(SummaryManager *mgr, const Chat *chat, int64_t now);
 /* Puts a message back at the head of the list: the agent that was asked for

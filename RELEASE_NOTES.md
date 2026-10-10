@@ -4,6 +4,10 @@ What changed in each version of tawk, newest first. `tawk --update` shows every 
 
 Each version has a section headed `## <version> (<date>)`, with one line for each change you would notice.
 
+## 0.14.4 (2026-10-10)
+
+- TL;DR covers both sides of a chat. With it on, your own messages are summarised as well as the other person's, new ones and those of the last 30 days.
+
 ## 0.14.3 (2026-10-10)
 
 - Fixed: with two agents connected, voice notes could still come out as English translations, and summaries never arrived. tawk handed a voice note to the first agent that could transcribe, which could be a session still running an older tawk-mcp; it now hands it to the one running the newest. And an agent that is asked for summaries and never hands one back (a session that takes no channel events) is passed over after two unanswered requests, which go to another agent; tawk tells you when it does this.

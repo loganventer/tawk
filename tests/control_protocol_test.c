@@ -1295,8 +1295,8 @@ static void test_tldr(void) {
     CHECK(asked_for("L1") && !asked_for("N1"), "the only agent that can is asked to summarise a long message, not a short one");
     length.tldr_min_chars = 0;
     settings_manager_apply(settings_mgr, &length);
-    arrives("N2", MOM, "Running late, there in ten", 0);
-    CHECK(asked_for("N2"), "with the length at 0, every message is asked for");
+    arrives("N2", MOM, "Running late, there in ten", 1);
+    CHECK(asked_for("N2"), "with the length at 0, every message is asked for, what you send as well as what you are sent");
     length.tldr_min_chars = 300;
     settings_manager_apply(settings_mgr, &length);
     CHECK(writes_tldr(first) == 0, "without having been chosen");

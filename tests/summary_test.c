@@ -233,12 +233,14 @@ static void test_store_and_manager(sqlite3 *db) {
     message_dispose(&old);
     CHECK(summary_manager_backfill(filler, &work, now) == 0, "a chat that is not in TL;DR mode has nothing filled in");
     summary_manager_set_tldr(filler, WORK, 1);
-    CHECK(summary_manager_backfill(filler, &work, now) == 2, "switched on, its long messages of the last month wait for a summary");
-    CHECK(summary_manager_next_wanted(filler, id, sizeof(id)) && strcmp(id, "D02") == 0, "the newest first");
+    CHECK(summary_manager_backfill(filler, &work, now) == 3, "switched on, its long messages of the last month wait for a summary, yours as well as theirs");
+    CHECK(summary_manager_next_wanted(filler, id, sizeof(id)) && strcmp(id, "D01mine") == 0, "the newest first, and that one is your own");
     summary_manager_drop_wanted(filler);
-    CHECK(summary_manager_next_wanted(filler, id, sizeof(id)) && strcmp(id, "D10") == 0, "then the one before");
+    CHECK(summary_manager_next_wanted(filler, id, sizeof(id)) && strcmp(id, "D02") == 0, "then the one before");
     summary_manager_drop_wanted(filler);
-    CHECK(!summary_manager_next_wanted(filler, id, sizeof(id)), "not the one from before that, your own, or a short one");
+    CHECK(summary_manager_next_wanted(filler, id, sizeof(id)) && strcmp(id, "D10") == 0, "and the one before that");
+    summary_manager_drop_wanted(filler);
+    CHECK(!summary_manager_next_wanted(filler, id, sizeof(id)), "not the one from more than a month back, or a short one");
     CHECK(summary_manager_backfill(filler, &work, now) == 0, "and it is done once");
     settings.tldr_back_days = 60;
     summary_manager_set_tldr(filler, WORK, 0);

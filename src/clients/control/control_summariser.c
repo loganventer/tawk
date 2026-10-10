@@ -263,7 +263,7 @@ void control_summaries_on_message(ControlServer *s, const LiveMessageRef *ref) {
     if (!mgr && !s->summary_asking) return;
     Message msg;
     if (messaging_manager_get(s->deps.messaging, ref->id, &msg) != 0) return;
-    if (!take_answer(s, &msg) && mgr && !msg.from_me) {
+    if (!take_answer(s, &msg) && mgr) {                     /* what you send is summarised too */
         const Chat *chat = control_visible_chat(s, msg.chat_jid);
         if (chat) summary_manager_want(mgr, &msg, chat);
     }

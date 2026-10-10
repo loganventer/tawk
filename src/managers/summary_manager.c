@@ -135,7 +135,6 @@ int summary_manager_backfill(SummaryManager *m, const Chat *chat, int64_t now) {
     int64_t since = now - (int64_t)days * 86400;
     for (int i = count - 1; i >= 0; i--) {                  /* newest first: what you read first is summarised first */
         if (recent[i].timestamp < since) break;
-        if (recent[i].from_me) continue;
         int before = m->waiting_count;
         summary_manager_want(m, &recent[i], chat);
         if (m->waiting_count > before) added++;

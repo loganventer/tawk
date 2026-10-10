@@ -470,6 +470,7 @@ static void layout(MessageView *v, UiRect r, const Message *msgs, int count, con
         if (status_widest > inner) inner = status_widest;
         if (brief && utf8_columns(summary_view_head(folded)) > inner) inner = utf8_columns(summary_view_head(folded));
         for (int k = 0; k < n_brief; k++) if (brief_lines[k].columns > inner) inner = brief_lines[k].columns;
+        if (inline_ticks && n_brief > 0 && brief_lines[n_brief - 1].columns + 3 > inner) inner = brief_lines[n_brief - 1].columns + 3;
         /* A voice note's transcript: all of its words, in the same bubble under the play line. */
         const TranscriptView *spoken = transcript_of(v, i);
         TextLine *spoken_lines = NULL;
@@ -511,7 +512,8 @@ static void layout(MessageView *v, UiRect r, const Message *msgs, int count, con
         free(desc_lines);
         if (brief) push_row(v, (MessageRow){ i, MESSAGE_ROW_TLDR_HEAD, x, width, 0, 0, 0, folded });
         for (int k = 0; k < n_brief; k++) {
-            push_row(v, (MessageRow){ i, MESSAGE_ROW_TLDR, x, width, brief_lines[k].offset, brief_lines[k].length, 0, 0 });
+            /* Your own message in a run that shares one time keeps its ticks at the end of its last line, summary or not. */
+            push_row(v, (MessageRow){ i, MESSAGE_ROW_TLDR, x, width, brief_lines[k].offset, brief_lines[k].length, k == n_brief - 1 && inline_ticks, 0 });
         }
         free(brief_lines);
         for (int k = 0; k < n_lines; k++) {
@@ -736,6 +738,10 @@ static void draw_row(const MessageView *v, const MessageRow *row, int y, UiRect 
         case MESSAGE_ROW_TLDR: {
             const SummaryView *brief = summary_of(v, row->message);
             if (brief) summary_view_draw_line(brief, y, x + 1, room, row->offset, row->length, bubble);
+            if (row->meta_inline) {
+                int read = m->status == MESSAGE_STATUS_READ;
+                tui_text_right(y, x + row->width - 1, 3, message_status_ticks(m->status), read ? bubble | ATTR_BOLD : bubble | ATTR_DIM);
+            }
             break;
         }
         case MESSAGE_ROW_TRANSCRIPT: {
