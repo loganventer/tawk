@@ -441,7 +441,12 @@ static void on_message(MessagingManager *m, Event *e, ManagerChanges *ch) {
 
     Chat chat;
     int have_chat = m->deps.chats->get(m->deps.chats, msg->chat_jid, &chat) == 0;
-    if (!notification_policy_should_notify(m->deps.settings, have_chat ? &chat : NULL, msg, e->live, is_open)) return;
+    time_t now = time(NULL);
+    struct tm local;
+    localtime_r(&now, &local);
+    NotificationMoment moment = { e->live, is_open, messaging_manager_alert_level(m, msg->chat_jid), local.tm_wday,
+                                  local.tm_hour * 60 + local.tm_min };
+    if (!notification_policy_should_notify(m->deps.settings, have_chat ? &chat : NULL, msg, &moment)) return;
 
     ChatTally *t = find_tally(m, msg->chat_jid, 1);
     if (t) t->tally.counts[msg->type]++;
@@ -981,6 +986,17 @@ static int queue_outgoing(MessagingManager *m, Message *msg, const char *jid) {
     m->deps.chats->touch(m->deps.chats, jid, msg->timestamp, preview);
     m->chats_dirty = m->messages_dirty = 1;
     return 0;
+}
+
+ChatAlertLevel messaging_manager_alert_level(MessagingManager *m, const char *jid) {
+    ChatPrefs prefs;
+    if (!m->deps.chat_prefs || !jid || m->deps.chat_prefs->get(m->deps.chat_prefs, jid, &prefs) != 0) return CHAT_ALERT_ALL;
+    return prefs.alerts;
+}
+
+int messaging_manager_set_alert_level(MessagingManager *m, const char *jid, ChatAlertLevel level) {
+    if (!m->deps.alert_prefs || !jid || !jid[0]) return -1;
+    return m->deps.alert_prefs->set_level(m->deps.alert_prefs, jid, level);
 }
 
 int messaging_manager_send_text_to(MessagingManager *m, const char *jid, const OutgoingText *request) {

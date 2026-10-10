@@ -167,6 +167,9 @@ const char *messaging_manager_qr(MessagingManager *mgr);
 const char *messaging_manager_pairing_code(MessagingManager *mgr);
 const char *messaging_manager_user_name(MessagingManager *mgr);
 const char *messaging_manager_user_jid(MessagingManager *mgr);
+/* Which of a chat's messages alert you, and setting it. It holds for that person or group on all your numbers. */
+ChatAlertLevel messaging_manager_alert_level(MessagingManager *mgr, const char *jid);
+int            messaging_manager_set_alert_level(MessagingManager *mgr, const char *jid, ChatAlertLevel level);
 void        messaging_manager_request_pairing(MessagingManager *mgr, const char *phone);
 void        messaging_manager_request_qr(MessagingManager *mgr);
 void        messaging_manager_logout(MessagingManager *mgr);

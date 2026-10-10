@@ -5,6 +5,7 @@
 
 #include "contracts/i_chat_prefs_store.h"
 #include "contracts/i_chat_agent_prefs.h"
+#include "contracts/i_chat_alert_prefs.h"
 #include "contracts/i_chat_summary_prefs.h"
 #include "contracts/i_chat_transcript_prefs.h"
 
@@ -16,5 +17,7 @@ IChatTranscriptPrefs *sqlite_chat_prefs_store_transcripts(IChatPrefsStore *store
 IChatSummaryPrefs *sqlite_chat_prefs_store_summaries(IChatPrefsStore *store);
 /* The contract that sets and lists the rule for agents in a chat, over the same table. */
 IChatAgentPrefs *sqlite_chat_prefs_store_agents(IChatPrefsStore *store);
+/* The contract that sets which of a chat's messages alert you, over the same table. */
+IChatAlertPrefs *sqlite_chat_prefs_store_alerts(IChatPrefsStore *store);
 
 #endif

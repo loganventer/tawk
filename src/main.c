@@ -30,6 +30,8 @@
 #include "infrastructure/poppler_document_pages.h"
 #include "infrastructure/process_audio_player.h"
 #include "infrastructure/pty_idle_action.h"
+#include "infrastructure/desktop_notifier.h"
+#include "infrastructure/osc_notifier.h"
 #include "infrastructure/sound_notifier.h"
 #include "infrastructure/system_clipboard_image.h"
 #include "infrastructure/system_media_opener.h"
@@ -450,6 +452,8 @@ int main(int argc, char **argv) {
     INotifier *notifier = composite_notifier_create();
     composite_notifier_add(notifier, sound_notifier_create(sound_player, s));
     composite_notifier_add(notifier, tui_notifier_create(&blink, &flasher, title, s));
+    composite_notifier_add(notifier, osc_notifier_create(s));
+    composite_notifier_add(notifier, desktop_notifier_create(s));
 
     /* The accounts: each gets its gateway, its stores over the one database
      * and its managers. The clients start with the primary one in view. */

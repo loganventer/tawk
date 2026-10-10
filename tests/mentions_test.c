@@ -6,6 +6,10 @@
 #include "engines/mention_encoder.h"
 #include "engines/mention_matcher.h"
 #include "engines/notification_policy.h"
+#include "utilities/str_util.h"
+#include "core/notification.h"
+#include "engines/banner_text.h"
+#include "engines/quiet_hours_policy.h"
 #include "resource_access/json_protocol.h"
 
 #include <stdio.h>
@@ -72,14 +76,76 @@ static void test_policy(void) {
     chat.is_muted = 1;
     Message msg;
     message_init(&msg);
-    CHECK(!notification_policy_should_notify(&s, &chat, &msg, 1, 0), "a muted group stays quiet");
+    NotificationMoment noon = { 1, 0, CHAT_ALERT_ALL, 3, 12 * 60 };          /* a Wednesday at noon */
+    CHECK(!notification_policy_should_notify(&s, &chat, &msg, &noon), "a muted group stays quiet");
     msg.mentions_me = 1;
-    CHECK(notification_policy_should_notify(&s, &chat, &msg, 1, 0), "unless you are mentioned");
+    CHECK(notification_policy_should_notify(&s, &chat, &msg, &noon), "unless you are mentioned");
     s.do_not_disturb = 1;
-    CHECK(!notification_policy_should_notify(&s, &chat, &msg, 1, 0), "do not disturb still wins");
+    CHECK(!notification_policy_should_notify(&s, &chat, &msg, &noon), "do not disturb still wins");
     s.do_not_disturb = 0;
     s.mention_notifications = 0;
-    CHECK(!notification_policy_should_notify(&s, &chat, &msg, 1, 0), "and the setting turns it off");
+    CHECK(!notification_policy_should_notify(&s, &chat, &msg, &noon), "and the setting turns it off");
+
+    /* Mentions only, per chat. */
+    settings_set_defaults(&s);
+    chat.is_muted = 0;
+    msg.mentions_me = 0;
+    NotificationMoment only = noon;
+    only.level = CHAT_ALERT_MENTIONS;
+    CHECK(notification_policy_should_notify(&s, &chat, &msg, &noon) && !notification_policy_should_notify(&s, &chat, &msg, &only),
+          "a chat set to mentions only stays quiet for an ordinary message");
+    msg.mentions_me = 1;
+    CHECK(notification_policy_should_notify(&s, &chat, &msg, &only), "and alerts for one that mentions you");
+    s.mention_notifications = 0;
+    CHECK(notification_policy_should_notify(&s, &chat, &msg, &only), "even with mentions-always-notify off: the chat asked for mentions");
+
+    /* Quiet hours. */
+    settings_set_defaults(&s);
+    msg.mentions_me = 0;
+    str_copy(s.quiet_hours, sizeof(s.quiet_hours), "22:00-07:00");
+    NotificationMoment late = { 1, 0, CHAT_ALERT_ALL, 3, 23 * 60 + 30 }, early = { 1, 0, CHAT_ALERT_ALL, 4, 6 * 60 + 59 },
+                       morning = { 1, 0, CHAT_ALERT_ALL, 4, 7 * 60 };
+    CHECK(!notification_policy_should_notify(&s, &chat, &msg, &late) && !notification_policy_should_notify(&s, &chat, &msg, &early),
+          "nothing alerts you inside quiet hours, on either side of midnight");
+    CHECK(notification_policy_should_notify(&s, &chat, &msg, &morning) && notification_policy_should_notify(&s, &chat, &msg, &noon),
+          "and it does again from the minute they end");
+    msg.mentions_me = 1;
+    CHECK(notification_policy_should_notify(&s, &chat, &msg, &late), "a mention gets through quiet hours");
+    msg.mentions_me = 0;
+    str_copy(s.quiet_hours_weekend, sizeof(s.quiet_hours_weekend), "23:00-09:30");
+    NotificationMoment saturday_8 = { 1, 0, CHAT_ALERT_ALL, 6, 8 * 60 }, saturday_2230 = { 1, 0, CHAT_ALERT_ALL, 6, 22 * 60 + 30 },
+                       monday_8 = { 1, 0, CHAT_ALERT_ALL, 1, 8 * 60 };
+    CHECK(!notification_policy_should_notify(&s, &chat, &msg, &saturday_8) && notification_policy_should_notify(&s, &chat, &msg, &saturday_2230) &&
+          notification_policy_should_notify(&s, &chat, &msg, &monday_8), "the weekend has its own hours when you give it some");
+
+    QuietHours h = quiet_hours_policy_parse("22-7");
+    CHECK(h.set && h.from == 22 * 60 && h.until == 7 * 60, "hours may be written without minutes");
+    h = quiet_hours_policy_parse(" 13:30 - 14:15 ");
+    CHECK(h.set && quiet_hours_policy_covers(h, 13 * 60 + 30) && quiet_hours_policy_covers(h, 14 * 60 + 14) && !quiet_hours_policy_covers(h, 14 * 60 + 15),
+          "a stretch inside one day covers from its first minute up to, not including, its last");
+    CHECK(!quiet_hours_policy_parse("").set && !quiet_hours_policy_parse("22:00").set && !quiet_hours_policy_parse("25:00-07:00").set &&
+          !quiet_hours_policy_parse("22:61-07:00").set && !quiet_hours_policy_parse("soon-later").set && !quiet_hours_policy_parse("08:00-08:00").set &&
+          !quiet_hours_policy_parse("22:00-07:00 please").set && !quiet_hours_policy_parse(NULL).set,
+          "anything that is not two times with a dash gives no quiet hours at all");
+
+    /* The banner. */
+    Notification n;
+    memset(&n, 0, sizeof(n));
+    str_copy(n.title, sizeof(n.title), "Mom\x1b]0;x\x07");
+    str_copy(n.body, sizeof(n.body), "Dinner; at six\nbring bread");
+    str_copy(n.account_label, sizeof(n.account_label), "Personal");
+    char title[200], body[300];
+    banner_text_title(&n, title, sizeof(title));
+    banner_text_body(&n, body, sizeof(body));
+    CHECK(!strchr(title, '\x1b') && !strchr(title, '\x07') && strstr(title, "Mom") == title && strstr(title, "(Personal)"),
+          "a banner's title names the account and carries no escape of the sender's");
+    CHECK(!strchr(body, ';') && !strchr(body, '\n') && strstr(body, "Dinner"), "its body cannot end the escape early or part its fields");
+    n.body[0] = '\0';
+    banner_text_body(&n, body, sizeof(body));
+    CHECK(!strcmp(body, "New message"), "with previews off it says only that there is a message");
+    CHECK(banner_text_osc("iTerm.app", NULL, "xterm-256color") == 9 && banner_text_osc(NULL, "3", "xterm-kitty") == 99 &&
+          banner_text_osc("ghostty", "", "xterm-ghostty") == 9 && banner_text_osc(NULL, NULL, "foot") == 777 && banner_text_osc(NULL, NULL, NULL) == 777,
+          "each terminal is asked in the way it understands");
 }
 
 int main(void) {

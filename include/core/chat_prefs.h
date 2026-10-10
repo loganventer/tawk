@@ -3,6 +3,7 @@
 
 #include "core/account_id.h"
 #include "core/chat_agent_rule.h"
+#include "core/chat_alert_level.h"
 #include "core/chat_merge_choice.h"
 #include "core/chat_transcript_choice.h"
 
@@ -16,6 +17,7 @@ typedef struct ChatPrefs {
     int             tldr;                   /* 1: this chat's messages show as a summary */
     char            voice_languages[64];    /* the languages its voice notes are spoken in ("af,en"); "": any, as the setting says */
     ChatAgentRule   agent_rule;             /* what agents may do here, on top of what the account allows */
+    ChatAlertLevel  alerts;                 /* which of its messages alert you */
 } ChatPrefs;
 
 #endif

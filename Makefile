@@ -3,7 +3,7 @@
 # Run `make help` for every target and option.
 
 APP        ?= tawk
-VERSION    ?= 0.16.0
+VERSION    ?= 0.17.0
 # The commit this build comes from, so `tawk --update` can tell whether it is current.
 COMMIT     ?= $(shell git rev-parse HEAD 2>/dev/null)
 

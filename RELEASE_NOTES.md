@@ -4,6 +4,14 @@ What changed in each version of tawk, newest first. `tawk --update` shows every 
 
 Each version has a section headed `## <version> (<date>)`, with one line for each change you would notice.
 
+## 0.17.0 (2026-10-10)
+
+Notifications that reach you outside tawk, and stay quiet when you want them to.
+
+- **System notifications** (Settings, Notifications; off by default). `terminal` asks the terminal itself for a banner with the escape code it understands (iTerm2, kitty, WezTerm, Ghostty, foot, urxvt); `desktop` runs `terminal-notifier` or `osascript` on macOS and `notify-send` elsewhere; `both` does both. The banner carries the message only when "Show preview" is on, and otherwise says "New message". Inside tmux or screen the terminal kind usually does not get through; use `desktop` there.
+- **Quiet hours** (`quiet_hours`, such as `22:00-07:00`), with other hours for Saturday and Sunday if you give them (`quiet_hours_weekend`). Nothing alerts you inside them except a mention, when "Mentions always notify" is on. Unread counts still go up.
+- **Notify me**, a new row on every contact card: for every message, or only when mentioned. A busy group set to mentions only stays silent until someone names you. It holds for that group on all your numbers.
+
 ## 0.16.0 (2026-10-10)
 
 Tighter control over what agents see and do, chat by chat.

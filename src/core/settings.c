@@ -78,6 +78,7 @@ void settings_set_defaults(Settings *s) {
     s->automation_rate = 5;
     s->automation_self_per_hour = 20;
     s->automation_mask_codes = 1;
+    str_copy(s->system_notifications, sizeof(s->system_notifications), "off");
     s->owner_replies_per_hour = 60;
     s->owner_approvals = 1;
     s->owner_card_wait = 20;

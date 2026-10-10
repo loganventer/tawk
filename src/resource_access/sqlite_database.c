@@ -317,9 +317,12 @@ static const Migration MIGRATIONS[] = {
     { 23,
       /* What agents may do in one chat: 0 as the account says, 1 always ask, 2 read only, 3 hidden from them. */
       "ALTER TABLE chat_prefs ADD COLUMN agent_rule INTEGER NOT NULL DEFAULT 0;" },
+    { 24,
+      /* Which of a chat's messages alert you: 0 all of them, 1 only one that mentions you. */
+      "ALTER TABLE chat_prefs ADD COLUMN alerts INTEGER NOT NULL DEFAULT 0;" },
 };
 
-#define LATEST_VERSION 23
+#define LATEST_VERSION 24
 
 static int user_version(sqlite3 *db) {
     sqlite3_stmt *st = NULL;

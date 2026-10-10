@@ -12,6 +12,7 @@
 #include "resource_access/sqlite_receipt_store.h"
 #include "resource_access/sqlite_scheduled_message_store.h"
 #include "resource_access/sqlite_status_store.h"
+#include "resource_access/sqlite_chat_prefs_store.h"
 #include "resource_access/sqlite_summary_store.h"
 #include "resource_access/sqlite_transcript_store.h"
 #include "utilities/event_queue.h"
@@ -128,7 +129,7 @@ AccountRuntime *account_runtime_create(const AccountRuntimeParams *p, const Acco
     rt->network = ifaddrs_network_monitor_create();
     MessagingManagerDeps messaging_deps = { rt->gateway, rt->messages, rt->chats, rt->contacts, rt->aliases, rt->reactions, rt->receipts,
                                             p->notifier, rt->events, s, rt->observers, p->exporter, rt->network, liker,
-                                            id, rt->label };
+                                            id, rt->label, p->chat_prefs, sqlite_chat_prefs_store_alerts(p->chat_prefs) };
     rt->services.messaging = messaging_manager_create(&messaging_deps);
     if (!rt->services.messaging) {
         account_runtime_destroy(rt);

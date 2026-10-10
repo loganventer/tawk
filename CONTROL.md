@@ -134,7 +134,7 @@ Result:
 ```json
 {
   "protocol": 1,
-  "tawk": "0.16.0",
+  "tawk": "0.17.0",
   "access": "read",
   "account": {"jid": "27830000000@s.whatsapp.net", "name": "Logan"},
   "connected": true,
@@ -351,8 +351,8 @@ Chats that are locked, hidden or outside `chats` never produce notifications.
 ## Example
 
 ```text
-→ {"id":"1","op":"hello","args":{"client":"tawk","version":"0.16.0","protocol":1,"origin":"cli"}}
-← {"id":"1","ok":true,"result":{"protocol":1,"tawk":"0.16.0","access":"send","account":{"jid":"27830000000@s.whatsapp.net","name":"Logan"},"connected":true}}
+→ {"id":"1","op":"hello","args":{"client":"tawk","version":"0.17.0","protocol":1,"origin":"cli"}}
+← {"id":"1","ok":true,"result":{"protocol":1,"tawk":"0.17.0","access":"send","account":{"jid":"27830000000@s.whatsapp.net","name":"Logan"},"connected":true}}
 → {"id":"2","op":"unread_summary"}
 ← {"id":"2","ok":true,"result":{"total":2,"mentions":0,"chats":[{"jid":"27820000000@s.whatsapp.net","name":"Mom","is_group":false,"unread":2,"unread_mention":false,"muted":false,"pinned":true,"archived":false,"last_ts":1790000000,"preview":"See you at 6"}]}}
 → {"id":"3","op":"send_message","args":{"chat":"Mom","text":"On my way"}}

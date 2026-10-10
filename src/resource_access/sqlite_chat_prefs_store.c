@@ -12,6 +12,7 @@ typedef struct ChatPrefsState {
     IChatTranscriptPrefs transcripts;
     IChatSummaryPrefs    summaries;
     IChatAgentPrefs      agents;
+    IChatAlertPrefs      alerts;
 } ChatPrefsState;
 
 static sqlite3 *db_of(IChatPrefsStore *self) { return ((ChatPrefsState *)self->ctx)->db; }
@@ -35,7 +36,7 @@ static int prefs_get(IChatPrefsStore *self, const char *jid, ChatPrefs *out) {
     memset(out, 0, sizeof(*out));
     str_copy(out->jid, sizeof(out->jid), jid);
     sqlite3_stmt *st = NULL;
-    const char *sql = "SELECT send_account, merge, show_transcripts, transcribe_off, tldr, voice_languages, agent_rule FROM chat_prefs WHERE jid = ?";
+    const char *sql = "SELECT send_account, merge, show_transcripts, transcribe_off, tldr, voice_languages, agent_rule, alerts FROM chat_prefs WHERE jid = ?";
     if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, jid, -1, SQLITE_TRANSIENT);
     if (sqlite3_step(st) == SQLITE_ROW) {
@@ -46,6 +47,7 @@ static int prefs_get(IChatPrefsStore *self, const char *jid, ChatPrefs *out) {
         out->tldr = sqlite3_column_int(st, 4) != 0;
         str_copy(out->voice_languages, sizeof(out->voice_languages), (const char *)sqlite3_column_text(st, 5));
         out->agent_rule = chat_agent_rules_from(sqlite3_column_int(st, 6));
+        out->alerts = sqlite3_column_int(st, 7) == CHAT_ALERT_MENTIONS ? CHAT_ALERT_MENTIONS : CHAT_ALERT_ALL;
     }
     sqlite3_finalize(st);
     return 0;
@@ -88,6 +90,11 @@ static int transcripts_set_languages(IChatTranscriptPrefs *self, const char *jid
 static int summaries_set_tldr(IChatSummaryPrefs *self, const char *jid, int on) {
     return set_int_in((sqlite3 *)self->ctx, "INSERT INTO chat_prefs (jid, tldr) VALUES (?1, ?2) "
                       "ON CONFLICT(jid) DO UPDATE SET tldr = excluded.tldr", jid, on ? 1 : 0);
+}
+
+static int alerts_set_level(IChatAlertPrefs *self, const char *jid, ChatAlertLevel level) {
+    return set_int_in((sqlite3 *)self->ctx, "INSERT INTO chat_prefs (jid, alerts) VALUES (?1, ?2) "
+                      "ON CONFLICT(jid) DO UPDATE SET alerts = excluded.alerts", jid, (int)level);
 }
 
 static int agents_set_rule(IChatAgentPrefs *self, const char *jid, ChatAgentRule rule) {
@@ -144,8 +151,8 @@ static int prefs_forget_account(IChatPrefsStore *self, AccountId account) {
 static int prefs_reassign_jid(IChatPrefsStore *self, const char *from, const char *to) {
     /* What was chosen under the address that stays wins over the one that goes. */
     static const char *const SQL[] = {
-        "INSERT OR IGNORE INTO chat_prefs (jid, send_account, merge, show_transcripts, transcribe_off, tldr, voice_languages, agent_rule) "
-        "SELECT ?2, send_account, merge, show_transcripts, transcribe_off, tldr, voice_languages, agent_rule FROM chat_prefs WHERE jid = ?1",
+        "INSERT OR IGNORE INTO chat_prefs (jid, send_account, merge, show_transcripts, transcribe_off, tldr, voice_languages, agent_rule, alerts) "
+        "SELECT ?2, send_account, merge, show_transcripts, transcribe_off, tldr, voice_languages, agent_rule, alerts FROM chat_prefs WHERE jid = ?1",
         "DELETE FROM chat_prefs WHERE jid = ?1",
     };
     for (int i = 0; i < 2; i++) {
@@ -166,6 +173,10 @@ static void prefs_destroy(IChatPrefsStore *self) {
 
 IChatTranscriptPrefs *sqlite_chat_prefs_store_transcripts(IChatPrefsStore *self) {
     return self ? &((ChatPrefsState *)self->ctx)->transcripts : NULL;
+}
+
+IChatAlertPrefs *sqlite_chat_prefs_store_alerts(IChatPrefsStore *self) {
+    return self ? &((ChatPrefsState *)self->ctx)->alerts : NULL;
 }
 
 IChatAgentPrefs *sqlite_chat_prefs_store_agents(IChatPrefsStore *self) {
@@ -190,6 +201,8 @@ IChatPrefsStore *sqlite_chat_prefs_store_create(sqlite3 *db) {
     state->agents.ctx = db;
     state->agents.set_rule = agents_set_rule;
     state->agents.list = agents_list;
+    state->alerts.ctx = db;
+    state->alerts.set_level = alerts_set_level;
     s->ctx = state;
     s->get = prefs_get;
     s->set_send_account = prefs_set_send_account;
