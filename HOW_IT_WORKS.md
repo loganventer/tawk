@@ -706,7 +706,7 @@ sequenceDiagram
     participant T as tawk
     participant A as the default agent
     U->>T: TL;DR on, on the contact card
-    Note over T: summary_policy: text, from someone else,<br/>every one, or those at least tldr_from_chars long
+    Note over T: summary_policy: text, from either side,<br/>every one, or those at least tldr_from_chars long
     Note over T: the last tldr_back_days days go on the waiting list,<br/>newest first; new arrivals and what you scroll to follow
     T->>A: summary_wanted (the message, max_chars)
     Note over A: its model writes one paragraph
