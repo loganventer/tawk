@@ -1,4 +1,5 @@
 #include "control_server_state.h"
+#include "engines/text_redactor.h"
 #include "clients/control/control_op_entry.h"
 #include "engines/client_version.h"
 #include "utilities/app_info.h"
@@ -120,6 +121,33 @@ int control_resolve_chat(ControlServer *s, const ControlSession *session, const 
         control_fail(s, session->conn, req->id, "not_found", why);
     }
     return -1;
+}
+
+/* Replaces the string `name` of `object` by its masked form, when there is something to hide in it. */
+static void mask_field(cJSON *object, const char *name) {
+    cJSON *item = cJSON_GetObjectItemCaseSensitive(object, name);
+    if (!cJSON_IsString(item)) return;
+    char *masked = text_redactor_redact(item->valuestring);
+    if (!masked) return;
+    cJSON_ReplaceItemInObjectCaseSensitive(object, name, cJSON_CreateString(masked));
+    free(masked);
+}
+
+cJSON *control_message_json(ControlServer *s, ControlOrigin origin, const Message *msg, const char *sender_name) {
+    cJSON *o = control_codec_message(msg, sender_name);
+    if (!automation_manager_masks(s->deps.automation, origin)) return o;
+    mask_field(o, "text");
+    mask_field(cJSON_GetObjectItemCaseSensitive(o, "reply_to"), "text");
+    cJSON *link = cJSON_GetObjectItemCaseSensitive(o, "link");
+    mask_field(link, "title");
+    mask_field(link, "description");
+    return o;
+}
+
+cJSON *control_chat_json(ControlServer *s, ControlOrigin origin, const Chat *chat) {
+    cJSON *o = control_codec_chat(chat);
+    if (automation_manager_masks(s->deps.automation, origin)) mask_field(o, "preview");
+    return o;
 }
 
 const Chat *control_visible_chat(ControlServer *s, const char *jid) {

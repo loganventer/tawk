@@ -13,12 +13,12 @@
 
 static const Chat *chats_of(ControlServer *s, int *count) { return messaging_manager_chats(s->deps.messaging, count); }
 
-static cJSON *messages_json(ControlServer *s, const Message *items, int count) {
+static cJSON *messages_json(ControlServer *s, ControlOrigin origin, const Message *items, int count) {
     cJSON *list = cJSON_CreateArray();
     for (int i = 0; i < count; i++) {
         char name[128];
         control_sender_name(s, &items[i], name, sizeof(name));
-        cJSON_AddItemToArray(list, control_codec_message(&items[i], name));
+        cJSON_AddItemToArray(list, control_message_json(s, origin, &items[i], name));
     }
     return list;
 }
@@ -36,7 +36,7 @@ void control_op_list_chats(ControlServer *s, ControlSession *session, const Cont
         if (!automation_manager_chat_allowed(s->deps.automation, &all[i])) continue;
         if (!chat_match_filter(&all[i], filter)) continue;
         if (unread_only && all[i].unread == 0) continue;
-        cJSON_AddItemToArray(list, control_codec_chat(&all[i]));
+        cJSON_AddItemToArray(list, control_chat_json(s, session->origin, &all[i]));
         added++;
     }
     control_reply(s, session->conn, control_codec_ok(req->id, r));
@@ -57,8 +57,8 @@ void control_op_read_messages(ControlServer *s, ControlSession *session, const C
         return;
     }
     cJSON *r = cJSON_CreateObject();
-    cJSON_AddItemToObject(r, "chat", control_codec_chat(&chat));
-    cJSON_AddItemToObject(r, "messages", messages_json(s, items, count));
+    cJSON_AddItemToObject(r, "chat", control_chat_json(s, session->origin, &chat));
+    cJSON_AddItemToObject(r, "messages", messages_json(s, session->origin, items, count));
     cJSON_AddNumberToObject(r, "next_before", count == limit && count > 0 ? (double)items[0].timestamp : 0);
     message_array_free(items, count);
     control_reply(s, session->conn, control_codec_ok(req->id, r));
@@ -93,7 +93,7 @@ void control_op_search_messages(ControlServer *s, ControlSession *session, const
         kept++;
     }
     cJSON *r = cJSON_CreateObject();
-    cJSON_AddItemToObject(r, "messages", messages_json(s, items, kept));
+    cJSON_AddItemToObject(r, "messages", messages_json(s, session->origin, items, kept));
     message_array_free(items, kept);
     control_reply(s, session->conn, control_codec_ok(req->id, r));
 }
@@ -108,7 +108,7 @@ void control_op_unread_summary(ControlServer *s, ControlSession *session, const 
         if (all[i].unread == 0 || !automation_manager_chat_allowed(s->deps.automation, &all[i])) continue;
         total += all[i].unread > 0 ? all[i].unread : 1;          /* -1: marked unread by hand */
         mentions += all[i].unread_mention ? 1 : 0;
-        cJSON_AddItemToArray(list, control_codec_chat(&all[i]));
+        cJSON_AddItemToArray(list, control_chat_json(s, session->origin, &all[i]));
     }
     cJSON_AddNumberToObject(r, "total", total);
     cJSON_AddNumberToObject(r, "mentions", mentions);
@@ -148,7 +148,7 @@ void control_op_chat_info(ControlServer *s, ControlSession *session, const Contr
     if (at < 0) return;
     Chat chat = all[at];
     cJSON *r = cJSON_CreateObject();
-    cJSON_AddItemToObject(r, "chat", control_codec_chat(&chat));
+    cJSON_AddItemToObject(r, "chat", control_chat_json(s, session->origin, &chat));
     control_tag_transcribe(s, r, &chat);
     control_tag_tldr(s, r, &chat);
     ContactProfile profile;

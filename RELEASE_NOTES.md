@@ -4,6 +4,16 @@ What changed in each version of tawk, newest first. `tawk --update` shows every 
 
 Each version has a section headed `## <version> (<date>)`, with one line for each change you would notice.
 
+## 0.16.0 (2026-10-10)
+
+Tighter control over what agents see and do, chat by chat.
+
+- **Agents here**, a new row on every contact card, steps through four choices for that chat: as the account says, always ask me, read only, hidden from agents. A rule only tightens what the account's level allows, and holds for that person or group on all your numbers.
+  - *Always ask me*: every send there is yours to answer, each time. "Allow for this session" does not cover it and an agent cannot answer its own request.
+  - *Read only*: agents may read the chat and are refused any write in it, without you being asked.
+  - *Hidden from agents*: the chat is not listed, cannot be read, searched or named, and nothing about it is pushed. It reads the same as a chat that does not exist.
+- **Codes and card numbers are hidden from models.** A one-time code in a message that speaks of a code, PIN, password or verification reaches an agent acting for a model as `[code]`, and a card number as `[card number]`, in messages, quoted text, link cards and chat previews. Your own shell commands (`tawk tail`, `tawk unread`) see the text as it is. On by default; Settings, Automation, "Hide codes and card numbers from agents" (`mask_codes`) switches it off.
+
 ## 0.15.0 (2026-10-10)
 
 The owner's chat: talk to your agent, and answer its requests, from WhatsApp on your phone.

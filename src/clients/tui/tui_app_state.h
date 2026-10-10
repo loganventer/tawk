@@ -347,6 +347,9 @@ void tui_app_toggle_tldr(TuiApp *app, const char *jid);
 /* tui_owner_chat.c: the card row that names your own chat as your chat with the agent. */
 void tui_app_refresh_owner_pref(TuiApp *app);
 void tui_app_toggle_owner_chat(TuiApp *app, const char *jid);
+/* tui_agent_rule.c: the card row that says what agents may do in one chat. */
+void tui_app_refresh_agent_rule_pref(TuiApp *app);
+void tui_app_step_agent_rule(TuiApp *app, const char *jid);
 /* Unfolds a summarised message to its original, or folds it back; 0 when the message has no summary. */
 int  tui_app_toggle_summary(TuiApp *app, int index);
 /* Voice note transcripts (tui_transcripts.c). */

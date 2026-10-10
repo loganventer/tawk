@@ -1,4 +1,5 @@
 #include "resource_access/sqlite_chat_prefs_store.h"
+#include "engines/chat_agent_rules.h"
 #include "utilities/log.h"
 #include "utilities/str_util.h"
 
@@ -10,6 +11,7 @@ typedef struct ChatPrefsState {
     sqlite3             *db;
     IChatTranscriptPrefs transcripts;
     IChatSummaryPrefs    summaries;
+    IChatAgentPrefs      agents;
 } ChatPrefsState;
 
 static sqlite3 *db_of(IChatPrefsStore *self) { return ((ChatPrefsState *)self->ctx)->db; }
@@ -33,7 +35,7 @@ static int prefs_get(IChatPrefsStore *self, const char *jid, ChatPrefs *out) {
     memset(out, 0, sizeof(*out));
     str_copy(out->jid, sizeof(out->jid), jid);
     sqlite3_stmt *st = NULL;
-    const char *sql = "SELECT send_account, merge, show_transcripts, transcribe_off, tldr, voice_languages FROM chat_prefs WHERE jid = ?";
+    const char *sql = "SELECT send_account, merge, show_transcripts, transcribe_off, tldr, voice_languages, agent_rule FROM chat_prefs WHERE jid = ?";
     if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, jid, -1, SQLITE_TRANSIENT);
     if (sqlite3_step(st) == SQLITE_ROW) {
@@ -43,6 +45,7 @@ static int prefs_get(IChatPrefsStore *self, const char *jid, ChatPrefs *out) {
         out->transcribe_off = sqlite3_column_int(st, 3) != 0;
         out->tldr = sqlite3_column_int(st, 4) != 0;
         str_copy(out->voice_languages, sizeof(out->voice_languages), (const char *)sqlite3_column_text(st, 5));
+        out->agent_rule = chat_agent_rules_from(sqlite3_column_int(st, 6));
     }
     sqlite3_finalize(st);
     return 0;
@@ -87,6 +90,24 @@ static int summaries_set_tldr(IChatSummaryPrefs *self, const char *jid, int on) 
                       "ON CONFLICT(jid) DO UPDATE SET tldr = excluded.tldr", jid, on ? 1 : 0);
 }
 
+static int agents_set_rule(IChatAgentPrefs *self, const char *jid, ChatAgentRule rule) {
+    return set_int_in((sqlite3 *)self->ctx, "INSERT INTO chat_prefs (jid, agent_rule) VALUES (?1, ?2) "
+                      "ON CONFLICT(jid) DO UPDATE SET agent_rule = excluded.agent_rule", jid, (int)rule);
+}
+
+static int agents_list(IChatAgentPrefs *self, ChatAgentChoice *out, int max) {
+    sqlite3_stmt *st = NULL;
+    if (sqlite3_prepare_v2((sqlite3 *)self->ctx, "SELECT jid, agent_rule FROM chat_prefs WHERE agent_rule <> 0 ORDER BY jid", -1, &st, NULL) != SQLITE_OK) return -1;
+    int n = 0;
+    while (n < max && sqlite3_step(st) == SQLITE_ROW) {
+        str_copy(out[n].jid, sizeof(out[n].jid), (const char *)sqlite3_column_text(st, 0));
+        out[n].rule = chat_agent_rules_from(sqlite3_column_int(st, 1));
+        n++;
+    }
+    sqlite3_finalize(st);
+    return n;
+}
+
 static int prefs_set_send_account(IChatPrefsStore *self, const char *jid, AccountId account) {
     return set_int(self, "INSERT INTO chat_prefs (jid, send_account) VALUES (?1, ?2) "
                          "ON CONFLICT(jid) DO UPDATE SET send_account = excluded.send_account", jid, account);
@@ -123,8 +144,8 @@ static int prefs_forget_account(IChatPrefsStore *self, AccountId account) {
 static int prefs_reassign_jid(IChatPrefsStore *self, const char *from, const char *to) {
     /* What was chosen under the address that stays wins over the one that goes. */
     static const char *const SQL[] = {
-        "INSERT OR IGNORE INTO chat_prefs (jid, send_account, merge, show_transcripts, transcribe_off, tldr, voice_languages) "
-        "SELECT ?2, send_account, merge, show_transcripts, transcribe_off, tldr, voice_languages FROM chat_prefs WHERE jid = ?1",
+        "INSERT OR IGNORE INTO chat_prefs (jid, send_account, merge, show_transcripts, transcribe_off, tldr, voice_languages, agent_rule) "
+        "SELECT ?2, send_account, merge, show_transcripts, transcribe_off, tldr, voice_languages, agent_rule FROM chat_prefs WHERE jid = ?1",
         "DELETE FROM chat_prefs WHERE jid = ?1",
     };
     for (int i = 0; i < 2; i++) {
@@ -147,6 +168,10 @@ IChatTranscriptPrefs *sqlite_chat_prefs_store_transcripts(IChatPrefsStore *self)
     return self ? &((ChatPrefsState *)self->ctx)->transcripts : NULL;
 }
 
+IChatAgentPrefs *sqlite_chat_prefs_store_agents(IChatPrefsStore *self) {
+    return self ? &((ChatPrefsState *)self->ctx)->agents : NULL;
+}
+
 IChatSummaryPrefs *sqlite_chat_prefs_store_summaries(IChatPrefsStore *self) {
     return self ? &((ChatPrefsState *)self->ctx)->summaries : NULL;
 }
@@ -162,6 +187,9 @@ IChatPrefsStore *sqlite_chat_prefs_store_create(sqlite3 *db) {
     state->transcripts.set_languages = transcripts_set_languages;
     state->summaries.ctx = db;
     state->summaries.set_tldr = summaries_set_tldr;
+    state->agents.ctx = db;
+    state->agents.set_rule = agents_set_rule;
+    state->agents.list = agents_list;
     s->ctx = state;
     s->get = prefs_get;
     s->set_send_account = prefs_set_send_account;

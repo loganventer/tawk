@@ -101,7 +101,7 @@ static void send_message(ControlServer *s, const LiveMessageRef *ref) {
         cJSON *c = cJSON_AddObjectToObject(evt, "chat");
         cJSON_AddStringToObject(c, "jid", chat->jid);
         cJSON_AddStringToObject(c, "name", chat->name);
-        cJSON_AddItemToObject(evt, "message", control_codec_message(&msg, name));
+        cJSON_AddItemToObject(evt, "message", control_message_json(s, session->origin, &msg, name));
         if (msg.type == MESSAGE_TYPE_AUDIO) control_tag_transcribe(s, evt, chat);
         control_tag_account(s, evt);
         control_reply(s, session->conn, control_codec_event("message", evt));
@@ -166,7 +166,7 @@ static void send_activity(ControlServer *s, const LiveMessageRef *ref) {
             if (messaging_manager_get(s->deps.messaging, ref->id, &msg) == 0) {
                 char sender[128];
                 control_sender_name(s, &msg, sender, sizeof(sender));
-                cJSON_AddItemToObject(evt, "message", control_codec_message(&msg, sender));
+                cJSON_AddItemToObject(evt, "message", control_message_json(s, session->origin, &msg, sender));
                 message_dispose(&msg);
             }
         }
@@ -192,7 +192,7 @@ static int send_unread_changes(ControlServer *s, ControlSession *session) {
         if (w && w->unread == all[i].unread) continue;
         if (!w && all[i].unread == 0) continue;
         cJSON *evt = cJSON_CreateObject();
-        cJSON_AddItemToObject(evt, "chat", control_codec_chat(&all[i]));
+        cJSON_AddItemToObject(evt, "chat", control_chat_json(s, session->origin, &all[i]));
         control_tag_account(s, evt);
         control_reply(s, session->conn, control_codec_event("chat", evt));
         if (!w) return 1;

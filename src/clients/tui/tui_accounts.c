@@ -572,6 +572,7 @@ void tui_app_refresh_contact_prefs(TuiApp *app) {
     ContactPanel *panel = &app->contact;
     AccountRosterManager *roster = app->deps.roster;
     tui_app_refresh_owner_pref(app);                        /* last of the card's settings, so it is added first */
+    tui_app_refresh_agent_rule_pref(app);
     tui_app_refresh_summary_prefs(app);
     tui_app_refresh_transcript_prefs(app);                  /* then these, so the rows below end up above them */
     if (!panel->open || !roster) return;

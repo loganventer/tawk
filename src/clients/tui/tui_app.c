@@ -1249,6 +1249,7 @@ void tui_app_contact_action(TuiApp *app) {
         case CONTACT_ACTION_TRANSCRIBE:    tui_app_toggle_transcribing(app, jid); break;
         case CONTACT_ACTION_TLDR:          tui_app_toggle_tldr(app, jid); break;
         case CONTACT_ACTION_OWNER_CHAT:    tui_app_toggle_owner_chat(app, jid); break;
+        case CONTACT_ACTION_AGENT_RULE:    tui_app_step_agent_rule(app, jid); break;
         case CONTACT_ACTION_VOICE_LANGUAGES: tui_app_open_voice_languages(app, jid); break;
         case CONTACT_ACTION_SEARCH:     app->contact.open = 0; tui_app_open_search(app, ""); break;
         case CONTACT_ACTION_OPTIONS:    app->contact.open = 0; tui_app_open_chat_options(app, jid); break;

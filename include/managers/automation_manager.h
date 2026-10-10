@@ -10,6 +10,7 @@
 #include "core/automation_status.h"
 #include "core/automation_verdict.h"
 #include "core/chat.h"
+#include "core/chat_agent_rule.h"
 #include "core/chat_resolution.h"
 #include "core/contact.h"
 #include "core/control_origin.h"
@@ -40,6 +41,11 @@ void automation_manager_serve(AutomationManager *mgr, AccountId account, const c
 void automation_manager_admin_wanted(AutomationManager *mgr, int wanted);
 
 int               automation_manager_chat_allowed(AutomationManager *mgr, const Chat *chat);
+/* The rule you gave one chat for agents, and setting it. A rule only tightens what the account allows. */
+ChatAgentRule     automation_manager_chat_rule(AutomationManager *mgr, const char *jid);
+int               automation_manager_set_chat_rule(AutomationManager *mgr, const char *jid, ChatAgentRule rule);
+/* Whether what a client of that origin reads has its codes and card numbers hidden. */
+int               automation_manager_masks(AutomationManager *mgr, ControlOrigin origin);
 /* The one chat `ref` names among `chats`; see chat_reference_resolve. */
 ChatResolution    automation_manager_resolve(AutomationManager *mgr, const Chat *chats, int count, const char *ref,
                                              int *found, int *candidates, int max, int *candidate_count);

@@ -314,9 +314,12 @@ static const Migration MIGRATIONS[] = {
       "  ref INTEGER NOT NULL DEFAULT 0,"
       "  at INTEGER NOT NULL DEFAULT 0,"
       "  PRIMARY KEY (account_id, message_id));" },
+    { 23,
+      /* What agents may do in one chat: 0 as the account says, 1 always ask, 2 read only, 3 hidden from them. */
+      "ALTER TABLE chat_prefs ADD COLUMN agent_rule INTEGER NOT NULL DEFAULT 0;" },
 };
 
-#define LATEST_VERSION 22
+#define LATEST_VERSION 23
 
 static int user_version(sqlite3 *db) {
     sqlite3_stmt *st = NULL;

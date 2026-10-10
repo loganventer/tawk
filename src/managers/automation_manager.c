@@ -1,5 +1,6 @@
 #include "managers/automation_manager.h"
 #include "engines/automation_policy.h"
+#include "engines/chat_agent_rules.h"
 #include "engines/chat_reference_resolver.h"
 #include "engines/confirmation_token.h"
 #include "engines/hourly_quota.h"
@@ -16,6 +17,8 @@
 #define MAX_COMMANDS 16
 #define MAX_NOTICES  8
 #define ADMIN_TOKEN_SIZE 72
+
+#define CHAT_RULES_MAX 256
 
 struct AutomationManager {
     /* The account being served, and what applies to it in place of the settings. */
@@ -35,6 +38,9 @@ struct AutomationManager {
     char                  admin_token[ADMIN_TOKEN_SIZE];   /* "" while access is not admin */
     char                  notices[MAX_NOTICES][256];
     int                   notice_count;
+    ChatAgentChoice       rules[CHAT_RULES_MAX];           /* the chats with a rule of their own */
+    int                   rule_count;
+    int                   rules_loaded;
 };
 
 /* The settings as they apply to the account being served. */
@@ -78,19 +84,85 @@ void automation_manager_destroy(AutomationManager *m) {
     free(m);
 }
 
+/* The chats with a rule of their own, read once and kept in step with what is set here. */
+static void load_rules(AutomationManager *m) {
+    if (m->rules_loaded) return;
+    m->rules_loaded = 1;
+    m->rule_count = 0;
+    if (!m->deps.chat_rules) return;
+    int n = m->deps.chat_rules->list(m->deps.chat_rules, m->rules, CHAT_RULES_MAX);
+    m->rule_count = n > 0 ? n : 0;
+}
+
+ChatAgentRule automation_manager_chat_rule(AutomationManager *m, const char *jid) {
+    load_rules(m);
+    for (int i = 0; jid && i < m->rule_count; i++) if (strcmp(m->rules[i].jid, jid) == 0) return m->rules[i].rule;
+    return CHAT_AGENT_FOLLOW;
+}
+
+int automation_manager_set_chat_rule(AutomationManager *m, const char *jid, ChatAgentRule rule) {
+    if (!m->deps.chat_rules || !jid || !jid[0]) return -1;
+    if (m->deps.chat_rules->set_rule(m->deps.chat_rules, jid, rule) != 0) return -1;
+    m->rules_loaded = 0;                                    /* read again: the list is short */
+    m->changed = 1;
+    return 0;
+}
+
+int automation_manager_masks(AutomationManager *m, ControlOrigin origin) {
+    return origin == CONTROL_ORIGIN_MCP && m->deps.settings->automation_mask_codes;
+}
+
 int automation_manager_chat_allowed(AutomationManager *m, const Chat *chat) {
-    return automation_policy_chat_allowed(eff(m), chat);
+    return automation_policy_chat_allowed(eff(m), chat) && chat_agent_rules_readable(automation_manager_chat_rule(m, chat->jid));
+}
+
+/* The chats without those you hid from agents, with where each was in `chats`. The caller frees both. */
+static int readable_chats(AutomationManager *m, const Chat *chats, int count, Chat **kept, int **from) {
+    *kept = calloc((size_t)(count > 0 ? count : 1), sizeof(Chat));
+    *from = calloc((size_t)(count > 0 ? count : 1), sizeof(int));
+    if (!*kept || !*from) { free(*kept); free(*from); *kept = NULL; *from = NULL; return -1; }
+    int n = 0;
+    for (int i = 0; i < count; i++) {
+        if (!chat_agent_rules_readable(automation_manager_chat_rule(m, chats[i].jid))) continue;
+        (*kept)[n] = chats[i];
+        (*from)[n] = i;
+        n++;
+    }
+    return n;
 }
 
 ChatResolution automation_manager_resolve(AutomationManager *m, const Chat *chats, int count, const char *ref,
                                           int *found, int *candidates, int max, int *candidate_count) {
-    return chat_reference_resolve(chats, count, eff(m), ref, found, candidates, max, candidate_count);
+    load_rules(m);
+    if (m->rule_count == 0) return chat_reference_resolve(chats, count, eff(m), ref, found, candidates, max, candidate_count);
+    Chat *kept;
+    int *from;
+    int n = readable_chats(m, chats, count, &kept, &from);
+    if (n < 0) return CHAT_RESOLUTION_NOT_FOUND;
+    ChatResolution r = chat_reference_resolve(kept, n, eff(m), ref, found, candidates, max, candidate_count);
+    if (r == CHAT_RESOLUTION_FOUND) *found = from[*found];
+    for (int i = 0; candidates && candidate_count && i < *candidate_count; i++) candidates[i] = from[candidates[i]];
+    free(kept);
+    free(from);
+    return r;
 }
 
 ChatResolution automation_manager_resolve_recipient(AutomationManager *m, const Chat *chats, int chat_count,
                                                     const Contact *contacts, int contact_count, const char *ref,
                                                     Recipient *found, Recipient *candidates, int max, int *candidate_count) {
-    return recipient_resolve(eff(m), chats, chat_count, contacts, contact_count, ref, found, candidates, max, candidate_count);
+    ChatResolution r = recipient_resolve(eff(m), chats, chat_count, contacts, contact_count, ref, found, candidates, max, candidate_count);
+    /* Someone you hid from agents reads the same as someone who is not there. */
+    if (r == CHAT_RESOLUTION_FOUND && !chat_agent_rules_readable(automation_manager_chat_rule(m, found->jid))) return CHAT_RESOLUTION_NOT_FOUND;
+    if (r == CHAT_RESOLUTION_AMBIGUOUS && candidates && candidate_count) {
+        int kept = 0;
+        for (int i = 0; i < *candidate_count; i++) {
+            if (chat_agent_rules_readable(automation_manager_chat_rule(m, candidates[i].jid))) candidates[kept++] = candidates[i];
+        }
+        *candidate_count = kept;
+        if (kept == 1) { *found = candidates[0]; *candidate_count = 0; return CHAT_RESOLUTION_FOUND; }
+        if (kept == 0) return CHAT_RESOLUTION_NOT_FOUND;
+    }
+    return r;
 }
 
 const char *automation_manager_access(AutomationManager *m) {

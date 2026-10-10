@@ -471,7 +471,7 @@ int main(int argc, char **argv) {
     char admin_token_file[600];
     admin_token_path(admin_token_file, sizeof(admin_token_file));
     IAdminTokenStore *admin_tokens = file_admin_token_store_create(admin_token_file);
-    AutomationManagerDeps automation_deps = { automation_log, s, admin_tokens };
+    AutomationManagerDeps automation_deps = { automation_log, s, admin_tokens, sqlite_chat_prefs_store_agents(chat_prefs) };
     AutomationManager *automation = automation_manager_create(&automation_deps);
     ISentIdLog *sent_ids = sqlite_sent_id_log_create(db);
     OwnerChatManagerDeps owner_deps = { sent_ids, s };

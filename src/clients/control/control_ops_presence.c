@@ -24,7 +24,7 @@ void control_op_presence(ControlServer *s, ControlSession *session, const Contro
     int have = messaging_manager_presence(s->deps.messaging, chat.jid, &known);
     int watching = messaging_manager_watch_presence(s->deps.messaging, chat.jid);
     cJSON *r = cJSON_CreateObject();
-    cJSON_AddItemToObject(r, "chat", control_codec_chat(&chat));
+    cJSON_AddItemToObject(r, "chat", control_chat_json(s, session->origin, &chat));
     cJSON_AddStringToObject(r, "state", have ? presence_state_name(known.state) : "unknown");
     if (have && known.last_seen > 0) cJSON_AddNumberToObject(r, "last_seen", (double)known.last_seen);
     cJSON_AddBoolToObject(r, "watching", watching);

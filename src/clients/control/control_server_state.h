@@ -96,6 +96,10 @@ int             control_resolve_chat(ControlServer *server, const ControlSession
  * message would start the chat; returns -1, having answered, otherwise. */
 int             control_resolve_recipient(ControlServer *server, const ControlSession *session, const ControlRequest *req,
                                           const char *name, char *jid, size_t size, int *new_chat);
+/* A message, or a chat, as a client of `origin` is given it: with one-time codes and card numbers
+ * hidden when you asked for that and the client acts for a model. */
+cJSON          *control_message_json(ControlServer *server, ControlOrigin origin, const Message *msg, const char *sender_name);
+cJSON          *control_chat_json(ControlServer *server, ControlOrigin origin, const Chat *chat);
 /* The visible chat a JID belongs to, or NULL. */
 const Chat     *control_visible_chat(ControlServer *server, const char *jid);
 /* A message by id, answering not_found itself unless its chat is visible. */

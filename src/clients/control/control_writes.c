@@ -4,6 +4,7 @@
  * tawk. Every outcome goes to the automation log. */
 #include "control_server_state.h"
 #include "engines/ai_disclaimer.h"
+#include "engines/chat_agent_rules.h"
 #include "utilities/clock_util.h"
 #include "utilities/str_util.h"
 
@@ -182,6 +183,13 @@ void control_write(ControlServer *s, ControlSession *session, ControlPending *p)
         control_pending_dispose(p);
         return;
     }
+    ChatAgentRule rule = automation_manager_chat_rule(s->deps.automation, p->chat_jid);
+    if (p->chat_jid[0] && !chat_agent_rules_writable(rule)) {
+        record(s, p, AUTOMATION_OUTCOME_REFUSED);
+        control_fail(s, p->conn, p->request_id, "not_allowed", "The user lets agents read this chat and not write in it (its contact card, Agents here)");
+        control_pending_dispose(p);
+        return;
+    }
     int retry = 0;
     char key[128];
     allowance_key(p, key, sizeof(key));
@@ -201,7 +209,7 @@ void control_write(ControlServer *s, ControlSession *session, ControlPending *p)
         return;
     } else if (v == AUTOMATION_VERDICT_ASK && control_owner_reply(s, session, p)) {
         finish(s, p, AUTOMATION_OUTCOME_DONE);             /* an answer to you in the owner's chat reaches nobody else */
-    } else if (v == AUTOMATION_VERDICT_ASK && (p->new_chat || !control_session_allows(session, p->op, key))) {
+    } else if (v == AUTOMATION_VERDICT_ASK && (p->new_chat || chat_agent_rules_always_asks(rule) || !control_session_allows(session, p->op, key))) {
         ask(s, p);                                         /* a first message to someone is asked about whatever was allowed before */
         return;
     } else if (v == AUTOMATION_VERDICT_ASK) {
@@ -298,6 +306,11 @@ void control_op_approve(ControlServer *s, ControlSession *session, const Control
                      "The first message to someone is the user's to approve in tawk; this one waits for the user");
         return;
     }
+    if (chat_agent_rules_always_asks(automation_manager_chat_rule(s->deps.automation, p->chat_jid))) {
+        control_fail(s, session->conn, req->id, "not_allowed",
+                     "The user answers every request about this chat themselves (its contact card, Agents here); this one waits for the user");
+        return;
+    }
     int retry = 0;
     SelfApprovalVerdict v = automation_manager_self_approve(s->deps.automation, p->op, control_visible_chat(s, p->chat_jid),
                                                             control_codec_string(req->args, "admin_token"), clock_now_ms(), &retry);
@@ -338,7 +351,8 @@ static void settle(ControlServer *s, int at, ApprovalAnswer *answer) {
         ControlSession *session = control_session_of(s, p->conn);
         char key[128];
         allowance_key(p, key, sizeof(key));
-        if (answer->remember && session && p->kind != WRITE_KIND_DESTRUCTIVE) control_session_allow(session, p->op, key);
+        if (answer->remember && session && p->kind != WRITE_KIND_DESTRUCTIVE &&
+            !chat_agent_rules_always_asks(automation_manager_chat_rule(s->deps.automation, p->chat_jid))) control_session_allow(session, p->op, key);
         carry_out(s, p, AUTOMATION_OUTCOME_APPROVED);
     } else {
         record(s, p, AUTOMATION_OUTCOME_DECLINED);

@@ -51,7 +51,7 @@ static cJSON *do_set_chat(ControlServer *s, const ControlPending *p, ControlFail
     c = current(s, p->chat_jid);
     if (!c) { str_copy(f->why, sizeof(f->why), "The chat is gone"); return NULL; }
     cJSON *r = cJSON_CreateObject();
-    if (automation_manager_chat_allowed(s->deps.automation, c)) cJSON_AddItemToObject(r, "chat", control_codec_chat(c));
+    if (automation_manager_chat_allowed(s->deps.automation, c)) cJSON_AddItemToObject(r, "chat", control_chat_json(s, p->origin, c));
     return r;
 }
 

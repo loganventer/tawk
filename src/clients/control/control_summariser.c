@@ -199,7 +199,7 @@ static void send_wanted(ControlServer *s, int conn, const Message *msg, const Ch
     cJSON *c = cJSON_AddObjectToObject(evt, "chat");
     cJSON_AddStringToObject(c, "jid", chat->jid);
     cJSON_AddStringToObject(c, "name", chat->name);
-    cJSON_AddItemToObject(evt, "message", control_codec_message(msg, sender));
+    cJSON_AddItemToObject(evt, "message", control_message_json(s, CONTROL_ORIGIN_MCP, msg, sender));
     cJSON_AddNumberToObject(evt, "max_chars", SUMMARY_MAX_CHARS);
     control_tag_account(s, evt);
     control_reply(s, conn, control_codec_event("summary_wanted", evt));

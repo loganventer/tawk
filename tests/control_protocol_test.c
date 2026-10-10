@@ -1358,6 +1358,62 @@ static void test_tldr(void) {
     clear_outbox();
 }
 
+static int said(const char *id, const char *needle) {
+    for (int i = outbox_count - 1; i >= 0; i--) {
+        char want[96];
+        snprintf(want, sizeof(want), "\"id\":\"%s\"", id);
+        if (strstr(outbox[i], want) && !strstr(outbox[i], "\"evt\"")) return strstr(outbox[i], needle) != NULL;
+    }
+    return 0;
+}
+
+/* A rule of its own for one chat, and codes hidden from what a model reads. */
+static void test_agent_rules(void) {
+    for (int c = 1; c < next_conn; c++) inbox[inbox_count++] = (ControlInbound){ CONTROL_INBOUND_CLOSED, c, NULL };
+    tick();
+    while (approval_queue_at(queue, 0)) answer_first(0, NULL, 0);
+    int agent = open_client("mcp", "send");
+    int shell = open_client("cli", "send");
+    add_message("C1", WORK, "Your verification code is 482913", 0, 1790003000);
+
+    say(agent, "{\"id\":\"a1\",\"op\":\"read_messages\",\"args\":{\"chat\":\"" WORK "\"}}");
+    CHECK(said("a1", "Your verification code is [code]") && !said("a1", "482913"), "an agent for a model reads a one-time code as [code]");
+    say(shell, "{\"id\":\"s1\",\"op\":\"read_messages\",\"args\":{\"chat\":\"" WORK "\"}}");
+    CHECK(said("s1", "482913"), "your own shell command reads the text as it is");
+
+    automation_manager_set_chat_rule(automation, WORK, CHAT_AGENT_NO_SEND);
+    say(agent, "{\"id\":\"a2\",\"op\":\"send_message\",\"args\":{\"chat\":\"" WORK "\",\"text\":\"hello\"}}");
+    cJSON *r = reply("a2");
+    CHECK(r && !strcmp(error_code(r), "not_allowed") && approval_queue_at(queue, 0) == NULL, "a read-only chat takes no send, and you are not even asked");
+    cJSON_Delete(r);
+    say(agent, "{\"id\":\"a3\",\"op\":\"read_messages\",\"args\":{\"chat\":\"" WORK "\"}}");
+    CHECK(said("a3", "verification"), "but it can still be read");
+
+    automation_manager_set_chat_rule(automation, MOM, CHAT_AGENT_ALWAYS_ASK);
+    say(agent, "{\"id\":\"a4\",\"op\":\"send_message\",\"args\":{\"chat\":\"" MOM "\",\"text\":\"one\"}}");
+    answer_first(1, NULL, 1);                               /* allowed, "for this session" */
+    say(agent, "{\"id\":\"a5\",\"op\":\"send_message\",\"args\":{\"chat\":\"" MOM "\",\"text\":\"two\"}}");
+    CHECK(approval_queue_at(queue, 0) != NULL, "in an always-ask chat the next send is asked about again, whatever was allowed for the session");
+    answer_first(0, NULL, 0);
+
+    automation_manager_set_chat_rule(automation, MOMMY, CHAT_AGENT_HIDDEN);
+    say(agent, "{\"id\":\"a6\",\"op\":\"list_chats\",\"args\":{}}");
+    CHECK(said("a6", "\"Mom\"") && !said("a6", "Mommy"), "a hidden chat is not listed");
+    say(agent, "{\"id\":\"a7\",\"op\":\"read_messages\",\"args\":{\"chat\":\"" MOMMY "\"}}");
+    r = reply("a7");
+    CHECK(r && !strcmp(error_code(r), "not_found"), "and naming it reads the same as naming a chat that is not there");
+    cJSON_Delete(r);
+    say(shell, "{\"id\":\"s2\",\"op\":\"read_messages\",\"args\":{\"chat\":\"" MOMMY "\"}}");
+    r = reply("s2");
+    CHECK(r && !strcmp(error_code(r), "not_found"), "for every client, your own commands included");
+    cJSON_Delete(r);
+
+    automation_manager_set_chat_rule(automation, WORK, CHAT_AGENT_FOLLOW);
+    automation_manager_set_chat_rule(automation, MOM, CHAT_AGENT_FOLLOW);
+    automation_manager_set_chat_rule(automation, MOMMY, CHAT_AGENT_FOLLOW);
+    clear_outbox();
+}
+
 /* A message of yours in your own chat, as it arrives from your phone: quoting `quoted` when given, forwarded when asked. */
 static void from_phone(const char *id, const char *text, const char *quoted, int forwarded) {
     Event e;
@@ -1553,11 +1609,11 @@ int main(void) {
     mm = messaging_manager_create(&deps);
     SchedulingManagerDeps sched_deps = { scheduled };
     SchedulingManager *scheduling = scheduling_manager_create(&sched_deps);
-    AutomationManagerDeps automation_deps = { log, settings_manager_current(settings_mgr), &admin_tokens };
+    IChatPrefsStore *chat_prefs = sqlite_chat_prefs_store_create(db);
+    AutomationManagerDeps automation_deps = { log, settings_manager_current(settings_mgr), &admin_tokens, sqlite_chat_prefs_store_agents(chat_prefs) };
     automation = automation_manager_create(&automation_deps);
     queue = approval_queue_create();
     ITranscriptStore *transcript_store = sqlite_transcript_store_create(db, ACCOUNT_ID_FIRST);
-    IChatPrefsStore *chat_prefs = sqlite_chat_prefs_store_create(db);
     TranscriptManagerDeps transcript_deps = { transcript_store, chat_prefs, sqlite_chat_prefs_store_transcripts(chat_prefs),
                                               settings_manager_current(settings_mgr) };
     transcripts = transcript_manager_create(&transcript_deps);
@@ -1591,6 +1647,7 @@ int main(void) {
     test_disclaimer();
     test_admin_answers_its_own();
     test_someone_with_no_chat_yet();
+    test_agent_rules();
     test_owner_chat();                              /* before the rate is used up */
     test_rate();
     test_tldr();

@@ -3,7 +3,7 @@
 # Run `make help` for every target and option.
 
 APP        ?= tawk
-VERSION    ?= 0.15.0
+VERSION    ?= 0.16.0
 # The commit this build comes from, so `tawk --update` can tell whether it is current.
 COMMIT     ?= $(shell git rev-parse HEAD 2>/dev/null)
 
@@ -258,6 +258,7 @@ TESTS := $(BUILD)/tests/pty_idle_action_test $(BUILD)/tests/ncurses_mouse_queue_
          $(BUILD)/tests/transcript_test \
          $(BUILD)/tests/summary_test \
          $(BUILD)/tests/owner_chat_test \
+         $(BUILD)/tests/agent_rules_test \
          $(BUILD)/tests/composer_words_test \
          $(BUILD)/tests/status_answer_test $(BUILD)/tests/message_search_test \
          $(BUILD)/tests/control_transport_test $(BUILD)/tests/control_protocol_test $(BUILD)/tests/status_photo_viewer_test \
@@ -342,6 +343,10 @@ $(BUILD)/tests/summary_test: $(BUILD)/tests/summary_test.o $(filter-out $(BUILD)
 	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
 
 $(BUILD)/tests/owner_chat_test: $(BUILD)/tests/owner_chat_test.o $(filter-out $(BUILD)/src/main.o,$(OBJ)) $(LINK_WM)
+	$(call step,LD,$@)
+	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
+
+$(BUILD)/tests/agent_rules_test: $(BUILD)/tests/agent_rules_test.o $(filter-out $(BUILD)/src/main.o,$(OBJ)) $(LINK_WM)
 	$(call step,LD,$@)
 	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
 
