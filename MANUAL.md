@@ -21,6 +21,7 @@ The screenshots in this manual were taken from tawk running on a demo account wi
 - [Search](#search)
 - [Voice notes](#voice-notes)
 - [TL;DR mode](#tldr-mode)
+- [The owner's chat](#the-owners-chat)
 - [Sending files](#sending-files)
 - [The photo viewer](#the-photo-viewer)
 - [Notifications](#notifications)
@@ -649,6 +650,33 @@ A message that has no summary yet shows in full, as it always did, and changes t
 - With several connected and none chosen, tawk asks you on WhatsApp. It sends a numbered list of the agents to your own "message yourself" chat, on the number the TL;DR chat is on, and you answer there with the number. tawk confirms in the same chat, and that agent is your default agent from then on. Messages wait meanwhile. The question is asked once, and again after ten minutes if summaries are still waiting and nobody is chosen. This is the only message tawk sends by itself, and it reaches nobody but you.
 
 A summary is removed with its message, and when the message is edited. Switching TL;DR off for a chat hides its summaries and keeps them. A summary is a model's reading of the message: unfold it when the details matter.
+
+## The owner's chat
+
+You can talk to your agent from WhatsApp on your phone, and answer its requests there, when you are away from the terminal. tawk has to be running, with an agent connected.
+
+**Switching it on.** In tawk, open your own "message yourself" chat (the chat with your own number), open its [contact card](#contact-details) and press Enter on **This is my chat with the agent**. The row shows only on that chat. With several numbers, the one in view is the one named; naming another moves it. It is off until you do this, and an agent cannot do it for you.
+
+**Talking to the agent.** Type in that chat on your phone. What you type reaches the agent as your own words, the same as if you had typed it in the agent's own window, and it answers in the chat, from your number, by itself. The agent needs tawk-mcp 0.11.0 or later and its channel on; with none connected, tawk says so in the chat.
+
+Only text you type counts as your words. A forwarded message, a message that quotes another, a voice note, a picture or a file there is passed on like any other message: something to read, never something to obey. What you write in any other chat, groups included, is never an instruction.
+
+**Answering requests.** A send to anyone else still waits for your answer. After 20 seconds unanswered in tawk, it is also put to you in the owner's chat as a card: who asks, what for, in which chat and from which number, and the exact words.
+
+| You do | What happens |
+|---|---|
+| Reply to the card with `y`, `yes`, `ok` or `ja`, or react to it with 👍 | It is sent, and tawk says "allowed" |
+| Reply to the card with `n`, `no` or `nee`, or react with 👎 | It is declined, and nothing is sent |
+| Reply to the card with other words | Those words replace the text. Nothing is sent yet: a new card reads them back, and that one is answered the same way |
+| Answer in tawk first | The card's request is gone; answering the card afterwards sends nothing, and tawk says so |
+
+The reply has to be a reply to the card (hold the card, choose Reply), so that one `y` can never allow something else. A request still expires when its time runs out.
+
+**What it never does.** Deletes, blocks, changes to settings or your profile, and a first message to someone new are never put to you there and cannot be allowed from WhatsApp; they wait in tawk. An agent asked for one of these from the phone says that it needs the terminal.
+
+**Who can use it.** tawk tells your messages from the agent's by remembering what it sent: both carry your number. It does not check which of your devices wrote a message, so anyone holding your unlocked phone, or at another device linked to that number, can instruct the agent within these limits. See [SECURITY.md](SECURITY.md).
+
+The settings are under Settings, Automation: how many answers an hour the agent may send there by itself (60), whether requests are put to you there at all, and how long they wait in tawk first (20 seconds; 0 asks on WhatsApp at once).
 
 ## Sending files
 

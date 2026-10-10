@@ -181,6 +181,10 @@ What other programs reaching tawk through its control socket may do: tawk-mcp an
 | `transcribe_model` | `large-v3-turbo` | The Whisper model an agent's transcriber (tawk-mcp) uses for voice notes: `tiny`, `base`, `small`, `medium`, `large-v3-turbo` or `large-v3`. A list to choose from in the settings panel |
 | `transcribe_languages` | `en` | The languages voice notes are spoken in, as codes separated by commas, or `auto` for any. Set from Settings, Chats, Voice note languages as a list of switches. Each voice note is written once, in whichever of them is spoken; a chat's own languages (its contact card) come first |
 | `transcribe_auto` | `off` | Every voice note other people send is transcribed as it arrives. Off, only the ones an agent asks for |
+| `owner_chat` | (empty) | The account, by its id, whose "message yourself" chat is your chat with the agent (see [The owner's chat](MANUAL.md#the-owners-chat)). Set from that chat's contact card. Empty is off. An agent cannot change it |
+| `owner_replies_per_hour` | `60` | How many answers an agent may send you in the owner's chat by itself in an hour (1 to 600); past this they wait for you like any send |
+| `owner_approvals` | `on` | A send that waits for your answer in tawk is also put to you in the owner's chat, to allow or decline from your phone |
+| `owner_card_wait` | `20` | Seconds a request waits in tawk before it is put to you on WhatsApp (0 to 600); 0 asks there at once |
 | `default_agent` | (empty) | Your default agent, by its label without the process id: the agent tawk turns to by itself, which writes TL;DR summaries. Set with **d** in the Agents list or by answering tawk's question on WhatsApp. Empty uses the only agent connected, or asks when there are several |
 | `self_approvals_per_hour` | `20` | With `access = admin`: requests a program may answer itself in an hour (1 to 240); past this they wait for you |
 

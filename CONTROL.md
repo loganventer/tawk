@@ -138,7 +138,7 @@ Result:
   "access": "read",
   "account": {"jid": "27830000000@s.whatsapp.net", "name": "Logan"},
   "connected": true,
-  "features": ["transcripts", "summaries"]
+  "features": ["transcripts", "summaries", "owner_chat"]
 }
 ```
 
@@ -188,6 +188,14 @@ tawk asks with an event, sent to one client only whether or not it subscribed:
 - `{"evt":"summary_wanted","chat":{"jid","name"},"message":message,"max_chars":400}` for a text message in the chat, yours or someone else's (every one while `tldr_from_chars` is 0, else those at least that many characters long), in a chat in TL;DR mode that the client may see. It is sent when the message arrives, for the chat's long messages of the last `tldr_back_days` days when its TL;DR is switched on or it is first shown, and for an older one when you look at it in tawk; once for each message while tawk runs, four at once and then one every second and a half.
 
 Which client that is: the one you made your default agent in the Agents list while it is connected; else the only client connected with origin `mcp` that named `summaries` and is not paused; else, with several such and none chosen, nobody until you choose. A client that did not name the feature is never asked and does not count. A `summary_wanted` that is not answered with `set_summary` within 90 seconds goes to be asked for again. A client that lets two in a row go unanswered is not asked for five minutes, in case it was only busy, and is then tried again; any answer clears that. tawk then asks you in the "message yourself" chat of the account the chat is in, and the number you answer with chooses. The choice is kept in `default_agent` under `[automation]`, as the client's `label` with any ", pid N" taken out, so a client that wants to be recognised again keeps its label the same.
+
+### The owner's chat
+
+You can name the "message yourself" chat of one of your numbers as your chat with the agent, on that chat's contact card. A tawk that has the feature names `owner_chat` in the `features` of its hello, and a client that takes what you write there names `owner_chat` in the `features` of its own.
+
+- `{"evt":"owner_message","chat":{"jid","name"},"message":message}` is sent to one client, whether or not it subscribed, for each text message you type in that chat. It is the one event whose text is yours and not someone else's. A message there that is forwarded, quotes another, or is not text is not sent this way; it reaches subscribers as an ordinary `message`. Which client hears it: your default agent when it named the feature, else the client with origin `mcp` that named it and has the highest `version`. With none connected, tawk says so in the chat.
+- `send_message` into that chat from a client with origin `mcp` is carried out without asking, up to `owner_replies_per_hour`, and logged as done. Past the limit it is asked about like any send. tawk remembers the id of every message a client puts there, so none of them comes back as an `owner_message`.
+- A request waiting for your answer (`{"evt":"approval","state":"waiting"}`) is also put to you in that chat as a message, after `owner_card_wait` seconds, when it is a send to a chat that exists and agents may see. A reply quoting that message with `y` or `n`, or a thumb on it, answers the request exactly as an answer in tawk does: the client gets its result, or `declined`. Other words replace the text first, as editing in tawk does, and the result then carries `"edited":true`. Destructive and managing operations and first messages to someone new are never put there.
 
 ### Writing
 

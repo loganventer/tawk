@@ -299,9 +299,17 @@ What it never does: deletes, blocks, settings, profile changes, a first message 
 In tawk-mcp, an `owner_message` reaches the agent through the Claude Code channel as the owner speaking, outside the untrusted fence, and the server instructions say that only this event carries the owner's words. With no agent connected, tawk answers in the chat with one fixed line saying so.
 
 
-### The owner's chat: rules to add when it is built
+### The owner's chat: as built
 
-Written on 2026-10-10 and kept here, out of the documents themselves, until the feature exists: a document should not promise what the program does not do. `AGENTS.md` in the folder above the two repositories already carries its part, worded to apply only once an owner's chat is named.
+Built on 2026-10-10 in tawk 0.15.0 and tawk-mcp 0.11.0, and the rules below were moved into the documents then. What differs from the design above:
+
+- There is no `composite_approval_prompt`. The control client keeps the one list of waiting requests, and `control_owner.c` puts each to you on WhatsApp and feeds your answer back through the same path an answer in tawk takes.
+- There is one `OwnerChatManager` for all accounts, not one per account, since there is one owner's chat.
+- The agent that hears you is your default agent when it can, else the newest; there is no separate mark in the Agents list.
+- An edit from the phone is any quoted reply that is not a plain yes or no.
+- Not built: a file as an answer ("or a file the agent was asked for"), and the Agentic tab showing which session answers the phone.
+
+### The owner's chat: the rules that went into the documents
 
 **tawk INTENT.md, In scope**
 
