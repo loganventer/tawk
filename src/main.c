@@ -453,7 +453,9 @@ int main(int argc, char **argv) {
      * and its managers. The clients start with the primary one in view. */
     BackendGatewayOptions gateway_options = { s, backend, sidecar_dir, state_dir, opt.debug };
     IGatewayFactory *gateways = backend_gateway_factory_create(&gateway_options);
-    AccountRuntimeParams runtime_params = { db, s, notifier, exporter, gateways };
+    AccountRuntimeParams runtime_params = { db, s, notifier, exporter, gateways, chat_prefs,
+                                            sqlite_chat_prefs_store_transcripts(chat_prefs),
+                                            sqlite_chat_prefs_store_summaries(chat_prefs) };
     AccountHost *host = account_host_create(&runtime_params, account_store);
     IAccountDirectory *directory = host ? account_host_directory(host) : NULL;
     const AccountServices *active = directory ? directory->find(directory, account_roster_manager_primary(roster)) : NULL;
@@ -476,7 +478,7 @@ int main(int argc, char **argv) {
     ControlServerDeps control_deps = { control_transport, approval_queue_prompt(approvals), active->messaging, active->profiles,
                                        active->scheduling, active->feed, automation, settings_mgr, active->accounts,
                                        active->statuses, active->calls, active->backend_name, control_path,
-                                       directory, roster };
+                                       directory, roster, active->transcripts, active->summaries };
     ControlServer *control = control_server_create(&control_deps);
     ICamera *camera = ffmpeg_camera_create();
     MediaManagerDeps media_deps = { opener, voice_player, recorder, camera, audio, s };
@@ -497,6 +499,7 @@ int main(int argc, char **argv) {
         .restart_requested = &s_restart, .feed = active->feed, .scheduling = active->scheduling,
         .automation = automation, .approvals = approvals, .frame_hook = control ? control_server_frame_hook(control) : NULL,
         .directory = directory, .roster = roster, .active_account = active->id,
+        .transcripts = active->transcripts, .summaries = active->summaries,
     };
     TuiApp *tui = tui_app_create(&tdeps);
     int exit_code = tui ? tui_app_run(tui) : 1;

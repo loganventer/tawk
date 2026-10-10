@@ -96,6 +96,10 @@ Some preferences are set per chat: mutes, pins, archiving, the notification tone
 | `share_typing` | `true` | Show "typing…" (or recording audio) to the other person while you type or record |
 | `appear_online` | `true` | Show as online while tawk is in use; needed to see others typing and online |
 | `show_online` | `true` | Show "online" or "last seen" under the name of the open chat, for people who share it with you. Needs `appear_online` |
+| `show_transcripts` | `true` | Show the words of a voice note under it when it has been transcribed. A chat can say otherwise on its contact card (always or never) |
+| `transcript_lines` | `6` | Lines of a transcript shown in the conversation, 1 to 40. The message menu's "Show transcript" shows the rest |
+| `tldr_min_chars` | `300` | In a chat with TL;DR switched on (on its contact card), a message at least this many characters long shows as a summary. 100 to 5000 |
+| `tldr_back_days` | `30` | How many days back a TL;DR chat's older long messages are summarised by themselves, newest first. 0 to 365; 0 summarises only what you look at |
 | `reopen_last_chat` | `true` | When tawk starts, open the chat that was open when it last quit. Skipped when that chat was deleted or is in Locked chats |
 | `last_chat` | empty | The chat open when tawk last ran; kept up to date as you open chats and not shown in the settings panel |
 | `recent_emoji` | `👍 ❤️ 😂 😮 😢 🙏` | Space-separated, most recent first; kept up to date by the emoji picker (up to 24) and not shown in the settings panel |
@@ -178,6 +182,7 @@ What other programs reaching tawk through its control socket may do: tawk-mcp an
 | `transcribe_model` | `large-v3-turbo` | The Whisper model an agent's transcriber (tawk-mcp) uses for voice notes: `tiny`, `base`, `small`, `medium`, `large-v3-turbo` or `large-v3`. A list to choose from in the settings panel |
 | `transcribe_languages` | `auto` | The languages voice notes are written out in, as codes separated by commas (`af,en`), or `auto`. Each one gets its own transcription |
 | `transcribe_auto` | `off` | Every voice note other people send is transcribed as it arrives. Off, only the ones an agent asks for |
+| `default_agent` | (empty) | Your default agent, by its label without the process id: the agent tawk turns to by itself, which writes TL;DR summaries. Set with **d** in the Agents list or by answering tawk's question on WhatsApp. Empty uses the only agent connected, or asks when there are several |
 | `self_approvals_per_hour` | `20` | With `access = admin`: requests a program may answer itself in an hour (1 to 240); past this they wait for you |
 
 None of these can be changed over the socket, nor can settings that run a program, folders, the backend or the log level.

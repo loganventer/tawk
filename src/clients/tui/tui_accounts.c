@@ -424,6 +424,8 @@ void tui_app_take_services(TuiApp *app, const AccountServices *sv) {
     app->deps.statuses = sv->statuses;
     app->deps.feed = sv->feed;
     app->deps.scheduling = sv->scheduling;
+    app->deps.transcripts = sv->transcripts;
+    app->deps.summaries = sv->summaries;
     app->deps.backend_name = sv->backend_name;
     app->deps.active_account = sv->id;
 }
@@ -569,6 +571,8 @@ static const char *label_of(TuiApp *app, AccountId id, Account *scratch) {
 void tui_app_refresh_contact_prefs(TuiApp *app) {
     ContactPanel *panel = &app->contact;
     AccountRosterManager *roster = app->deps.roster;
+    tui_app_refresh_summary_prefs(app);                     /* last of the card's settings, so it is added first */
+    tui_app_refresh_transcript_prefs(app);                  /* then these, so the rows below end up above them */
     if (!panel->open || !roster) return;
     ChatPrefs prefs;
     account_roster_manager_chat_prefs(roster, panel->jid, &prefs);

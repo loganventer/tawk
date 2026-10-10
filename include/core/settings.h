@@ -35,6 +35,10 @@ typedef struct Settings {
     int  share_typing;          /* tell others when you are typing */
     int  appear_online;         /* show as online while tawk is in use */
     int  show_online;           /* show "online" or "last seen" under the name of the open chat */
+    int  show_transcripts;      /* show a voice note's transcript under it, unless the chat says otherwise */
+    int  transcript_lines;      /* lines of a transcript shown in the conversation before "more" */
+    int  tldr_min_chars;        /* a message at least this long is summarised in a chat in TL;DR mode */
+    int  tldr_back_days;        /* how far back a TL;DR chat's older messages are summarised without being looked at; 0: not at all */
     char recent_emoji[256];
     int  status_keep_days;      /* how long statuses stay viewable here (WhatsApp shows them for one) */     /* space-separated, most recent first (kept by the picker) */
 
@@ -99,6 +103,7 @@ typedef struct Settings {
     char transcribe_model[24];     /* the Whisper model an agent's transcriber uses for voice notes */
     char transcribe_languages[64]; /* the languages it writes them in: codes separated by commas, or auto */
     int  transcribe_auto;          /* voice notes other people send are transcribed as they arrive */
+    char default_agent[64];           /* your default agent, by its label: the one tawk turns to by itself (it writes TL;DR summaries); empty: none chosen */
 
     /* Advanced */
     char backend[16];           /* whatsmeow (in-process) or baileys (node sidecar) */

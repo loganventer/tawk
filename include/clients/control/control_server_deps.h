@@ -14,6 +14,8 @@
 #include "managers/settings_manager.h"
 #include "managers/status_feed_manager.h"
 #include "managers/status_manager.h"
+#include "managers/summary_manager.h"
+#include "managers/transcript_manager.h"
 
 /* Everything the control client uses, injected by the composition root. */
 typedef struct ControlServerDeps {
@@ -35,6 +37,8 @@ typedef struct ControlServerDeps {
      * without them there is the one account, as there always was. */
     IAccountDirectory  *directory;
     AccountRosterManager *roster;
+    TranscriptManager  *transcripts;      /* voice note transcripts; NULL when this tawk keeps none */
+    SummaryManager     *summaries;        /* TL;DR summaries; NULL when this tawk keeps none */
 } ControlServerDeps;
 
 #endif

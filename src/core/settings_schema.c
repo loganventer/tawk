@@ -37,6 +37,10 @@ static const SettingField FIELDS[] = {
     B(SETTING_CATEGORY_CHATS, "share_typing", "Share typing", "Show \"typing\u2026\" to the other person while you type", share_typing),
     B(SETTING_CATEGORY_CHATS, "appear_online", "Appear online", "Show as online while tawk is in use (needed to see others typing)", appear_online),
     B(SETTING_CATEGORY_CHATS, "show_online", "Show online status", "Show \"online\" or \"last seen\" under the name of the open chat, for people who share it with you (needs Appear online)", show_online),
+    B(SETTING_CATEGORY_CHATS, "show_transcripts", "Voice note transcripts", "Show the words of a voice note under it when it has been transcribed; a chat can say otherwise on its contact card", show_transcripts),
+    I(SETTING_CATEGORY_CHATS, "transcript_lines", "Transcript lines", "Lines of a transcript shown in the conversation; the message menu shows the rest", transcript_lines, 1, 40, 1, 0),
+    I(SETTING_CATEGORY_CHATS, "tldr_min_chars", "TL;DR from (characters)", "In a chat with TL;DR switched on (its contact card), a message at least this long shows as a summary", tldr_min_chars, 100, 5000, 50, 0),
+    I(SETTING_CATEGORY_CHATS, "tldr_back_days", "TL;DR back (days)", "How many days back a TL;DR chat's older long messages are summarised by themselves, newest first; 0 summarises only what you look at", tldr_back_days, 0, 365, 1, 0),
     B(SETTING_CATEGORY_CHATS, "reopen_last_chat", "Reopen last chat", "Open the chat you had open when tawk last quit", reopen_last_chat),
     B(SETTING_CATEGORY_CHATS, "merge_accounts", "Merge the same contact across my numbers", "Someone who writes to several of your accounts shows as one chat; a contact can be set apart on its contact card", merge_accounts),
     S(SETTING_CATEGORY_CHATS, "last_chat", "Last chat", "Kept up to date as you open chats", last_chat, 0),
@@ -102,6 +106,8 @@ static const SettingField FIELDS[] = {
       SETTING_KIND_CHOICE, offsetof(Settings, transcribe_model), sizeof(((Settings *)0)->transcribe_model), 0, 0, 0, "tiny|base|small|medium|large-v3-turbo|large-v3", 0 },
     S(SETTING_CATEGORY_AUTOMATION, "transcribe_languages", "Transcription languages", "Language codes separated by commas, such as af,en, or auto; each one gets its own transcription of a voice note", transcribe_languages, 0),
     B(SETTING_CATEGORY_AUTOMATION, "transcribe_auto", "Transcribe voice notes as they arrive", "An agent's transcriber writes out every voice note other people send, without being asked; off, only the ones an agent asks for", transcribe_auto),
+
+    S(SETTING_CATEGORY_AUTOMATION, "default_agent", "Default agent", "The agent tawk turns to by itself, which writes TL;DR summaries: chosen in the Agents list (d) or by answering tawk's question on WhatsApp; empty uses the only one connected, or asks", default_agent, 0),
 
     { SETTING_CATEGORY_ADVANCED, "backend", "WhatsApp backend", "whatsmeow runs in-process; baileys runs a Node.js sidecar",
       SETTING_KIND_CHOICE, offsetof(Settings, backend), sizeof(((Settings *)0)->backend), 0, 0, 0, "whatsmeow|baileys", 1 },

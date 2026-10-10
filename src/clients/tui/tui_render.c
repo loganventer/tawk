@@ -177,6 +177,9 @@ void tui_render_frame(TuiApp *app, int64_t now) {
             .activity_phase = (int)(now / 300),
             .formatter = &app->formatter,
             .statuses = &app->status_source,
+            .transcripts = tui_app_transcripts_for(app, chat),
+            .transcript_lines = s->transcript_lines,
+            .summaries = tui_app_summaries_for(app, chat),
         };
         ScheduledMessage *scheduled = NULL;
         int n_scheduled = 0;

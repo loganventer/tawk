@@ -12,6 +12,8 @@
 #include "resource_access/sqlite_receipt_store.h"
 #include "resource_access/sqlite_scheduled_message_store.h"
 #include "resource_access/sqlite_status_store.h"
+#include "resource_access/sqlite_summary_store.h"
+#include "resource_access/sqlite_transcript_store.h"
 #include "utilities/event_queue.h"
 #include "utilities/log.h"
 #include "utilities/path_util.h"
@@ -39,6 +41,8 @@ struct AccountRuntime {
     IProfileStore          *profile_store;
     IStatusStore           *status_store;
     IScheduledMessageStore *scheduled_store;
+    ITranscriptStore       *transcript_store;
+    ISummaryStore          *summary_store;
 
     /* Backend */
     EventQueue      *events;
@@ -77,6 +81,8 @@ AccountRuntime *account_runtime_create(const AccountRuntimeParams *p, const Acco
     rt->profile_store = sqlite_profile_store_create(p->db, id);
     rt->status_store = sqlite_status_store_create(p->db, id);
     rt->scheduled_store = sqlite_scheduled_message_store_create(p->db, id);
+    rt->transcript_store = sqlite_transcript_store_create(p->db, id);
+    rt->summary_store = sqlite_summary_store_create(p->db, id);
 
     rt->events = event_queue_create(EVENT_QUEUE_SIZE);
     GatewayParts parts;
@@ -88,7 +94,7 @@ AccountRuntime *account_runtime_create(const AccountRuntimeParams *p, const Acco
     IStatusPublisher *publisher = parts.publisher;
     IStatusLiker *liker = parts.liker;
     if (!rt->messages || !rt->chats || !rt->contacts || !rt->aliases || !rt->reactions || !rt->receipts || !rt->profile_store ||
-        !rt->status_store || !rt->scheduled_store || !rt->gateway) {
+        !rt->status_store || !rt->scheduled_store || !rt->transcript_store || !rt->summary_store || !rt->gateway) {
         LOG_ERROR("account %d could not be started", id);
         account_runtime_destroy(rt);
         return NULL;
@@ -105,6 +111,10 @@ AccountRuntime *account_runtime_create(const AccountRuntimeParams *p, const Acco
     rt->services.feed = status_feed_manager_create(&feed_deps);
     SchedulingManagerDeps scheduling_deps = { rt->scheduled_store };
     rt->services.scheduling = scheduling_manager_create(&scheduling_deps);
+    TranscriptManagerDeps transcript_deps = { rt->transcript_store, p->chat_prefs, p->transcript_prefs, s };
+    rt->services.transcripts = transcript_manager_create(&transcript_deps);
+    SummaryManagerDeps summary_deps = { rt->summary_store, p->chat_prefs, p->summary_prefs, s, rt->messages };
+    rt->services.summaries = summary_manager_create(&summary_deps);
 
     rt->observers = composite_event_observer_create();
     composite_event_observer_add(rt->observers, profile_manager_observer(rt->services.profiles));
@@ -136,6 +146,8 @@ void account_runtime_destroy(AccountRuntime *rt) {
     if (rt->observers) rt->observers->destroy(rt->observers);
     if (rt->services.feed) status_feed_manager_destroy(rt->services.feed);
     if (rt->services.scheduling) scheduling_manager_destroy(rt->services.scheduling);
+    if (rt->services.transcripts) transcript_manager_destroy(rt->services.transcripts);
+    if (rt->services.summaries) summary_manager_destroy(rt->services.summaries);
     if (rt->services.statuses) status_manager_destroy(rt->services.statuses);
     if (rt->services.accounts) account_manager_destroy(rt->services.accounts);
     /* Closing the queue first unblocks a backend that is waiting on
@@ -148,6 +160,8 @@ void account_runtime_destroy(AccountRuntime *rt) {
     if (rt->profile_store) rt->profile_store->destroy(rt->profile_store);
     if (rt->status_store) rt->status_store->destroy(rt->status_store);
     if (rt->scheduled_store) rt->scheduled_store->destroy(rt->scheduled_store);
+    if (rt->transcript_store) rt->transcript_store->destroy(rt->transcript_store);
+    if (rt->summary_store) rt->summary_store->destroy(rt->summary_store);
     if (rt->aliases) rt->aliases->destroy(rt->aliases);
     if (rt->contacts) rt->contacts->destroy(rt->contacts);
     if (rt->chats) rt->chats->destroy(rt->chats);

@@ -68,6 +68,10 @@ Calls only flow downwards. Managers never call each other; the client coordinate
 
 Each type has its own header (`include/<layer>/<type>.h`) with its implementation in `src/<layer>/<type>.c`.
 
+Voice note transcripts follow the same split. `TranscriptManager` (one per account, in `AccountRuntime`) keeps what a transcriber hands over and answers what to show; it transcribes nothing. The rules are engines: `transcript_validator` (what may be kept, and making the text safe), `transcript_choice` (which language shows), `transcript_display_policy` (the setting and a chat's own choice) and `transcription_policy` (whether a chat is transcribed at all). The control client's `control_ops_transcripts.c` takes `set_transcript` and `get_transcript`, loading the message and its chat through the messaging manager and handing both to the transcript manager, since managers never call each other. Transcripts are removed with their message by triggers in the database, so the messaging manager needs to know nothing about them.
+
+TL;DR is built the same way, one step further, because the words come from a model tawk does not have. `SummaryManager` (one per account) keeps which chats are in TL;DR mode, the summaries handed over, and a short list of long messages waiting for one. The rules are engines: `summary_policy` (which messages are summarised), `summary_validator` (what may be kept), `summariser_choice` (which connected agent writes them: the chosen one, else the only one, else ask) and `agent_question` (the numbered question, reading the number answered, and the part of an agent's label that stays the same when it reconnects). The control client does the rest in `control_summariser.c`: each tick it hands waiting messages to the agent `summariser_choice` names as a `summary_wanted` event, and when the verdict is to ask, it sends the question to your own chat through the messaging manager and reads your answer from the same stream of live messages it already follows. `control_ops_summaries.c` takes `set_summary` and `get_summary`. Choosing the default agent in the Agents list travels as an `AutomationCommand`, like pausing one.
+
 ## Component map
 
 ```mermaid
@@ -143,6 +147,10 @@ flowchart TD
 | `IProfileStore` | `sqlite_profile_store` (contact and group details, profile picture paths and the block list, in the `profiles` table) |
 | `IStatusStore` | `sqlite_status_store` (statuses received or posted, in the `statuses` table until they expire; authors and their updates are read for a time window, `since` to `until`, so the same calls serve the recent statuses and the archive) |
 | `IScheduledMessageStore` | `sqlite_scheduled_message_store` (messages to send later, in the `scheduled_messages` table until they are sent or cancelled: waiting ones for a chat or all, the ones due by a given time, and moving a chat's to another JID) |
+| `ITranscriptStore` | `sqlite_transcript_store` (the words of voice notes handed over by a transcriber, in the `transcripts` table: one per message and language, bound to an account; `save`, `find` and `remove`) |
+| `IChatTranscriptPrefs` | Handed out by `sqlite_chat_prefs_store` (`sqlite_chat_prefs_store_transcripts`) and owned by it: `set_show` and `set_transcribe_off` for one chat. They are read with the rest of `ChatPrefs` through `IChatPrefsStore`, which is not widened for them |
+| `ISummaryStore` | `sqlite_summary_store` (TL;DR summaries an agent hands over, in the `summaries` table: one per message, bound to an account; `save`, `find` and `remove`) |
+| `IChatSummaryPrefs` | Handed out by `sqlite_chat_prefs_store` (`sqlite_chat_prefs_store_summaries`) and owned by it: `set_tldr` for one chat |
 | `IChatExporter` | `text_chat_exporter` (a chat in WhatsApp's own export format, optionally with copies of its media) |
 | `IEventObserver` | `profile_manager_observer`, `call_manager_observer`, `account_manager_observer`, `status_manager_observer`, `status_feed_manager_observer`, and `composite_event_observer`, which hands each event to all of them |
 | `IEmojiCatalog` | `tsv_emoji_catalog` (reads `emoji.tsv`: glyph, group, name and CLDR keywords per line) |
@@ -261,6 +269,8 @@ The TUI is split into widgets that each draw one part of the screen and turn key
 | `command_suggestions` | `/command` suggestions above the input |
 | `emoji_suggestions` | The strip of emoji matching a `(word` shortcode above the input; scrolls sideways and takes clicks |
 | `typing_indicator` | The "typing" or "recording audio" bubble with animated dots on the last row of the conversation |
+| `transcript_view` | The transcript of one voice note as the conversation shows it: its words as plain text in grey italics, wrapped and cut to `transcript_lines`. `message_view` gives it rows inside the voice note's own bubble, under the play line. It gets the transcript through a `TranscriptSource` (one function and a `ctx`, like `PortraitSource`) and never calls the transcript manager itself; `tui_transcripts.c` implements the source and carries out the contact card's two rows, Alt+T and `/transcripts` |
+| `summary_view` | The TL;DR of one long message: the line that folds it (`▸ TL;DR` over the summary, `▾ TL;DR · original` over the full text) and the summary's rows. `message_view` keeps which messages are unfolded and swaps the text rows for the summary rows; it gets summaries through a `SummarySource`. `tui_summaries.c` implements the source, puts a long message with no summary on the waiting list as it is looked at, and carries out the contact card's TL;DR row and the fold |
 | `chat_subtitle` | The dim line under the open chat's name: "online" or "last seen" for one person when known and switched on, else the about text or member count |
 | `message_info_panel` | Who received, read and played a message you sent, and when, from the receipts handed in at each draw |
 | `message_menu` | Right-click menu of `message_action` entries for a message; the same widget shows the delete choice and the save or open offer for unknown files |
@@ -402,7 +412,7 @@ tawk holds several WhatsApp accounts in one process. The rule that keeps this si
 | `SqliteAccountScope` | `resource_access` | Binds a store to one account when it is created. Every per-account table has `account_id` in its key, and the store's statements name it once, so no store method takes an account |
 | `IAccountStore`, `IChatPrefsStore` | `contracts` | The roster of accounts, and what is kept per contact whichever account it is on |
 | `AccountRosterManager` | `managers` | Adding, renaming, removing and ordering accounts, the primary account, agent access and self-approval chats |
-| `AccountRuntime` | `composition` | Everything one account needs to run: its gateway, event queue, bound stores and its seven managers |
+| `AccountRuntime` | `composition` | Everything one account needs to run: its gateway, event queue, bound stores and its managers (messaging, account, profile, status, status feed, scheduling, call and transcript) |
 | `IGatewayFactory`, `GatewayParts` | `contracts` | Makes one account's connection to WhatsApp. `BackendGatewayFactory` in `composition` is the real one and the only code that chooses between whatsmeow and the Node.js bridge; a test hands the runtime a factory whose gateways play WhatsApp |
 | `AccountHost` | `composition` | Owns the runtimes and starts and stops them. It implements `IAccountDirectory` |
 | `IAccountDirectory`, `AccountServices` | `clients` | What a client is given: the accounts that are running, and the managers of each |
@@ -476,6 +486,9 @@ The schema is versioned with `PRAGMA user_version`. `sqlite_database.c` creates 
 | 14 | `quoted_status` on messages: the reply answers a status, and `quoted_id` is the status's id |
 | 15 | The `automation_log` table: `id`, `at`, `origin`, `client`, `op`, `chat_jid`, `summary` and `outcome`, with an index on `at` |
 | 16 | No new columns: indexes on `reactions(sender_jid)` and `message_receipts(jid)`, used when a contact's address changes |
+| 17 | Several accounts: the `accounts` table, `account_id` in the key of every per-account table, and `chat_prefs` (`jid`, `send_account`, `merge`) for what you chose per contact |
+| 18 | The `transcripts` table: `account_id`, `message_id`, `language`, `text`, `model`, `source` and `created_at`, keyed by the first three, with the triggers `transcripts_message_removed` and `transcripts_message_deleted` on `messages` that remove a message's transcripts when its row is deleted or marked deleted for everyone; and `show_transcripts` and `transcribe_off` on `chat_prefs` |
+| 19 | The `summaries` table: `account_id`, `message_id`, `text`, `model`, `source` and `created_at`, keyed by the first two, with the triggers `summaries_message_removed` and `summaries_message_changed` on `messages` that remove a message's summary when its row is deleted, when it is marked deleted for everyone, and when its text changes; and `tldr` on `chat_prefs` |
 
 Before the first migration of an upgrade runs, the database is copied to `tawk.db.pre-v<N>` (once, 0600), so a failed upgrade can be rolled back by hand. The schema after version 16 is below. The tables declare no foreign keys; the relationships are by value (a message's `chat_jid` matches a chat's `jid`, a reaction's or receipt's `message_id` matches a message's `id`, a status's `author_jid` matches a contact's `jid`, a profile's `jid` matches a chat's or contact's `jid`, and an alias maps a LID to the phone number JID used everywhere else). `messages_fts` is an external-content FTS5 table over `messages.text`, keyed by the message `rowid` and kept in step by the triggers `messages_fts_ai`, `messages_fts_ad` and `messages_fts_au`.
 

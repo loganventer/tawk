@@ -77,6 +77,8 @@ int control_serve_account(ControlServer *s, AccountId id) {
     s->deps.accounts = sv->accounts;
     s->deps.statuses = sv->statuses;
     s->deps.calls = sv->calls;
+    s->deps.transcripts = sv->transcripts;
+    s->deps.summaries = sv->summaries;
     s->deps.backend_name = sv->backend_name;
     s->account = id;
     log_context_set(control_account_count(s) > 1 ? account.label : NULL);

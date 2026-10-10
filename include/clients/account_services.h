@@ -9,6 +9,8 @@
 #include "managers/scheduling_manager.h"
 #include "managers/status_feed_manager.h"
 #include "managers/status_manager.h"
+#include "managers/summary_manager.h"
+#include "managers/transcript_manager.h"
 
 /* The managers that work for one account. Managers never call each other,
  * so a client that needs two of them, or the same one for several accounts,
@@ -24,6 +26,8 @@ typedef struct AccountServices {
     StatusManager     *statuses;
     StatusFeedManager *feed;
     SchedulingManager *scheduling;
+    TranscriptManager *transcripts;
+    SummaryManager    *summaries;
 } AccountServices;
 
 #endif

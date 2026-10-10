@@ -376,7 +376,8 @@ int main(void) {
     account_roster_manager_add(roster, "work", 1, &work);
 
     IChatExporter *exporter = text_chat_exporter_create();
-    AccountRuntimeParams params = { db, settings_manager_current(settings_mgr), &notifier, exporter, &factory };
+    AccountRuntimeParams params = { db, settings_manager_current(settings_mgr), &notifier, exporter, &factory, prefs,
+                                    sqlite_chat_prefs_store_transcripts(prefs), sqlite_chat_prefs_store_summaries(prefs) };
     AccountHost *host = account_host_create(&params, account_store);
     if (!host) { fprintf(stderr, "FAIL: the accounts could not be started\n"); return 1; }
     directory = account_host_directory(host);

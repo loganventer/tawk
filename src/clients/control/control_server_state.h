@@ -41,6 +41,15 @@ struct ControlServer {
     AccountId           live_accounts[ACCOUNT_MAX];
     uint64_t            live_seqs[ACCOUNT_MAX];
     int                 changed;
+    /* TL;DR: the question out on WhatsApp about which agent writes summaries, and the agents it listed. */
+    int                 summary_asking;
+    AccountId           summary_ask_account;
+    int                 summary_ask_conns[AUTOMATION_STATUS_SESSIONS];
+    int                 summary_ask_count;
+    int64_t             summary_asked_ms;
+    /* Requests for summaries go out a few at once and then one every so often, so a chat's older messages do not flood an agent. */
+    int                 summary_tokens;
+    int64_t             summary_refill_ms;
 };
 
 /* ---- accounts (control_accounts.c) ---- */
@@ -162,6 +171,27 @@ void control_op_app_status(ControlServer *server, ControlSession *session, const
 void control_op_describe(ControlServer *server, ControlSession *session, const ControlRequest *req);
 void control_op_reconnect(ControlServer *server, ControlSession *session, const ControlRequest *req);
 void control_op_decline_call(ControlServer *server, ControlSession *session, const ControlRequest *req);
+/* control_ops_transcripts.c */
+void control_op_set_transcript(ControlServer *server, ControlSession *session, const ControlRequest *req);
+void control_op_get_transcript(ControlServer *server, ControlSession *session, const ControlRequest *req);
+/* Tells one agent about older voice notes that wait for a transcript. */
+void control_transcripts_tick(ControlServer *server);
+/* Adds "transcribe":false to an answer or event about `chat` when its voice notes are not to be transcribed. */
+void control_tag_transcribe(ControlServer *server, cJSON *object, const Chat *chat);
+/* control_ops_summaries.c */
+void control_op_set_summary(ControlServer *server, ControlSession *session, const ControlRequest *req);
+void control_op_get_summary(ControlServer *server, ControlSession *session, const ControlRequest *req);
+/* Adds "tldr":true to an answer about `chat` when it is in TL;DR mode. */
+void control_tag_tldr(ControlServer *server, cJSON *object, const Chat *chat);
+/* control_summariser.c: which agent writes TL;DR summaries, and telling it which messages wait for one. */
+/* Whether `session` is the one you chose. */
+int  control_summariser_is(ControlServer *server, const ControlSession *session);
+/* You chose the agent on `conn` in the Agents tab; choosing it again takes the choice back. */
+void control_summariser_choose(ControlServer *server, int conn);
+/* A message arrived in the account being served: it may be one to summarise, or your answer to tawk's question. */
+void control_summaries_on_message(ControlServer *server, const LiveMessageRef *ref);
+/* Hands waiting messages to the agent that writes summaries, or asks you which agent that is. */
+void control_summaries_tick(ControlServer *server, int64_t now_ms);
 /* control_ops_live.c */
 void control_op_subscribe(ControlServer *server, ControlSession *session, const ControlRequest *req);
 void control_op_unsubscribe(ControlServer *server, ControlSession *session, const ControlRequest *req);

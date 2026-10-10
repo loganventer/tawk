@@ -123,6 +123,11 @@ static void cmd_softlock(TuiApp *app, const char *args) {
     tui_app_toggle_soft_lock(app, messaging_manager_open_jid(app->deps.messaging));
 }
 
+static void cmd_transcripts(TuiApp *app, const char *args) {
+    (void)args;
+    tui_app_step_show_transcripts(app, messaging_manager_open_jid(app->deps.messaging));
+}
+
 static void cmd_paste(TuiApp *app, const char *args) {
     (void)args;
     tui_app_paste_image(app);
@@ -193,6 +198,7 @@ static const SlashCommand COMMANDS[] = {
     { "screensaver", "",                     "start the screensaver now",       cmd_lock },
     { "lock",        "",                     "start the screensaver now",       cmd_lock },
     { "softlock",    "",                     "blur this chat, or show it again", cmd_softlock },
+    { "transcripts", "",                     "show voice note transcripts in this chat: as the setting says, always, never", cmd_transcripts },
     { "info",        "",                     "contact or group details",        cmd_info },
     { "profile",     "",                     "your name, about and photo",      cmd_profile },
     { "status",      "",                     "post a status",                   cmd_status },

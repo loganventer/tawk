@@ -27,6 +27,7 @@ typedef struct ControlSession {
     int64_t       since;                   /* epoch seconds */
     int           requests;
     int           paused;                  /* you paused it in the Agents tab */
+    int           summariser;              /* you chose it to write TL;DR summaries */
     ControlAllowance allowances[CONTROL_SESSION_ALLOWANCES];
     int           allowance_count;
 } ControlSession;

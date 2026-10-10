@@ -8,6 +8,8 @@
 #include "clients/tui/media_sources.h"
 #include "clients/tui/message_formatter.h"
 #include "clients/tui/status_source.h"
+#include "clients/tui/summary_source.h"
+#include "clients/tui/transcript_source.h"
 
 /* Everything the view needs besides the messages. thumbs may be NULL when
  * previews are turned off. */
@@ -41,6 +43,11 @@ typedef struct MessageViewContext {
     const AccountId    *owners;
     const AccountBadge *badges;
     int                 badge_count;
+    /* The transcripts of voice notes, shown under them; NULL shows none (the setting, or this chat's own choice). */
+    const TranscriptSource *transcripts;
+    int                 transcript_lines;   /* lines of one shown before it is cut */
+    /* The TL;DR summaries of long messages, shown in their place until unfolded; NULL in a chat that is not in TL;DR mode. */
+    const SummarySource *summaries;
 } MessageViewContext;
 
 #endif

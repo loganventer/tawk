@@ -322,7 +322,14 @@ static int is_long_text(const Message *m) {
 
 static void offer_unknown_file(TuiApp *app, int index);
 
+/* Enter or a click on a message. One with a TL;DR summary unfolds to its
+ * original, or folds back; anything else opens. */
 void tui_app_activate_message(TuiApp *app, int index) {
+    if (tui_app_toggle_summary(app, index)) return;
+    tui_app_open_message(app, index);
+}
+
+void tui_app_open_message(TuiApp *app, int index) {
     const Message *m = message_at(app, index);
     if (!m) return;
     if (is_long_text(m)) {
@@ -430,6 +437,8 @@ void tui_app_open_message_menu(TuiApp *app, int index, int y, int x) {
                                       (m->type != MESSAGE_TYPE_TEXT || (m->text && m->text[0]));
     enabled[MESSAGE_ACTION_OPEN] = !m->deleted && message_type_is_openable(m->type);
     enabled[MESSAGE_ACTION_READ] = !m->deleted && is_long_text(m);
+    enabled[MESSAGE_ACTION_TLDR] = message_view_summarised(&app->message_view, index);
+    enabled[MESSAGE_ACTION_TRANSCRIPT] = tui_app_has_transcript(app, m, tui_app_message_account(app, index));
     enabled[MESSAGE_ACTION_RETRY] = m->from_me && m->status == MESSAGE_STATUS_FAILED;
     enabled[MESSAGE_ACTION_SAVE] = !m->deleted && message_type_is_openable(m->type);
     enabled[MESSAGE_ACTION_GOTO_QUOTE] = !m->deleted && m->quoted_id[0];
@@ -504,7 +513,9 @@ void tui_app_apply_message_action(TuiApp *app) {
             break;
         case MESSAGE_ACTION_FORWARD: tui_app_open_forward(app, index); break;
         case MESSAGE_ACTION_OPEN:
-        case MESSAGE_ACTION_READ:  app->unknown_offer = 1; tui_app_activate_message(app, index); break;
+        case MESSAGE_ACTION_READ:  app->unknown_offer = 1; tui_app_open_message(app, index); break;
+        case MESSAGE_ACTION_TLDR:  tui_app_toggle_summary(app, index); break;
+        case MESSAGE_ACTION_TRANSCRIPT: tui_app_show_transcript(app, m, tui_app_message_account(app, index)); break;
         case MESSAGE_ACTION_RETRY:
             if (messaging_manager_retry_message(app->deps.messaging, m->id) == 0) tui_app_toast(app, "Retrying\xE2\x80\xA6", 0);
             break;
@@ -1230,6 +1241,9 @@ void tui_app_contact_action(TuiApp *app) {
         case CONTACT_ACTION_SEND_FROM:     tui_app_step_send_from(app, jid); break;
         case CONTACT_ACTION_MERGE:         tui_app_step_merge(app, jid); break;
         case CONTACT_ACTION_AGENT_ANSWERS: tui_app_toggle_agent_answers(app, jid); break;
+        case CONTACT_ACTION_SHOW_TRANSCRIPTS: tui_app_step_show_transcripts(app, jid); break;
+        case CONTACT_ACTION_TRANSCRIBE:    tui_app_toggle_transcribing(app, jid); break;
+        case CONTACT_ACTION_TLDR:          tui_app_toggle_tldr(app, jid); break;
         case CONTACT_ACTION_SEARCH:     app->contact.open = 0; tui_app_open_search(app, ""); break;
         case CONTACT_ACTION_OPTIONS:    app->contact.open = 0; tui_app_open_chat_options(app, jid); break;
         case CONTACT_ACTION_SOFT_LOCK:  tui_app_toggle_soft_lock(app, jid); break;
@@ -1643,6 +1657,8 @@ TuiApp *tui_app_create(const TuiAppDeps *deps) {
     app->portraits = (PortraitSource){ app, portrait_of };
     app->formatter = (MessageFormatter){ app, format_through_manager, preview_through_manager };
     app->status_source = (StatusSource){ app, status_through_feed };
+    tui_app_init_transcripts(app);
+    tui_app_init_summaries(app);
     app->focus = TUI_FOCUS_CHATS;
     app->last_auth = AUTH_STATE_STARTING;
     app->caret_visible = -1;

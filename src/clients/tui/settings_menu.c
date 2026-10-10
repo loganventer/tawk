@@ -29,6 +29,10 @@ static const MenuNode CHATS[] = {
     FIELD(SETTING_CATEGORY_CHATS, "share_typing"),
     FIELD(SETTING_CATEGORY_CHATS, "appear_online"),
     FIELD(SETTING_CATEGORY_CHATS, "show_online"),
+    FIELD(SETTING_CATEGORY_CHATS, "show_transcripts"),
+    FIELD(SETTING_CATEGORY_CHATS, "transcript_lines"),
+    FIELD(SETTING_CATEGORY_CHATS, "tldr_min_chars"),
+    FIELD(SETTING_CATEGORY_CHATS, "tldr_back_days"),
     FIELD(SETTING_CATEGORY_CHATS, "message_margin"),
     FIELD(SETTING_CATEGORY_CHATS, "status_keep_days"),
 };

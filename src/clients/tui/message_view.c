@@ -70,8 +70,82 @@ static const QuotedStatus *quoted_of(const MessageView *v, int index) {
     return index >= 0 && index < v->quoted_count && v->quoted[index].found ? &v->quoted[index] : NULL;
 }
 
+static void forget_transcripts(MessageView *v) {
+    for (int i = 0; i < v->transcript_count; i++) transcript_view_dispose(&v->transcripts[i]);
+    free(v->transcripts);
+    v->transcripts = NULL;
+    v->transcript_count = 0;
+}
+
+/* The transcript of each voice note, looked up once per layout. */
+static void load_transcripts(MessageView *v, const Message *msgs, int count, const MessageViewContext *ctx) {
+    forget_transcripts(v);
+    int any = 0;
+    for (int i = 0; i < count && !any; i++) any = msgs[i].type == MESSAGE_TYPE_AUDIO && !msgs[i].deleted;
+    if (!any || !ctx->transcripts) return;
+    v->transcripts = calloc((size_t)count, sizeof(TranscriptView));
+    if (!v->transcripts) return;
+    v->transcript_count = count;
+    for (int i = 0; i < count; i++) {
+        if (msgs[i].type != MESSAGE_TYPE_AUDIO || msgs[i].deleted) continue;
+        transcript_view_load(&v->transcripts[i], ctx->transcripts, &msgs[i], ctx->owners ? ctx->owners[i] : ACCOUNT_ID_NONE);
+    }
+}
+
+static void forget_summaries(MessageView *v) {
+    for (int i = 0; i < v->summary_count; i++) summary_view_dispose(&v->summaries[i]);
+    free(v->summaries);
+    v->summaries = NULL;
+    v->summary_count = 0;
+}
+
+/* The TL;DR summary of each text message, looked up once per layout. */
+static void load_summaries(MessageView *v, const Message *msgs, int count, const MessageViewContext *ctx) {
+    forget_summaries(v);
+    if (!ctx->summaries || count <= 0) return;
+    v->summaries = calloc((size_t)count, sizeof(SummaryView));
+    if (!v->summaries) return;
+    v->summary_count = count;
+    for (int i = 0; i < count; i++) {
+        if (msgs[i].type != MESSAGE_TYPE_TEXT || msgs[i].deleted || !msgs[i].text) continue;
+        summary_view_load(&v->summaries[i], ctx->summaries, &msgs[i], ctx->owners ? ctx->owners[i] : ACCOUNT_ID_NONE);
+    }
+}
+
+static const SummaryView *summary_of(const MessageView *v, int index) {
+    return index >= 0 && index < v->summary_count && v->summaries[index].found ? &v->summaries[index] : NULL;
+}
+
+int message_view_summarised(const MessageView *v, int index) { return summary_of(v, index) != NULL; }
+
+int message_view_unfolded(const MessageView *v, const char *id) {
+    for (int i = 0; i < v->unfolded_count; i++) if (strcmp(v->unfolded[i], id) == 0) return 1;
+    return 0;
+}
+
+void message_view_toggle_summary(MessageView *v, const char *id) {
+    if (!id || !id[0]) return;
+    for (int i = 0; i < v->unfolded_count; i++) {
+        if (strcmp(v->unfolded[i], id) != 0) continue;
+        memmove(v->unfolded[i], v->unfolded[i + 1], (size_t)(v->unfolded_count - i - 1) * sizeof(v->unfolded[0]));
+        v->unfolded_count--;
+        return;
+    }
+    if (v->unfolded_count == MESSAGE_VIEW_MAX_UNFOLDED) {         /* full: the one unfolded longest ago folds again */
+        memmove(v->unfolded[0], v->unfolded[1], (size_t)(MESSAGE_VIEW_MAX_UNFOLDED - 1) * sizeof(v->unfolded[0]));
+        v->unfolded_count--;
+    }
+    snprintf(v->unfolded[v->unfolded_count++], sizeof(v->unfolded[0]), "%s", id);
+}
+
+static const TranscriptView *transcript_of(const MessageView *v, int index) {
+    return index >= 0 && index < v->transcript_count && v->transcripts[index].found ? &v->transcripts[index] : NULL;
+}
+
 void message_view_dispose(MessageView *v) {
     forget_quoted(v);
+    forget_transcripts(v);
+    forget_summaries(v);
     forget_styled(v);
     free(v->rows);
     v->rows = NULL;
@@ -312,6 +386,8 @@ static void layout(MessageView *v, UiRect r, const Message *msgs, int count, con
     v->row_count = 0;
     forget_styled(v);
     load_quoted(v, msgs, count, ctx);
+    load_transcripts(v, msgs, count, ctx);
+    load_summaries(v, msgs, count, ctx);
     v->styled = count > 0 ? calloc((size_t)count, sizeof(StyledText)) : NULL;
     if (v->styled) {
         v->styled_count = count;
@@ -349,6 +425,17 @@ static void layout(MessageView *v, UiRect r, const Message *msgs, int count, con
         TextLine *lines = NULL;
         const char *body = shown_text(v, i, m);
         int n_lines = (body && body[0]) ? utf8_wrap(body, max_inner, &lines) : 0;
+        /* TL;DR: a long message shows its summary in place of its text, under a line that unfolds it again. */
+        const SummaryView *brief = summary_of(v, i);
+        int folded = brief && !message_view_unfolded(v, m->id);
+        TextLine *brief_lines = NULL;
+        int n_brief = 0;
+        if (folded) {
+            free(lines);
+            lines = NULL;
+            n_lines = 0;
+            n_brief = utf8_wrap(brief->summary.text, max_inner, &brief_lines);
+        }
         if (m->deleted) media[0] = '\0';
         int media_cols = media[0] ? utf8_columns(media) : 0;
 
@@ -381,6 +468,17 @@ static void layout(MessageView *v, UiRect r, const Message *msgs, int count, con
         }
         if (status_pic && status_pic->cols > inner) inner = status_pic->cols;
         if (status_widest > inner) inner = status_widest;
+        if (brief && utf8_columns(summary_view_head(folded)) > inner) inner = utf8_columns(summary_view_head(folded));
+        for (int k = 0; k < n_brief; k++) if (brief_lines[k].columns > inner) inner = brief_lines[k].columns;
+        /* A voice note's transcript: a few lines of its words, in the same bubble under the play line. */
+        const TranscriptView *spoken = transcript_of(v, i);
+        TextLine *spoken_lines = NULL;
+        int spoken_cut = 0;
+        int n_spoken = spoken ? transcript_view_wrap(spoken, max_inner, ctx->transcript_lines, &spoken_lines, &spoken_cut) : 0;
+        for (int k = 0; k < n_spoken; k++) {
+            int cols = spoken_lines[k].columns + (spoken_cut && k == n_spoken - 1 ? 2 : 0);
+            if (cols > inner) inner = cols;
+        }
         if (show_sender && utf8_columns(m->sender_name) > inner) inner = utf8_columns(m->sender_name);
         int forwarded = m->forwarded && !m->deleted;
         if (forwarded && utf8_columns(FORWARDED_LABEL) > inner) inner = utf8_columns(FORWARDED_LABEL);
@@ -403,6 +501,11 @@ static void layout(MessageView *v, UiRect r, const Message *msgs, int count, con
         free(status_text);
         for (int t = 0; thumb && t < thumb->rows; t++) push_row(v, (MessageRow){ i, MESSAGE_ROW_THUMB, x, width, 0, 0, 0, t });
         if (media[0]) push_row(v, (MessageRow){ i, MESSAGE_ROW_MEDIA, x, width, 0, 0, 0, 0 });
+        for (int k = 0; k < n_spoken; k++) {
+            int cut = spoken_cut && k == n_spoken - 1;
+            push_row(v, (MessageRow){ i, MESSAGE_ROW_TRANSCRIPT, x, width, spoken_lines[k].offset, spoken_lines[k].length, cut, 0 });
+        }
+        free(spoken_lines);
         if (has_link) {
             if (m->link->title[0]) push_row(v, (MessageRow){ i, MESSAGE_ROW_LINK_TITLE, x, width, 0, 0, 0, 0 });
             for (int k = 0; k < n_desc; k++) {
@@ -411,6 +514,11 @@ static void layout(MessageView *v, UiRect r, const Message *msgs, int count, con
             push_row(v, (MessageRow){ i, MESSAGE_ROW_LINK_SITE, x, width, 0, 0, 0, 0 });
         }
         free(desc_lines);
+        if (brief) push_row(v, (MessageRow){ i, MESSAGE_ROW_TLDR_HEAD, x, width, 0, 0, 0, folded });
+        for (int k = 0; k < n_brief; k++) {
+            push_row(v, (MessageRow){ i, MESSAGE_ROW_TLDR, x, width, brief_lines[k].offset, brief_lines[k].length, 0, 0 });
+        }
+        free(brief_lines);
         for (int k = 0; k < n_lines; k++) {
             int last = k == n_lines - 1;
             push_row(v, (MessageRow){ i, MESSAGE_ROW_TEXT, x, width, lines[k].offset, lines[k].length, last && inline_ticks, 0 });
@@ -568,6 +676,16 @@ static void draw_row(const MessageView *v, const MessageRow *row, int y, UiRect 
                 text_veil_draw(y, x + 1, t ? t->cols : room, veil);
                 break;
             }
+            case MESSAGE_ROW_TLDR: {
+                const SummaryView *brief = summary_of(v, row->message);
+                if (brief) summary_view_draw_veiled(brief, y, x + 1, room, row->offset, row->length, veil);
+                break;
+            }
+            case MESSAGE_ROW_TRANSCRIPT: {
+                const TranscriptView *spoken = transcript_of(v, row->message);
+                if (spoken) transcript_view_draw_veiled(spoken, y, x + 1, room, row->offset, row->length, veil);
+                break;
+            }
             default:                 text_veil_draw(y, x + 1, room * 2 / 3, veil); break;
         }
         return;
@@ -617,6 +735,19 @@ static void draw_row(const MessageView *v, const MessageRow *row, int y, UiRect 
             media_label(m, ctx->playing_path, ctx->playing_ms, buf, sizeof(buf));
             tui_text(y, x + 1, room, buf, bubble | ATTR_BOLD);
             break;
+        case MESSAGE_ROW_TLDR_HEAD:
+            summary_view_draw_head(row->sub, y, x + 1, room, bubble);
+            break;
+        case MESSAGE_ROW_TLDR: {
+            const SummaryView *brief = summary_of(v, row->message);
+            if (brief) summary_view_draw_line(brief, y, x + 1, room, row->offset, row->length, bubble);
+            break;
+        }
+        case MESSAGE_ROW_TRANSCRIPT: {
+            const TranscriptView *spoken = transcript_of(v, row->message);
+            if (spoken) transcript_view_draw_line(spoken, y, x + 1, room, row->offset, row->length, row->meta_inline, bubble);
+            break;
+        }
         case MESSAGE_ROW_LINK_TITLE:
             if (m->link) tui_text(y, x + 1, room, m->link->title, bubble | ATTR_BOLD);
             break;

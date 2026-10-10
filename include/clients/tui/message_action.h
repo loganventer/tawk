@@ -9,6 +9,8 @@ typedef enum MessageAction {
     MESSAGE_ACTION_FORWARD,              /* send a copy to other chats */
     MESSAGE_ACTION_OPEN,
     MESSAGE_ACTION_READ,
+    MESSAGE_ACTION_TRANSCRIPT,           /* a voice note's transcript, in full */
+    MESSAGE_ACTION_TLDR,                 /* unfold a summarised message to its original, or fold it back */
     MESSAGE_ACTION_RETRY,
     MESSAGE_ACTION_SAVE,                 /* copy the file to the Downloads folder */
     MESSAGE_ACTION_GOTO_QUOTE,           /* scroll to the message a reply quotes */

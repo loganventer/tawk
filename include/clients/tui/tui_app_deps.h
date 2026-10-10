@@ -27,6 +27,8 @@
 #include "managers/scheduling_manager.h"
 #include "managers/status_feed_manager.h"
 #include "managers/status_manager.h"
+#include "managers/summary_manager.h"
+#include "managers/transcript_manager.h"
 
 /* Everything the terminal client uses, injected by the composition root. */
 typedef struct TuiAppDeps {
@@ -68,6 +70,8 @@ typedef struct TuiAppDeps {
     IAccountDirectory     *directory;
     AccountRosterManager  *roster;
     AccountId              active_account;
+    TranscriptManager     *transcripts;           /* voice note transcripts and your choices about them; may be NULL */
+    SummaryManager        *summaries;             /* TL;DR summaries and which chats are in that mode; may be NULL */
 } TuiAppDeps;
 
 #endif

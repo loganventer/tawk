@@ -16,6 +16,7 @@ typedef struct AutomationSession {
     int           requests;
     int           allowances;      /* "for this session" allowances you gave it */
     int           paused;          /* its writes are refused until you resume it */
+    int           summariser;      /* your default agent: the one that writes TL;DR summaries */
 } AutomationSession;
 
 #endif

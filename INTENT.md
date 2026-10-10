@@ -18,6 +18,7 @@ In scope:
 - Resilience against network drops, network changes (Wi-Fi, Ethernet, a hotspot) and backend crashes.
 - Protecting your data at rest: encrypting the local database with a passphrase, and encrypted backups you can restore.
 - Letting programs of yours reach a running tawk, when you turn it on: [tawk-mcp](https://github.com/loganventer/tawk-mcp) for AI assistants and the `tawk send`, `tail`, `unread` and `status-line` commands, with every write answered by you in the Agentic tab.
+- TL;DR mode for a chat you switch it on for: long messages shown as a summary a connected agent's model writes, with the original always kept and one key away.
 - Linux, macOS, and Windows through WSL or MSYS2.
 
 ## Out of scope
@@ -34,6 +35,8 @@ In scope:
 - The WhatsApp protocol is never implemented in tawk itself. It comes from a maintained library behind `IMessageGateway` (whatsmeow in-process or Baileys in a sidecar), so protocol changes stay in one replaceable place.
 - Backends report what happened; they never decide policy. Reconnect timing, notification rules and storage belong to tawk's managers and engines.
 - Nothing leaves the machine except traffic to WhatsApp. No telemetry, no analytics, no automatic update checks: tawk contacts GitHub only when you run `tawk --update`. Watching for network changes only reads the local interface addresses. Two exceptions are opt-in. With Agent access on, chat text an agent reads goes wherever that agent's model runs, which you choose when you connect it. With link previews turned on, the backend fetches the page of a link you send (https only, never an address on your own network) to make its card.
+- tawk writes no summary and no transcript itself, and has no model. A transcriber and an agent hand them over; tawk keeps them, shows them and removes them with their message.
+- tawk sends a message by itself in one case only: its question about which agent is your default agent, and the line confirming your answer, to your own "message yourself" chat.
 - User files follow XDG and installed files follow the Filesystem Hierarchy Standard. tawk never writes outside those locations.
 - Every executable tawk starts is either a fixed tool (ffmpeg, the audio player, the system opener) run with an argument list, tawk itself when it restarts after switching backend, or a command from the user's own configuration file.
 

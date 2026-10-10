@@ -17,6 +17,7 @@ static const OptionKey KEYS[] = {
     { 0x03C0, 'p', 1 },   /* π pin */
     { 0x00E5, 'a', 1 },   /* å archive */
     { 0x0153, 'q', 1 },   /* œ reply */
+    { 0x2020, 't', 0 },   /* † transcripts in this chat */
 };
 
 int mac_option_letter(int ch, int typing_text) {

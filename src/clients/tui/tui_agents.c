@@ -108,6 +108,7 @@ static void handle(TuiApp *app, AgentsPanelRequest request) {
         case AGENTS_REQUEST_TOO_LONG:   tui_app_toast(app, "Too long to edit here: decline it and write it yourself", 1); break;
         case AGENTS_REQUEST_DISCONNECT: if (am) automation_manager_command(am, AUTOMATION_COMMAND_DISCONNECT, app->agents.chosen_conn); break;
         case AGENTS_REQUEST_REVOKE:     if (am) automation_manager_command(am, AUTOMATION_COMMAND_REVOKE, app->agents.chosen_conn); break;
+        case AGENTS_REQUEST_SUMMARISER: if (am) automation_manager_command(am, AUTOMATION_COMMAND_SUMMARISER, app->agents.chosen_conn); break;
         case AGENTS_REQUEST_PAUSE: {
             const AutomationStatus *st = am ? automation_manager_status(am) : NULL;
             int paused = 0;

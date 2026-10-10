@@ -33,6 +33,10 @@ static const ControlOpEntry OPS[] = {
     { "forward_message",        control_op_forward_message, 0 },
     { "retry_message",          control_op_retry_message, 0 },
     { "download_media",         control_op_download_media, 1 },
+    { "get_transcript",         control_op_get_transcript, 1 },
+    { "set_transcript",         control_op_set_transcript, 0 },
+    { "get_summary",            control_op_get_summary, 1 },
+    { "set_summary",            control_op_set_summary, 0 },
     { "set_chat",               control_op_set_chat, 0 },
     { "set_chat_theme",         control_op_set_chat_theme, 0 },
     { "clear_chat",             control_op_clear_chat, 0 },
@@ -199,6 +203,10 @@ static void hello(ControlServer *s, ControlSession *session, const ControlReques
     cJSON_AddStringToObject(account, "jid", nobody ? "" : messaging_manager_user_jid(mm));
     cJSON_AddStringToObject(account, "name", nobody ? "" : messaging_manager_user_name(mm));
     cJSON_AddBoolToObject(r, "connected", !nobody && messaging_manager_auth_state(mm) == AUTH_STATE_CONNECTED);
+    /* What this tawk can do beyond the first protocol, by name, so a client offers only what will work. */
+    cJSON *features = cJSON_AddArrayToObject(r, "features");
+    if (s->deps.transcripts) cJSON_AddItemToArray(features, cJSON_CreateString("transcripts"));
+    if (s->deps.summaries) cJSON_AddItemToArray(features, cJSON_CreateString("summaries"));
     if (s->deps.directory && s->deps.roster) {              /* this tawk serves each request from the account it names */
         cJSON_AddBoolToObject(r, "multi_account", 1);
         cJSON_AddItemToObject(r, "accounts", control_accounts_json(s));
@@ -326,6 +334,7 @@ static void report_status(ControlServer *s) {
         out->requests = c->requests;
         out->allowances = c->allowance_count;
         out->paused = c->paused;
+        out->summariser = control_summariser_is(s, c);
     }
     for (int i = 0; i < s->pending_count; i++) if (s->pending[i].approval_id) st.waiting++;
     str_copy(st.socket_path, sizeof(st.socket_path), s->deps.socket_path);
@@ -348,6 +357,7 @@ static void obey(ControlServer *s) {
             case AUTOMATION_COMMAND_REVOKE: session->allowance_count = 0; break;
             case AUTOMATION_COMMAND_PAUSE:  session->paused = 1; break;
             case AUTOMATION_COMMAND_RESUME: session->paused = 0; break;
+            case AUTOMATION_COMMAND_SUMMARISER: control_summariser_choose(s, c.conn); break;
         }
         s->changed = 1;
     }
@@ -374,6 +384,8 @@ int control_server_tick(ControlServer *s) {
         int check = now >= s->next_check_ms;
         if (check) s->next_check_ms = now + CHECK_MS;
         control_live_tick(s, check);
+        control_summaries_tick(s, now);
+        control_transcripts_tick(s);
     }
     control_writes_tick(s, now);
     report_status(s);

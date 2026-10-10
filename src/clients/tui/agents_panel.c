@@ -207,6 +207,7 @@ static AgentsPanelRequest agents_key(AgentsPanel *p, const AgentsPanelModel *m, 
         case 'x': return AGENTS_REQUEST_DISCONNECT;
         case 'p': return AGENTS_REQUEST_PAUSE;
         case 'r': return AGENTS_REQUEST_REVOKE;
+        case 'd': return AGENTS_REQUEST_SUMMARISER;
         default:  return AGENTS_REQUEST_NONE;
     }
 }
@@ -449,11 +450,11 @@ static void draw_agents(AgentsPanel *p, const AgentsPanelModel *m, UiRect list, 
         tui_fill((UiRect){ y, list.x, AGENT_ROWS <= list.h ? AGENT_ROWS : 1, list.w }, attr);
         char since[32], line[640], who[64], label[128];
         clock_format_short(a->since, m->settings->use_24h_clock, since, sizeof(since));
-        snprintf(line, sizeof(line), "%s %s %s %-18s since %-8s %4d requests  %d allowed for the session%s",
+        snprintf(line, sizeof(line), "%s %s %s %-18s since %-8s %4d requests  %d allowed for the session%s%s",
                  a->origin == CONTROL_ORIGIN_MCP ? "\xF0\x9F\xA4\x96" : "\xE2\x8C\xA8",
                  column(who, sizeof(who), a->client, 9), column(label, sizeof(label), a->label, 30),
                  a->origin == CONTROL_ORIGIN_MCP ? "acting for a model" : "your shell", since, a->requests, a->allowances,
-                 a->paused ? "  PAUSED" : "");
+                 a->paused ? "  PAUSED" : "", a->summariser ? "  \xE2\x98\x85 DEFAULT (writes TL;DR)" : "");
         tui_text(y, list.x, list.w, line, attr);
         if (y + 1 < list.y + list.h) {
             /* The agent's own words: a claim about what it is doing, not a fact. */
@@ -574,7 +575,7 @@ static const char *keys_for(const AgentsPanel *p) {
     if (p->editing_setting) return " Enter save" DOT "Esc cancel ";
     switch (p->view) {
         case AGENTS_VIEW_QUEUE: return " a approve" DOT "e edit" DOT "s allow for session" DOT "d decline" DOT "Space mark" DOT "Shift+A HIGH" DOT "Esc close ";
-        case AGENTS_VIEW_AGENTS: return " x disconnect" DOT "p pause or resume" DOT "r forget its allowances" DOT "Esc close ";
+        case AGENTS_VIEW_AGENTS: return " x disconnect" DOT "p pause or resume" DOT "r forget its allowances" DOT "d default agent" DOT "Esc close ";
         case AGENTS_VIEW_LOG: return " f filter" DOT "r show reads" DOT "/ search" DOT "Enter more" DOT "Esc close ";
         default: return " Enter change" DOT "\xE2\x86\x90\xE2\x86\x92 step a number" DOT "Esc close ";
     }

@@ -102,6 +102,7 @@ static void send_message(ControlServer *s, const LiveMessageRef *ref) {
         cJSON_AddStringToObject(c, "jid", chat->jid);
         cJSON_AddStringToObject(c, "name", chat->name);
         cJSON_AddItemToObject(evt, "message", control_codec_message(&msg, name));
+        if (msg.type == MESSAGE_TYPE_AUDIO) control_tag_transcribe(s, evt, chat);
         control_tag_account(s, evt);
         control_reply(s, session->conn, control_codec_event("message", evt));
     }
@@ -158,6 +159,7 @@ static void send_activity(ControlServer *s, const LiveMessageRef *ref) {
         if (ref->kind == LIVE_KIND_MEDIA_READY) {
             cJSON_AddStringToObject(evt, "path", media_path);
             cJSON_AddStringToObject(evt, "type", media_type);
+            if (strcmp(media_type, "audio") == 0) control_tag_transcribe(s, evt, chat);
         }
         if (ref->kind == LIVE_KIND_EDIT) {
             Message msg;
@@ -221,7 +223,7 @@ static void push_live(ControlServer *s) {
     uint64_t *cursor = live_cursor(s);
     int n = messaging_manager_live_since(s->deps.messaging, *cursor, refs, LIVE_PER_TICK);
     for (int i = 0; i < n; i++) {
-        if (refs[i].kind == LIVE_KIND_MESSAGE) send_message(s, &refs[i]);
+        if (refs[i].kind == LIVE_KIND_MESSAGE) { control_summaries_on_message(s, &refs[i]); send_message(s, &refs[i]); }
         else if (refs[i].kind == LIVE_KIND_PRESENCE) control_presence_send(s, find_chat(s, refs[i].chat_jid), &refs[i]);
         else send_activity(s, &refs[i]);
         *cursor = refs[i].seq;

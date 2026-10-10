@@ -16,7 +16,7 @@ static int failures = 0;
 
 #define CHECK(cond, what) do { if (!(cond)) { fprintf(stderr, "FAIL: %s\n", what); failures++; } } while (0)
 
-#define LATEST 17
+#define LATEST 19
 
 static int scalar(sqlite3 *db, const char *sql) {
     sqlite3_stmt *st = NULL;
@@ -218,6 +218,17 @@ static void test_first_account(const char *dir) {
     CHECK(scalar(db, "SELECT count(*) FROM accounts") == 1 &&
           scalar(db, "SELECT count(*) FROM accounts WHERE id = 1 AND label = 'main' AND is_primary = 1 AND agent_access = 'follow'") == 1,
           "what was there is the first account, primary, obeying the agent setting as before");
+    /* Version 18: transcripts of voice notes, and a chat's own choices about them. */
+    CHECK(scalar(db, "SELECT count(*) FROM transcripts") == 0, "there is a table for transcripts, empty");
+    CHECK(scalar(db, "SELECT count(*) FROM pragma_table_info('chat_prefs') WHERE name IN ('show_transcripts', 'transcribe_off')") == 2,
+          "and a chat's choices about them have their columns");
+    CHECK(scalar(db, "SELECT count(*) FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'transcripts_message_%'") == 2,
+          "with the triggers that remove a transcript when its message goes");
+    /* Version 19: TL;DR summaries, and a chat's switch for them. */
+    CHECK(scalar(db, "SELECT count(*) FROM summaries") == 0 &&
+          scalar(db, "SELECT count(*) FROM pragma_table_info('chat_prefs') WHERE name = 'tldr'") == 1 &&
+          scalar(db, "SELECT count(*) FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'summaries_message_%'") == 2,
+          "there is a table for TL;DR summaries, a chat's switch for them, and the triggers that keep them honest");
     static const char *const TABLES[] = { "messages", "chats", "contacts", "jid_aliases", "reactions", "message_receipts",
                                           "profiles", "statuses", "scheduled_messages", "automation_log" };
     static const int ROWS[] = { 2, 1, 1, 1, 1, 1, 1, 1, 1, 1 };

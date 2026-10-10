@@ -884,6 +884,10 @@ void tui_input_dispatch(TuiApp *app, int is_key, int ch) {
     }
     if (alt && !is_key && (ch == 'v' || ch == 'V') && !tui_app_show_login(app)) { tui_app_paste_image(app); return; }
     if (alt && !is_key && (ch == 'l' || ch == 'L') && !tui_app_show_login(app)) { tui_app_toggle_soft_lock_here(app); return; }
+    if (alt && !is_key && (ch == 't' || ch == 'T') && !tui_app_show_login(app)) {
+        tui_app_step_show_transcripts(app, messaging_manager_open_jid(app->deps.messaging));
+        return;
+    }
     if (alt && !is_key && (ch == 'a' || ch == 'A') && app->focus != TUI_FOCUS_CHATS && !tui_app_show_login(app)) {
         if (ch == 'A') tui_app_keep_send_account(app);      /* with Shift: for this contact from now on */
         else tui_app_cycle_send_account(app);

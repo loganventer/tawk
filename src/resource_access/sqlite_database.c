@@ -259,9 +259,44 @@ static const Migration MIGRATIONS[] = {
       /* These two keep their own ids, so the account is a plain column. */
       "ALTER TABLE scheduled_messages ADD COLUMN account_id INTEGER NOT NULL DEFAULT 1;"
       "ALTER TABLE automation_log ADD COLUMN account_id INTEGER NOT NULL DEFAULT 1;" },
+    { 18,
+      /* The words of voice notes, written out by a transcriber: one per message and language
+       * ('' when the transcriber did not say which). They go when their message goes, deleted
+       * here or for everyone, which the two triggers see to. */
+      "CREATE TABLE transcripts ("
+      "  account_id INTEGER NOT NULL DEFAULT 1, message_id TEXT NOT NULL, language TEXT NOT NULL DEFAULT '',"
+      "  text TEXT NOT NULL, model TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT '',"
+      "  created_at INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (account_id, message_id, language));"
+      "CREATE TRIGGER transcripts_message_removed AFTER DELETE ON messages BEGIN"
+      "  DELETE FROM transcripts WHERE account_id = old.account_id AND message_id = old.id;"
+      "END;"
+      "CREATE TRIGGER transcripts_message_deleted AFTER UPDATE OF deleted ON messages WHEN new.deleted <> 0 BEGIN"
+      "  DELETE FROM transcripts WHERE account_id = new.account_id AND message_id = new.id;"
+      "END;"
+      /* What you chose about transcripts for a person or group: whether theirs show (0 follows the
+       * setting, 1 always, 2 never), and whether their voice notes are left untranscribed from now on. */
+      "ALTER TABLE chat_prefs ADD COLUMN show_transcripts INTEGER NOT NULL DEFAULT 0;"
+      "ALTER TABLE chat_prefs ADD COLUMN transcribe_off INTEGER NOT NULL DEFAULT 0;" },
+    { 19,
+      /* TL;DR: a long message in a few words, written by an agent's model, one per message. It goes
+       * when its message goes or is deleted for everyone, and when the message's text is edited,
+       * since it then describes words that are no longer there. */
+      "CREATE TABLE summaries ("
+      "  account_id INTEGER NOT NULL DEFAULT 1, message_id TEXT NOT NULL, text TEXT NOT NULL,"
+      "  model TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL DEFAULT 0,"
+      "  PRIMARY KEY (account_id, message_id));"
+      "CREATE TRIGGER summaries_message_removed AFTER DELETE ON messages BEGIN"
+      "  DELETE FROM summaries WHERE account_id = old.account_id AND message_id = old.id;"
+      "END;"
+      "CREATE TRIGGER summaries_message_changed AFTER UPDATE OF text, deleted ON messages"
+      "  WHEN new.deleted <> 0 OR coalesce(new.text, '') <> coalesce(old.text, '') BEGIN"
+      "  DELETE FROM summaries WHERE account_id = new.account_id AND message_id = new.id;"
+      "END;"
+      /* Whether a person or group is in TL;DR mode. */
+      "ALTER TABLE chat_prefs ADD COLUMN tldr INTEGER NOT NULL DEFAULT 0;" },
 };
 
-#define LATEST_VERSION 17
+#define LATEST_VERSION 19
 
 static int user_version(sqlite3 *db) {
     sqlite3_stmt *st = NULL;

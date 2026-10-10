@@ -91,6 +91,8 @@ struct TuiApp {
     StatusFeedDialogs   feed;                 /* looking at statuses */
     MessageFormatter    formatter;            /* formatted message text, from the messaging manager */
     StatusSource        status_source;        /* the statuses replies answer, from the status feed manager */
+    TranscriptSource    transcript_source;    /* the transcripts of voice notes, from the transcript manager */
+    SummarySource       summary_source;       /* the TL;DR summaries of long messages, from the summary manager */
     HeaderHits          header_hits;          /* where the header drew + and your name */
     SplashView          splash;               /* the start-up animation */
     ChatPicker          forward_picker;       /* choosing chats to forward a message to */
@@ -170,6 +172,8 @@ int  tui_app_show_login(TuiApp *app);
 void tui_app_open_chat(TuiApp *app, const char *jid);
 void tui_app_apply_settings(TuiApp *app, const Settings *updated);
 void tui_app_activate_message(TuiApp *app, int index);
+/* Opens a message whatever else Enter would do with it: the reader for long text, the viewer or player for media. */
+void tui_app_open_message(TuiApp *app, int index);
 void tui_app_viewer_action(TuiApp *app, ImageViewerAction action);
 void tui_app_send_composer(TuiApp *app);
 void tui_app_toggle_recording(TuiApp *app);
@@ -331,6 +335,26 @@ void tui_app_refresh_contact_prefs(TuiApp *app);
 void tui_app_step_send_from(TuiApp *app, const char *jid);
 void tui_app_step_merge(TuiApp *app, const char *jid);
 void tui_app_toggle_agent_answers(TuiApp *app, const char *jid);
+/* TL;DR (tui_summaries.c). */
+void tui_app_init_summaries(TuiApp *app);
+/* Where the conversation of `chat` gets summaries, or NULL when it is not in TL;DR mode. */
+const SummarySource *tui_app_summaries_for(TuiApp *app, const Chat *chat);
+/* The contact card's TL;DR row: what it shows, and switching it. */
+void tui_app_refresh_summary_prefs(TuiApp *app);
+void tui_app_toggle_tldr(TuiApp *app, const char *jid);
+/* Unfolds a summarised message to its original, or folds it back; 0 when the message has no summary. */
+int  tui_app_toggle_summary(TuiApp *app, int index);
+/* Voice note transcripts (tui_transcripts.c). */
+void tui_app_init_transcripts(TuiApp *app);
+/* Where the conversation of `chat` gets transcripts, or NULL when they are not shown in it. */
+const TranscriptSource *tui_app_transcripts_for(TuiApp *app, const Chat *chat);
+/* The contact card's two rows about transcripts: what they show, and stepping each. */
+void tui_app_refresh_transcript_prefs(TuiApp *app);
+void tui_app_step_show_transcripts(TuiApp *app, const char *jid);
+void tui_app_toggle_transcribing(TuiApp *app, const char *jid);
+/* Whether a voice note has a transcript, and reading every one of them in full. */
+int  tui_app_has_transcript(TuiApp *app, const Message *message, AccountId owner);
+void tui_app_show_transcript(TuiApp *app, const Message *message, AccountId owner);
 /* The contacts with a sending account of their own. */
 void tui_app_open_send_accounts(TuiApp *app);
 void tui_app_send_accounts_request(TuiApp *app, SendAccountRequest request);

@@ -51,6 +51,8 @@ A notification, sent without a request:
 | `bad_token` | `confirm` was given a token that is unknown, used, expired or from another connection, or `approve` was given the wrong admin token. |
 | `draft_exists` | `draft_message` found a draft already waiting in that chat. |
 | `unsupported` | The backend in use cannot do it (posting a status needs whatsmeow). |
+| `tldr_off` | `set_summary` named a message in a chat that is not in TL;DR mode: you did not switch it on on its contact card, or the chat is soft-locked. |
+| `transcripts_off` | `set_transcript` named a voice note in a chat whose voice notes are not transcribed: you switched that off on its contact card, or the chat is soft-locked. |
 | `not_found` | No visible chat or message matches. Locked and hidden chats are reported as not found. |
 | `ambiguous` | A chat name matches more than one chat. `error.candidates` lists them as `{"jid","name"}`. |
 | `declined` | You declined the request in tawk. |
@@ -130,14 +132,15 @@ Result:
 ```json
 {
   "protocol": 1,
-  "tawk": "0.12.0",
+  "tawk": "0.14.0",
   "access": "read",
   "account": {"jid": "27830000000@s.whatsapp.net", "name": "Logan"},
-  "connected": true
+  "connected": true,
+  "features": ["transcripts", "summaries"]
 }
 ```
 
-`access` is `read`, `send`, `manage` or `admin`.
+`access` is `read`, `send`, `manage` or `admin`. `features` names what this tawk can do beyond the first shape of the protocol, so a client offers only what will work; a tawk from before 0.13.0 sends no such list. `transcripts` means `set_transcript` and `get_transcript` are there (0.13.0), and `summaries` means `set_summary`, `get_summary` and the `summary_wanted` event are (0.14.0).
 
 ### Reading
 
@@ -149,10 +152,38 @@ Reading never marks anything as read, never sends read receipts, and never chang
 | `read_messages` | `chat` (required), `before` (Unix seconds, for older pages), `limit` (1 to 200, default 30) | `{"chat":chat,"messages":[message…],"next_before":ts}`, oldest first; `next_before` is 0 when there is nothing older stored |
 | `search_messages` | `query` (required), `chat`, `limit` (1 to 100, default 20) | `{"messages":[message…]}`, newest first |
 | `unread_summary` | none | `{"total":5,"mentions":1,"chats":[chat…]}` with only the chats that have unread messages |
-| `chat_info` | `chat` (required) | `{"chat":chat,"about":"…","members":[{"jid","name","admin"}]}`; `members` only for groups |
+| `chat_info` | `chat` (required) | `{"chat":chat,"about":"…","members":[{"jid","name","admin"}]}`; `members` only for groups. `"transcribe":false` is added when the chat's voice notes are not to be transcribed, and `"tldr":true` when the chat is in TL;DR mode |
+| `get_summary` | `message_id` (required) | `{"summary":{"text","model","at"}}`, or `{}` when the message has none |
+| `get_transcript` | `message_id` (required) | `{"transcripts":[{"language","text","model","at"}]}`, newest first: what tawk keeps for a voice note, one for each language. Empty when it has none |
 | `presence` | `chat` (required), a one-to-one chat | `{"chat":chat,"state":"online"\|"offline"\|"unknown","last_seen":ts,"watching":true}`. It answers with what tawk knows now and asks WhatsApp to keep telling it about that person, as opening the chat does, so the answer to a first call is usually `unknown` and a call a second later has it. `last_seen` is present only when they share it. `watching` is false while tawk is not shown as online itself, when nothing can be learnt. Origin `mcp` needs `presence_lookup` on, or it is `not_allowed`; a group is `bad_request` |
 | `list_statuses` | `include_archived` (bool) | `{"statuses":[{"id","author","author_name","from_me","type","text","ts","viewed"}]}` |
 | `list_scheduled` | `chat` | `{"scheduled":[{"id","chat","text","due_at"}]}` |
+
+### Transcripts
+
+tawk transcribes nothing. A transcriber hands the words of a voice note over, tawk keeps them beside the message and shows them in the conversation, and they are removed with their message.
+
+| Operation | Arguments | Result |
+| --- | --- | --- |
+| `set_transcript` | `message_id` (required), `text` (required, at most 16 KB), `language` (a short code such as `af`; leave out or `auto` when not known), `model` | `{}`. Replaces the transcript the message already has in that language |
+
+`set_transcript` changes only this computer and sends nothing to WhatsApp, so it is not asked about, needs no more than `read`, and does not count against `writes_per_minute`; each one is written to the automation log. It is answered `bad_request` for anything that is not a voice note or other audio, `not_found` for a message in a chat the client may not see (a locked or soft-locked one included), and `transcripts_off` for a chat whose voice notes are not transcribed. Control characters in the text are replaced, and the text is shown as plain text, never formatted. A client cannot change a chat's transcript choices: they are set on its contact card.
+
+### TL;DR summaries
+
+In a chat you put in TL;DR mode, tawk shows a long message as a short summary. tawk writes none: it asks one agent for each, and keeps what the agent hands back.
+
+| Operation | Arguments | Result |
+| --- | --- | --- |
+| `set_summary` | `message_id` (required), `text` (required, at most 2000 bytes), `model` | `{}`. Replaces the summary the message already has |
+
+`set_summary` changes only this computer and sends nothing to WhatsApp, so it is not asked about, needs no more than `read`, and does not count against `writes_per_minute`; each one is written to the automation log. It is answered `bad_request` for anything that is not a text message, `not_found` for a message in a chat the client may not see, and `tldr_off` for a chat that is not in TL;DR mode. The text is made one plain paragraph, with control characters and line breaks replaced. A client cannot switch a chat's TL;DR mode: that is set on its contact card.
+
+tawk asks with an event, sent to one client only whether or not it subscribed:
+
+- `{"evt":"summary_wanted","chat":{"jid","name"},"message":message,"max_chars":400}` for a text message of at least `tldr_min_chars` characters, from someone else, in a chat in TL;DR mode that the client may see. It is sent when the message arrives, for the chat's long messages of the last `tldr_back_days` days when its TL;DR is switched on or it is first shown, and for an older one when you look at it in tawk; once for each message while tawk runs, four at once and then one every second and a half.
+
+Which client that is: the one you made your default agent in the Agents list while it is connected; else the only client connected with origin `mcp` that is not paused; else, with several and none chosen, nobody until you choose. tawk then asks you in your own "message yourself" chat on WhatsApp, and the number you answer with chooses. The choice is kept in `default_agent` under `[automation]`, as the client's `label` with any ", pid N" taken out, so a client that wants to be recognised again keeps its label the same.
 
 ### Writing
 
@@ -287,6 +318,8 @@ After `subscribe`, tawk sends:
 - `{"evt":"scheduled_sent","chat":{…},"message_id":"<the scheduled message's id>","at":ts}` when a message you scheduled goes out. Origin `mcp` with `push_scheduled` on.
 - `{"evt":"media_ready","chat":{…},"message_id":"…","path":"…","type":"audio","at":ts}` when a message's photo, voice note or file has finished downloading, whoever asked for it. `path` is the file in tawk's media folder and `type` the message's type. Origin `mcp`.
 - `{"evt":"presence","chat":{…},"who":{"jid","name"},"state":"online","last_seen":ts,"at":ts}` when the person in a subscribed one-to-one chat comes online or leaves. `state` is `online` or `offline`; `last_seen` is present only when they share it; there is no `message_id`. It is sent on a change, not on every notice. tawk only knows this for a chat the user has opened since connecting, or one a client asked about with `presence`. Origin `mcp` with `push_presence` on.
+- `{"evt":"transcript_wanted","chat":{"jid","name"},"message_id":"…"}` for an older voice note you looked at in tawk that has no transcript, sent to one client with origin `mcp`, whether or not it subscribed, and once for each voice note while tawk runs. Only while `transcribe_auto` is on, only for someone else's voice note, and only in a chat that is transcribed and shows transcripts. The client transcribes it as it does one that arrives.
+- A `message` event for a voice note, and a `media_ready` event for audio, carry `"transcribe":false` when the chat's voice notes are not to be transcribed, so a transcriber knows before it starts.
 - `{"evt":"chat","chat":chat}` when a subscribed chat's unread count changes.
 - `{"evt":"bye"}` just before tawk quits.
 
@@ -295,8 +328,8 @@ Chats that are locked, hidden or outside `chats` never produce notifications.
 ## Example
 
 ```text
-→ {"id":"1","op":"hello","args":{"client":"tawk","version":"0.12.0","protocol":1,"origin":"cli"}}
-← {"id":"1","ok":true,"result":{"protocol":1,"tawk":"0.12.0","access":"send","account":{"jid":"27830000000@s.whatsapp.net","name":"Logan"},"connected":true}}
+→ {"id":"1","op":"hello","args":{"client":"tawk","version":"0.14.0","protocol":1,"origin":"cli"}}
+← {"id":"1","ok":true,"result":{"protocol":1,"tawk":"0.14.0","access":"send","account":{"jid":"27830000000@s.whatsapp.net","name":"Logan"},"connected":true}}
 → {"id":"2","op":"unread_summary"}
 ← {"id":"2","ok":true,"result":{"total":2,"mentions":0,"chats":[{"jid":"27820000000@s.whatsapp.net","name":"Mom","is_group":false,"unread":2,"unread_mention":false,"muted":false,"pinned":true,"archived":false,"last_ts":1790000000,"preview":"See you at 6"}]}}
 → {"id":"3","op":"send_message","args":{"chat":"Mom","text":"On my way"}}

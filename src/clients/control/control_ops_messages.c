@@ -171,6 +171,7 @@ void control_op_download_media(ControlServer *s, ControlSession *session, const 
             cJSON *c = cJSON_AddObjectToObject(r, "chat");
             cJSON_AddStringToObject(c, "jid", all[i].jid);
             cJSON_AddStringToObject(c, "name", all[i].name);
+            if (msg.type == MESSAGE_TYPE_AUDIO) control_tag_transcribe(s, r, &all[i]);
             break;
         }
         message_dispose(&msg);

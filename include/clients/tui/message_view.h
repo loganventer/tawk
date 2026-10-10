@@ -5,12 +5,15 @@
 #include "clients/tui/message_row.h"
 #include "clients/tui/message_view_context.h"
 #include "clients/tui/quoted_status.h"
+#include "clients/tui/summary_view.h"
+#include "clients/tui/transcript_view.h"
 #include "clients/tui/ui_rect.h"
 #include "core/message.h"
 #include "core/styled_text.h"
 
 #define MESSAGE_VIEW_MAX_SCREEN_ROWS 512
 #define MESSAGE_VIEW_MAX_PLACEMENTS  16
+#define MESSAGE_VIEW_MAX_UNFOLDED    32
 
 /* The conversation pane: bubbles, day separators, media and voice notes. */
 typedef struct MessageView {
@@ -36,6 +39,12 @@ typedef struct MessageView {
     int         styled_count;
     QuotedStatus *quoted;        /* per message: the status it answers (found 0 when none) */
     int         quoted_count;
+    TranscriptView *transcripts; /* per message: the transcript of a voice note (found 0 when none) */
+    int         transcript_count;
+    SummaryView *summaries;      /* per message: its TL;DR summary (found 0 when none) */
+    int         summary_count;
+    char        unfolded[MESSAGE_VIEW_MAX_UNFOLDED][64];   /* ids of summarised messages showing their original */
+    int         unfolded_count;
     int         held;            /* the place below is put back at the next render */
     char        held_top[64];    /* id of the message at the top of the screen */
     int         held_offset;     /* which of its rows is the top row */
@@ -60,6 +69,12 @@ void message_view_scroll(MessageView *view, int delta);
 void message_view_scroll_to_latest(MessageView *view);
 /* Moves the selection by delta messages (selection starts at the newest). */
 void message_view_select(MessageView *view, int count, int delta);
+/* Whether message `index` has a TL;DR summary (shown or unfolded) at the last render. */
+int  message_view_summarised(const MessageView *view, int index);
+/* Whether a summarised message shows its original instead. */
+int  message_view_unfolded(const MessageView *view, const char *message_id);
+/* Unfolds a summarised message to its original, or folds it back to the summary. */
+void message_view_toggle_summary(MessageView *view, const char *message_id);
 /* Message whose bubble is under (y, x), or -1 (a click beside a bubble hits nothing). */
 int  message_view_hit(MessageView *view, int y, int x);
 /* The message whose quote strip is under (y, x), or -1. */

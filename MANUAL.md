@@ -98,6 +98,7 @@ Global:
 | Alt+I | [Contact details](#contact-details) of the selected chat in the list, otherwise of the open chat |
 | Ctrl+L | Start the screensaver |
 | Ctrl+Shift+L or Alt+L | Soft-lock the open or selected chat (blur it), or show it again; see [Soft lock](#soft-lock) |
+| Alt+T | Show voice note transcripts in the open chat: as the setting says, always, never; see [Voice notes](#voice-notes) |
 | PgUp / PgDn | Scroll the conversation (PgUp loads older messages at the top) |
 | F2 | Settings |
 | F3 | Switch between the Chats and [Agentic](#the-agentic-tab) tabs: requests from agents, who is connected, the log and permissions |
@@ -211,6 +212,7 @@ Type a command at the start of the input. Suggestions appear above the input as 
 | `/screensaver` | | Start the screensaver now |
 | `/lock` | | Start the screensaver now |
 | `/softlock` | | Blur this chat, or show it again |
+| `/transcripts` | | Show voice note transcripts in this chat: as the setting says, always or never (the same as Alt+T; see [Voice notes](#voice-notes)) |
 | `/clear` | | Clear the input, the attachment, the reply and this chat's draft |
 | `/settings` | | Open settings |
 | `/quit` | | Quit tawk |
@@ -366,6 +368,17 @@ For a person it shows the picture, name, phone number and about text, and for a 
 | Clear chat… | Asks first, with a flashing warning, then removes every message of the chat from this computer. The chat stays in the list, downloaded files stay in the media folder, and your phone keeps its copy |
 | Delete chat… | Asks first, with a flashing warning, then deletes the chat everywhere (see [Deleting chats and messages](#deleting-chats-and-messages)) |
 
+Above the actions the card lists the chat's own settings. Enter on one steps it to its next choice:
+
+| Setting | Choices |
+|---|---|
+| Send from | With several accounts: which of your numbers sends to this contact (see [Which number a message is sent from](#which-number-a-message-is-sent-from)) |
+| Merge across my numbers | With several accounts: follow the setting, always, never |
+| Agents answer by themselves here | On or off, for the account in view (see [Agents and accounts](#agents-and-accounts)) |
+| Show transcripts | As the setting says, always, never (see [Voice notes](#voice-notes)) |
+| Transcribe voice notes | On or off. Off leaves this chat's voice notes untranscribed from now on and keeps the transcripts it has |
+| TL;DR | On or off. On, this chat's long messages show as a summary that unfolds to the original (see [TL;DR mode](#tldr-mode)) |
+
 Every action that removes or blocks something shows a confirmation with Cancel selected first. An export never replaces an existing file; a second export becomes `tawk chat with NAME (1).txt`. Only the messages stored on this computer are exported.
 
 ## Deleting chats and messages
@@ -436,6 +449,8 @@ Right-click a message, or select it and press Alt+M. The menu lists the actions 
 | ↪ Forward… | Text, photos, videos, voice notes, documents and stickers that were not deleted |
 | ↗ Open / play | Photos and videos (in the viewer), documents, stickers and voice notes |
 | 📖 Read in full | Long text messages |
+| 📝 Show transcript | Voice notes that have been transcribed: the whole text, in every language it was written in |
+| ✂ TL;DR: original / summary | Messages shown as a summary: unfold to the original, or fold back |
 | ↻ Retry sending | Your messages that failed to send |
 | 💾 Save to Downloads | Photos, videos, voice notes, PDFs and other files |
 | ↥ Go to quoted message | Replies |
@@ -586,9 +601,41 @@ Typing in the chat list (or Ctrl+F) is different: it narrows the chat list by ch
 
 Voice notes show as `🔊 ▶ ●──────────── 0:14`: a play button, a progress bar and the length. Selecting one (Enter or a click) plays it in the background: the button turns into ■, the dot moves along the bar and the time counts down to 0:00 as it plays. Selecting it again stops it, and the bar resets when it ends. The terminal tab shows 🎧 while something plays.
 
+**Transcripts.** When a voice note has been transcribed, its words show in the voice note's own bubble, under the play line, in grey italics (grey alone where the terminal has no italics). The voice note itself looks as it always did; the bubble only grows to hold the words. tawk does not transcribe anything itself: an agent's transcriber does, as set under [Voice note transcription](#voice-note-transcription), and hands the words to tawk, which keeps them in its database. A long transcript shows its first six lines (Settings, Chats, Transcript lines, `transcript_lines`) and ends on `…`; choose **Show transcript** in the message menu for all of it. A transcript is what a model heard, so read it as a guide and play the voice note when it matters.
+
+Three things decide what you see:
+
+- **Settings, Chats, Voice note transcripts** (`show_transcripts`) turns transcripts in the conversation on or off for every chat.
+- On a chat's [contact card](#contact-details), **Show transcripts** steps through *as the setting says*, *always* and *never* for that chat. **Alt+T** (Option+T on a Mac) and `/transcripts` step the same row for the open chat, and the conversation stays where it was.
+- On the same card, **Transcribe voice notes** switches transcribing off for that chat. From then on nothing in it is transcribed, whether as it arrives or because an agent asked, and tawk refuses a transcript handed to it for that chat. It looks forwards only: the transcripts the chat already has are kept, and still shown as its Show transcripts row says.
+
+Older voice notes are filled in as you look at them. While "Transcribe voice notes as they arrive" is on, a voice note from someone else that comes onto the screen without a transcript is handed to the transcriber, and its words appear when they are ready. tawk does not go through a whole chat by itself: only what you scroll to. A voice note WhatsApp no longer holds cannot be fetched, and stays as it is.
+
+Hiding transcripts removes nothing, and "Show transcript" in the message menu works whether they are shown or not. A transcript is removed with its message: when you delete it, when the sender deletes it for everyone, and when you clear or delete the chat. A soft-locked chat shows the shape of a transcript only, and takes no new ones while it is locked.
+
 To send one, open a chat and press **Ctrl+R** (or type `/voice`). The line above the input turns into a blinking `● REC 0:07` counter, and the other person sees that you are recording audio. Press **Enter** to send or **Esc** to discard. Recordings shorter than about a second are discarded, and recording stops and sends at the maximum length (5 minutes by default).
 
 Recording needs ffmpeg and a microphone. tawk detects your audio system (PulseAudio, PipeWire, ALSA, CoreAudio or DirectShow); you can choose one and a microphone in Settings, Media, Voice notes. Under WSL, WSLg provides the microphone through PulseAudio.
+
+## TL;DR mode
+
+Some chats are full of long messages. Put one in TL;DR mode and each long message shows as a short summary instead, with the original one key away.
+
+**Switching it on.** Open the chat's [contact card](#contact-details) and press Enter on **TL;DR (summarise long messages)**. It is a setting of that chat alone: there is no switch for every chat, and every chat starts with it off.
+
+**What you see.** A message of at least 300 characters (Settings, Chats, TL;DR from, `tldr_min_chars`) shows `▸ TL;DR` and under it the summary, in place of its text. Press **Enter** on the message, or click it, and it unfolds: the line turns to `▾ TL;DR · original` and the full text shows. Enter again folds it back. Each message folds by itself, and what you unfolded stays unfolded while tawk runs. The message menu has the same as **TL;DR: original / summary**, and its **Read in full** still opens the original in the reader. Copy text, replies, forwarding and search always work on the original, never on the summary.
+
+A long message that has no summary yet shows in full, as it always did, and changes to its summary when one arrives. Older messages are filled in too: when you switch TL;DR on for a chat, and the first time you open such a chat after starting tawk, its long messages of the last 30 days (Settings, Chats, TL;DR back, `tldr_back_days`) are handed to the agent, newest first, a few at a time. Anything older is summarised when you scroll to it. Set the days to 0 to have only what you look at summarised. Short messages, your own messages, voice notes and pictures are never summarised.
+
+**Who writes the summaries.** tawk has no model of its own. A connected agent's model writes them: tawk tells the agent which message waits, and the agent hands the summary back. So TL;DR needs [Agent access](#automation-and-mcp) on and an agent connected, and the text of those long messages goes to the service that runs that agent's model without you asking each time. A chat agents may not see, and a locked or soft-locked chat, is never summarised.
+
+**Which agent.** In the Agentic tab's Agents list, select an agent and press **d** to make it your default agent; it is marked `★ DEFAULT`, and pressing d on it again takes the choice back. tawk remembers the choice by the agent's label, so it holds when that agent connects again. Then:
+
+- The agent you chose writes the summaries while it is connected.
+- With none chosen, or the chosen one away, the only agent connected is used.
+- With several connected and none chosen, tawk asks you on WhatsApp. It sends a numbered list of the agents to your own "message yourself" chat, and you answer there with the number. tawk confirms in the same chat, and that agent is your default agent from then on. Messages wait meanwhile. The question is asked once, and again after ten minutes if summaries are still waiting and nobody is chosen. This is the only message tawk sends by itself, and it reaches nobody but you.
+
+A summary is removed with its message, and when the message is edited. Switching TL;DR off for a chat hides its summaries and keeps them. A summary is a model's reading of the message: unfold it when the details matter.
 
 ## Sending files
 
@@ -1145,6 +1192,7 @@ The tab has four views, on keys 1 to 4 (Tab moves between them):
 | Key | Elsewhere |
 |---|---|
 | x, p, r | Agents: disconnect, pause or resume (its writes are refused while paused), forget its allowances |
+| d | Agents: make the selected agent your default agent, the one that writes [TL;DR](#tldr-mode) summaries; d again takes that back |
 | f, r, / | Log: filter by outcome, show reads, search |
 | Enter, ← → | Permissions: change a value, step a number |
 | Esc, q or F3 | Back to the chats |

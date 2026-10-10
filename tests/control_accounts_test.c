@@ -16,6 +16,7 @@
 #include "resource_access/sqlite_account_store.h"
 #include "resource_access/sqlite_automation_log.h"
 #include "resource_access/sqlite_chat_prefs_store.h"
+#include "resource_access/sqlite_transcript_store.h"
 #include "resource_access/sqlite_chat_store.h"
 #include "resource_access/sqlite_contact_store.h"
 #include "resource_access/sqlite_database.h"
@@ -89,8 +90,12 @@ typedef struct World {
     IScheduledMessageStore *scheduled;
     MessagingManager *messaging;
     SchedulingManager *scheduling;
+    ITranscriptStore  *transcript_store;
+    TranscriptManager *transcripts;
     AccountServices   services;
 } World;
+
+static IChatPrefsStore *shared_prefs;       /* what you chose for each chat, the same for every account */
 
 static World worlds[WORLD];
 
@@ -173,7 +178,11 @@ static void make_world(World *w, sqlite3 *db, AccountId id, IChatExporter *expor
     w->messaging = messaging_manager_create(&deps);
     SchedulingManagerDeps sched = { w->scheduled };
     w->scheduling = scheduling_manager_create(&sched);
-    w->services = (AccountServices){ id, "", "test", w->messaging, NULL, NULL, NULL, NULL, NULL, w->scheduling };
+    w->transcript_store = sqlite_transcript_store_create(db, id);
+    TranscriptManagerDeps spoken = { w->transcript_store, shared_prefs, sqlite_chat_prefs_store_transcripts(shared_prefs),
+                                     settings_manager_current(settings_mgr) };
+    w->transcripts = transcript_manager_create(&spoken);
+    w->services = (AccountServices){ id, "", "test", w->messaging, NULL, NULL, NULL, NULL, NULL, w->scheduling, w->transcripts, NULL };
     messaging_manager_start(w->messaging);
     Event connected;
     event_init(&connected, EVENT_AUTH_CONNECTED);
@@ -538,6 +547,60 @@ static void test_events_say_whose(AccountId work, AccountId closed) {
     clear_outbox();
 }
 
+static void voice_note(World *w, const char *id, const char *jid) {
+    Message m;
+    message_init(&m);
+    str_copy(m.id, sizeof(m.id), id);
+    str_copy(m.chat_jid, sizeof(m.chat_jid), jid);
+    str_copy(m.sender_jid, sizeof(m.sender_jid), jid);
+    m.type = MESSAGE_TYPE_AUDIO;
+    m.timestamp = 1790000600;
+    w->messages->save(w->messages, &m);
+    message_dispose(&m);
+}
+
+static int transcripts_in(const cJSON *r) {
+    return cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(result(r), "transcripts"));
+}
+
+/* The same voice note reaches two accounts under one id (a shared group does
+ * that). Its transcript is kept by the account the request names, and the
+ * other account has none. Switching a chat off counts in every account. */
+static void test_transcripts_are_per_account(AccountId work) {
+    voice_note(&worlds[0], "VN", MOM);
+    voice_note(&worlds[1], "VN", MOM);
+    int conn = open_client();
+    clear_outbox();
+    say(conn, "{\"id\":\"s\",\"op\":\"set_transcript\",\"args\":{\"message_id\":\"VN\",\"language\":\"af\",\"text\":\"Hallo\"}}");
+    cJSON *r = reply("s");
+    CHECK(ok(r), "a transcript is kept by the default account");
+    cJSON_Delete(r);
+    char line[220];
+    snprintf(line, sizeof(line), "{\"id\":\"g\",\"op\":\"get_transcript\",\"args\":{\"message_id\":\"VN\",\"account\":%d}}", work);
+    say(conn, line);
+    r = reply("g");
+    CHECK(ok(r) && transcripts_in(r) == 0, "and is not seen from another account that has the same message");
+    cJSON_Delete(r);
+    say(conn, "{\"id\":\"d\",\"op\":\"get_transcript\",\"args\":{\"message_id\":\"VN\"}}");
+    r = reply("d");
+    CHECK(ok(r) && transcripts_in(r) == 1, "while its own account reads it back");
+    cJSON_Delete(r);
+    snprintf(line, sizeof(line), "{\"id\":\"w\",\"op\":\"set_transcript\",\"args\":{\"message_id\":\"VN\",\"text\":\"Hello\",\"account\":%d}}", work);
+    say(conn, line);
+    r = reply("w");
+    CHECK(ok(r), "an account open to agents for reading may keep one too");
+    cJSON_Delete(r);
+
+    transcript_manager_set_transcribing(worlds[0].transcripts, MOM, 0);
+    snprintf(line, sizeof(line), "{\"id\":\"o\",\"op\":\"set_transcript\",\"args\":{\"message_id\":\"VN\",\"language\":\"en\",\"text\":\"Hi\",\"account\":%d}}", work);
+    say(conn, line);
+    r = reply("o");
+    CHECK(r && !strcmp(error_code(r), "transcripts_off"), "a chat switched off is switched off in every account");
+    cJSON_Delete(r);
+    transcript_manager_set_transcribing(worlds[0].transcripts, MOM, 1);
+    clear_outbox();
+}
+
 static void test_no_account_open(void) {
     Account all[ACCOUNT_MAX];
     int n = account_roster_manager_list(roster, all, ACCOUNT_MAX);
@@ -578,6 +641,7 @@ int main(void) {
 
     IAccountStore *account_store = sqlite_account_store_create(db);
     IChatPrefsStore *prefs = sqlite_chat_prefs_store_create(db);
+    shared_prefs = prefs;
     AccountRosterManagerDeps roster_deps = { account_store, prefs };
     roster = account_roster_manager_create(&roster_deps);
     AccountId work = ACCOUNT_ID_NONE, closed = ACCOUNT_ID_NONE;
@@ -606,7 +670,8 @@ int main(void) {
     FILE *stand_in = fopen(socket_path, "w");
     if (stand_in) fclose(stand_in);
     ControlServerDeps control_deps = { &transport, approval_queue_prompt(queue), worlds[0].messaging, NULL, worlds[0].scheduling, NULL,
-                                       automation, settings_mgr, NULL, NULL, NULL, "test", socket_path, &directory, roster };
+                                       automation, settings_mgr, NULL, NULL, NULL, "test", socket_path, &directory, roster,
+                                       worlds[0].transcripts, NULL };
     server = control_server_create(&control_deps);
     tick();
     tick();
@@ -618,6 +683,7 @@ int main(void) {
     test_a_send_follows_the_contact(work, closed);
     test_self_approval_is_per_account();
     test_events_say_whose(work, closed);
+    test_transcripts_are_per_account(work);
     test_no_account_open();
 
     control_server_destroy(server);
@@ -627,6 +693,8 @@ int main(void) {
         World *w = &worlds[i];
         messaging_manager_destroy(w->messaging);
         scheduling_manager_destroy(w->scheduling);
+        transcript_manager_destroy(w->transcripts);
+        w->transcript_store->destroy(w->transcript_store);
         event_queue_destroy(w->events);
         w->scheduled->destroy(w->scheduled);
         w->receipts->destroy(w->receipts);

@@ -14,6 +14,11 @@
 #include "managers/messaging_manager.h"
 #include "managers/scheduling_manager.h"
 #include "managers/settings_manager.h"
+#include "managers/transcript_manager.h"
+#include "managers/summary_manager.h"
+#include "resource_access/sqlite_chat_prefs_store.h"
+#include "resource_access/sqlite_summary_store.h"
+#include "resource_access/sqlite_transcript_store.h"
 #include "resource_access/ini_settings_store.h"
 #include "resource_access/json_theme_repository.h"
 #include "resource_access/sqlite_automation_log.h"
@@ -122,6 +127,8 @@ static EventQueue *events;
 static IMessageStore *messages;
 static IChatStore *chats;
 static IContactStore *people;
+static TranscriptManager *transcripts;
+static SummaryManager *summaries;
 
 static void tick(void) {
     ManagerChanges ch;
@@ -1060,6 +1067,251 @@ static void test_online_lookup(void) {
     clear_outbox();
 }
 
+static void add_voice_note(const char *id, const char *jid, int64_t ts) {
+    Message m;
+    message_init(&m);
+    str_copy(m.id, sizeof(m.id), id);
+    str_copy(m.chat_jid, sizeof(m.chat_jid), jid);
+    str_copy(m.sender_jid, sizeof(m.sender_jid), jid);
+    m.type = MESSAGE_TYPE_AUDIO;
+    m.duration_s = 12;
+    m.status = MESSAGE_STATUS_READ;
+    m.timestamp = ts;
+    messages->save(messages, &m);
+    message_dispose(&m);
+}
+
+static int has_feature(const cJSON *hello_result, const char *name) {
+    const cJSON *f;
+    cJSON_ArrayForEach(f, cJSON_GetObjectItemCaseSensitive(hello_result, "features")) {
+        if (cJSON_IsString(f) && !strcmp(f->valuestring, name)) return 1;
+    }
+    return 0;
+}
+
+static int transcript_count(const cJSON *r) {
+    return cJSON_GetArraySize(cJSON_GetObjectItemCaseSensitive(result(r), "transcripts"));
+}
+
+/* A transcriber hands a voice note's words over and reads them back; tawk
+ * refuses them for anything but a voice note, for a chat the client may not
+ * see, and for a chat you switched off, which keeps what it already had. */
+static void test_transcripts(void) {
+    add_voice_note("V1", MOM, 1790000200);
+    add_voice_note("V2", MOM, 1790000210);
+    add_voice_note("VS", SECRET, 1790000220);
+    add_voice_note("VH", HIDDEN, 1790000230);
+    int conn = next_conn++;
+    inbox[inbox_count++] = (ControlInbound){ CONTROL_INBOUND_OPENED, conn, NULL };
+    say(conn, "{\"id\":\"h\",\"op\":\"hello\",\"args\":{\"client\":\"tawk-mcp\",\"protocol\":1,\"origin\":\"mcp\"}}");
+    cJSON *r = reply("h");
+    CHECK(r && has_feature(result(r), "transcripts"), "hello names transcripts among what this tawk can do");
+    cJSON_Delete(r);
+    int waiting = approval_queue_count(queue);
+
+    say(conn, "{\"id\":\"t1\",\"op\":\"set_transcript\",\"args\":{\"message_id\":\"V1\",\"language\":\"af\",\"text\":\"Hallo my kind\",\"model\":\"large-v3\"}}");
+    r = reply("t1");
+    CHECK(r && cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(r, "ok")), "a voice note's transcript is kept");
+    cJSON_Delete(r);
+    CHECK(approval_queue_count(queue) == waiting, "without asking you, since nothing is sent");
+    say(conn, "{\"id\":\"t2\",\"op\":\"get_transcript\",\"args\":{\"message_id\":\"V1\"}}");
+    r = reply("t2");
+    const cJSON *first = r ? cJSON_GetArrayItem(cJSON_GetObjectItemCaseSensitive(result(r), "transcripts"), 0) : NULL;
+    CHECK(first && !strcmp(cJSON_GetObjectItemCaseSensitive(first, "text")->valuestring, "Hallo my kind") &&
+          !strcmp(cJSON_GetObjectItemCaseSensitive(first, "language")->valuestring, "af") &&
+          !strcmp(cJSON_GetObjectItemCaseSensitive(first, "model")->valuestring, "large-v3"), "and read back");
+    cJSON_Delete(r);
+
+    say(conn, "{\"id\":\"t3\",\"op\":\"set_transcript\",\"args\":{\"message_id\":\"M1\",\"text\":\"not a voice note\"}}");
+    r = reply("t3");
+    CHECK(r && !strcmp(error_code(r), "bad_request"), "a text message takes none");
+    cJSON_Delete(r);
+    say(conn, "{\"id\":\"t4\",\"op\":\"set_transcript\",\"args\":{\"message_id\":\"V1\"}}");
+    r = reply("t4");
+    CHECK(r && !strcmp(error_code(r), "bad_request"), "the words are required");
+    cJSON_Delete(r);
+    say(conn, "{\"id\":\"t5\",\"op\":\"set_transcript\",\"args\":{\"message_id\":\"VS\",\"text\":\"secret words\"}}");
+    r = reply("t5");
+    CHECK(r && !strcmp(error_code(r), "not_found"), "a locked chat's voice note is not found");
+    cJSON_Delete(r);
+    say(conn, "{\"id\":\"t6\",\"op\":\"set_transcript\",\"args\":{\"message_id\":\"VH\",\"text\":\"hidden words\"}}");
+    r = reply("t6");
+    CHECK(r && !strcmp(error_code(r), "not_found"), "nor a soft-locked chat's");
+    cJSON_Delete(r);
+    say(conn, "{\"id\":\"t7\",\"op\":\"get_transcript\",\"args\":{\"message_id\":\"VS\"}}");
+    r = reply("t7");
+    CHECK(r && !strcmp(error_code(r), "not_found"), "and none can be read from one");
+    cJSON_Delete(r);
+
+    say(conn, "{\"id\":\"t8\",\"op\":\"chat_info\",\"args\":{\"chat\":\"" MOM "\"}}");
+    r = reply("t8");
+    CHECK(r && !cJSON_GetObjectItemCaseSensitive(result(r), "transcribe"), "a chat that is transcribed says nothing about it");
+    cJSON_Delete(r);
+    transcript_manager_set_transcribing(transcripts, MOM, 0);
+    say(conn, "{\"id\":\"t9\",\"op\":\"chat_info\",\"args\":{\"chat\":\"" MOM "\"}}");
+    r = reply("t9");
+    CHECK(r && cJSON_IsFalse(cJSON_GetObjectItemCaseSensitive(result(r), "transcribe")), "one you switched off says so");
+    cJSON_Delete(r);
+    say(conn, "{\"id\":\"t10\",\"op\":\"set_transcript\",\"args\":{\"message_id\":\"V2\",\"text\":\"a new voice note\"}}");
+    r = reply("t10");
+    CHECK(r && !strcmp(error_code(r), "transcripts_off"), "and a new transcript for it is refused as transcripts_off");
+    cJSON_Delete(r);
+    say(conn, "{\"id\":\"t11\",\"op\":\"get_transcript\",\"args\":{\"message_id\":\"V2\"}}");
+    r = reply("t11");
+    CHECK(r && transcript_count(r) == 0, "so nothing new is kept");
+    cJSON_Delete(r);
+    say(conn, "{\"id\":\"t12\",\"op\":\"get_transcript\",\"args\":{\"message_id\":\"V1\"}}");
+    r = reply("t12");
+    CHECK(r && transcript_count(r) == 1, "while the one it already had is still there");
+    cJSON_Delete(r);
+    transcript_manager_set_transcribing(transcripts, MOM, 1);
+
+    /* An older voice note you looked at, with no transcript, is handed to an agent to transcribe. */
+    clear_outbox();
+    Settings automatic = *settings_manager_current(settings_mgr);
+    automatic.transcribe_auto = 1;
+    settings_manager_apply(settings_mgr, &automatic);
+    Message looked_at;
+    Chat mom;
+    chat_init(&mom, MOM);
+    mom.is_locked = 0;
+    CHECK(messages->get(messages, "V2", &looked_at) == 0, "the voice note is there");
+    transcript_manager_want(transcripts, &looked_at, &mom);
+    message_dispose(&looked_at);
+    tick();
+    int told = 0;
+    for (int i = 0; i < outbox_count; i++) told += strstr(outbox[i], "\"evt\":\"transcript_wanted\"") && strstr(outbox[i], "\"message_id\":\"V2\"");
+    CHECK(told == 1, "one agent is told, once");
+    automatic.transcribe_auto = 0;
+    settings_manager_apply(settings_mgr, &automatic);
+    clear_outbox();
+}
+
+#define SELF "27830000000@s.whatsapp.net"
+
+static const char LONG_TEXT[] =
+    "Good morning. I spoke to the school this morning and they have moved the parents evening from Tuesday to "
+    "Thursday because the hall is being used for the exams. They also asked whether we can bring something for the "
+    "tea table, and whether one of us can help to pack up afterwards, which should not take more than half an hour. "
+    "Please let me know before lunch so that I can answer them today.";
+
+static void arrives(const char *id, const char *jid, const char *text, int from_me) {
+    Event e;
+    event_init(&e, EVENT_MESSAGE_UPSERT);
+    e.live = 1;
+    str_copy(e.message.id, sizeof(e.message.id), id);
+    str_copy(e.message.chat_jid, sizeof(e.message.chat_jid), jid);
+    str_copy(e.message.sender_jid, sizeof(e.message.sender_jid), from_me ? SELF : jid);
+    e.message.from_me = from_me;
+    e.message.timestamp = 1790001000;
+    message_set_text(&e.message, text);
+    event_queue_push(events, &e);
+    tick();
+    tick();
+}
+
+/* Whether a summary_wanted event for message `id` was sent. */
+static int asked_for(const char *id) {
+    char want[96];
+    snprintf(want, sizeof(want), "\"id\":\"%s\"", id);
+    for (int i = 0; i < outbox_count; i++) {
+        if (strstr(outbox[i], "\"evt\":\"summary_wanted\"") && strstr(outbox[i], want)) return 1;
+    }
+    return 0;
+}
+
+static int writes_tldr(int conn) {
+    const AutomationStatus *st = automation_manager_status(automation);
+    for (int i = 0; i < st->session_count; i++) if (st->sessions[i].conn == conn) return st->sessions[i].summariser;
+    return 0;
+}
+
+/* TL;DR: an agent hands over the summary of a long message in a chat you
+ * switched on. The only agent connected is told which messages wait; with
+ * two and none chosen tawk asks you in your own chat and takes the number
+ * you answer with; the Agents tab chooses one too. */
+static void test_tldr(void) {
+    for (int c = 1; c < next_conn; c++) inbox[inbox_count++] = (ControlInbound){ CONTROL_INBOUND_CLOSED, c, NULL };
+    tick();
+    clear_outbox();
+    int first = next_conn++;
+    inbox[inbox_count++] = (ControlInbound){ CONTROL_INBOUND_OPENED, first, NULL };
+    say(first, "{\"id\":\"h\",\"op\":\"hello\",\"args\":{\"client\":\"tawk-mcp\",\"protocol\":1,\"origin\":\"mcp\",\"label\":\"dev (stdio, pid 11)\"}}");
+    cJSON *r = reply("h");
+    CHECK(r && has_feature(result(r), "summaries"), "hello names summaries among what this tawk can do");
+    cJSON_Delete(r);
+
+    arrives("L0", MOM, LONG_TEXT, 0);
+    CHECK(!asked_for("L0"), "a long message in a chat that is not in TL;DR mode is left alone");
+    say(first, "{\"id\":\"s0\",\"op\":\"set_summary\",\"args\":{\"message_id\":\"L0\",\"text\":\"School evening moved.\"}}");
+    r = reply("s0");
+    CHECK(r && !strcmp(error_code(r), "tldr_off"), "and takes no summary");
+    cJSON_Delete(r);
+
+    summary_manager_set_tldr(summaries, MOM, 1);
+    say(first, "{\"id\":\"i\",\"op\":\"chat_info\",\"args\":{\"chat\":\"" MOM "\"}}");
+    r = reply("i");
+    CHECK(r && cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(result(r), "tldr")), "a chat in TL;DR mode says so");
+    cJSON_Delete(r);
+    clear_outbox();
+    arrives("L1", MOM, LONG_TEXT, 0);
+    arrives("N1", MOM, "See you at 6", 0);
+    CHECK(asked_for("L1") && !asked_for("N1"), "the only agent connected is asked to summarise a long message, not a short one");
+    CHECK(writes_tldr(first) == 0, "without having been chosen");
+    say(first, "{\"id\":\"s1\",\"op\":\"set_summary\",\"args\":{\"message_id\":\"L1\",\"text\":\"School evening moved to Thursday.\",\"model\":\"sonnet\"}}");
+    r = reply("s1");
+    CHECK(r && cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(r, "ok")), "its summary is kept");
+    cJSON_Delete(r);
+    say(first, "{\"id\":\"g1\",\"op\":\"get_summary\",\"args\":{\"message_id\":\"L1\"}}");
+    r = reply("g1");
+    const cJSON *kept = r ? cJSON_GetObjectItemCaseSensitive(result(r), "summary") : NULL;
+    CHECK(kept && !strcmp(cJSON_GetObjectItemCaseSensitive(kept, "text")->valuestring, "School evening moved to Thursday."), "and read back");
+    cJSON_Delete(r);
+    say(first, "{\"id\":\"s2\",\"op\":\"set_summary\",\"args\":{\"message_id\":\"V1\",\"text\":\"a voice note\"}}");
+    r = reply("s2");
+    CHECK(r && !strcmp(error_code(r), "bad_request"), "a voice note takes no summary");
+    cJSON_Delete(r);
+
+    /* A second agent connects: with none chosen, tawk asks you which one. */
+    int second = next_conn++;
+    inbox[inbox_count++] = (ControlInbound){ CONTROL_INBOUND_OPENED, second, NULL };
+    say(second, "{\"id\":\"h2\",\"op\":\"hello\",\"args\":{\"client\":\"tawk-mcp\",\"protocol\":1,\"origin\":\"mcp\",\"label\":\"home (http)\"}}");
+    clear_outbox();
+    last_text[0] = '\0';
+    int sent_before = texts;
+    arrives("L2", MOM, LONG_TEXT, 0);
+    CHECK(!asked_for("L2"), "with two agents and none chosen, neither is handed the message");
+    CHECK(texts == sent_before + 1 && strstr(last_text, "which agent") && strstr(last_text, "1. tawk-mcp, dev") && strstr(last_text, "2. tawk-mcp, home"),
+          "tawk asks you in your own chat, listing them");
+    arrives("L3", MOM, LONG_TEXT, 0);
+    CHECK(texts == sent_before + 1, "once, not for every message");
+    arrives("A0", MOM, "2", 0);
+    CHECK(!writes_tldr(second), "a number from somebody else answers nothing");
+    arrives("A1", SELF, "2", 1);
+    CHECK(writes_tldr(second) && !writes_tldr(first), "the number you answer with chooses the agent");
+    CHECK(strstr(last_text, "home (http)") && strstr(last_text, "writes TL;DR"), "and tawk says so in the same chat");
+    tick();
+    CHECK(asked_for("L2") && asked_for("L3"), "which is then handed the messages that waited");
+    CHECK(!strcmp(settings_manager_current(settings_mgr)->default_agent, "home (http)"), "the choice is remembered by the agent's label");
+
+    /* The Agents tab chooses one as well, and choosing it again takes the choice back. */
+    automation_manager_command(automation, AUTOMATION_COMMAND_SUMMARISER, first);
+    tick();
+    CHECK(writes_tldr(first) && !writes_tldr(second) && !strcmp(settings_manager_current(settings_mgr)->default_agent, "dev (stdio)"),
+          "choosing another in the Agents tab moves it, remembered without the process id");
+    automation_manager_command(automation, AUTOMATION_COMMAND_SUMMARISER, first);
+    tick();
+    CHECK(!writes_tldr(first) && !writes_tldr(second) && !settings_manager_current(settings_mgr)->default_agent[0], "and choosing it again takes the choice back");
+
+    messages->edit_text(messages, "L1", "Never mind", 0);
+    say(first, "{\"id\":\"g2\",\"op\":\"get_summary\",\"args\":{\"message_id\":\"L1\"}}");
+    r = reply("g2");
+    CHECK(r && !cJSON_GetObjectItemCaseSensitive(result(r), "summary"), "a message that was edited has lost its summary");
+    cJSON_Delete(r);
+    summary_manager_set_tldr(summaries, MOM, 0);
+    clear_outbox();
+}
+
 int main(void) {
     char dir[] = "/tmp/tawk-control-XXXXXX";
     if (!mkdtemp(dir)) return 1;
@@ -1120,8 +1372,17 @@ int main(void) {
     AutomationManagerDeps automation_deps = { log, settings_manager_current(settings_mgr), &admin_tokens };
     automation = automation_manager_create(&automation_deps);
     queue = approval_queue_create();
+    ITranscriptStore *transcript_store = sqlite_transcript_store_create(db, ACCOUNT_ID_FIRST);
+    IChatPrefsStore *chat_prefs = sqlite_chat_prefs_store_create(db);
+    TranscriptManagerDeps transcript_deps = { transcript_store, chat_prefs, sqlite_chat_prefs_store_transcripts(chat_prefs),
+                                              settings_manager_current(settings_mgr) };
+    transcripts = transcript_manager_create(&transcript_deps);
+    ISummaryStore *summary_store = sqlite_summary_store_create(db, ACCOUNT_ID_FIRST);
+    SummaryManagerDeps summary_deps = { summary_store, chat_prefs, sqlite_chat_prefs_store_summaries(chat_prefs),
+                                        settings_manager_current(settings_mgr) };
+    summaries = summary_manager_create(&summary_deps);
     ControlServerDeps control_deps = { &transport, approval_queue_prompt(queue), mm, NULL, scheduling, NULL, automation,
-                                       settings_mgr, NULL, NULL, NULL, "test", "/tmp/unused.sock", NULL, NULL };
+                                       settings_mgr, NULL, NULL, NULL, "test", "/tmp/unused.sock", NULL, NULL, transcripts, summaries };
     server = control_server_create(&control_deps);
 
 
@@ -1134,6 +1395,7 @@ int main(void) {
     tick();
 
     test_handshake_and_reads();
+    test_transcripts();
     test_writes_wait_for_you();
     test_destructive_and_manage();
     test_live_and_log();
@@ -1143,11 +1405,17 @@ int main(void) {
     test_admin_answers_its_own();
     test_someone_with_no_chat_yet();
     test_rate();
+    test_tldr();
 
     control_server_destroy(server);
     approval_queue_destroy(queue);
     automation_manager_destroy(automation);
     messaging_manager_destroy(mm);
+    transcript_manager_destroy(transcripts);
+    summary_manager_destroy(summaries);
+    summary_store->destroy(summary_store);
+    chat_prefs->destroy(chat_prefs);
+    transcript_store->destroy(transcript_store);
     scheduling_manager_destroy(scheduling);
     event_queue_destroy(events);
     clear_outbox();

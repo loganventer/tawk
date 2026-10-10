@@ -65,6 +65,9 @@ static const char *pref_value(const ContactPanel *p, ContactAction a) {
         case CONTACT_ACTION_SEND_FROM:     return p->send_from;
         case CONTACT_ACTION_MERGE:         return p->merge;
         case CONTACT_ACTION_AGENT_ANSWERS: return p->agent_answers;
+        case CONTACT_ACTION_SHOW_TRANSCRIPTS: return p->show_transcripts;
+        case CONTACT_ACTION_TRANSCRIBE:    return p->transcribe;
+        case CONTACT_ACTION_TLDR:          return p->tldr;
         default:                           return NULL;
     }
 }
@@ -74,21 +77,39 @@ static int has_action(const ContactPanel *p, ContactAction a) {
     return 0;
 }
 
+/* Adds the settings of `prefs` that have something to show and are not listed yet. They go
+ * first, above the things that are done once: settings are what a card is opened for. */
+static void add_prefs(ContactPanel *p, const ContactAction *prefs, int count) {
+    int added = 0;
+    for (int k = 0; k < count; k++) {
+        const char *value = pref_value(p, prefs[k]);
+        if (!value[0] || has_action(p, prefs[k]) || p->action_count >= CONTACT_ACTION_COUNT) continue;
+        for (int i = p->action_count; i > added; i--) p->actions[i] = p->actions[i - 1];
+        p->actions[added++] = prefs[k];
+        p->action_count++;
+    }
+    if (added) p->selected += added;                       /* what was highlighted stays highlighted */
+}
+
 void contact_panel_set_prefs(ContactPanel *p, const char *send_from, const char *merge, const char *agent_answers) {
     str_copy(p->send_from, sizeof(p->send_from), send_from ? send_from : "");
     str_copy(p->merge, sizeof(p->merge), merge ? merge : "");
     str_copy(p->agent_answers, sizeof(p->agent_answers), agent_answers ? agent_answers : "");
     static const ContactAction PREFS[] = { CONTACT_ACTION_SEND_FROM, CONTACT_ACTION_MERGE, CONTACT_ACTION_AGENT_ANSWERS };
-    /* They go first, above the things that are done once: settings are what a card is opened for. */
-    int added = 0;
-    for (int k = 0; k < 3; k++) {
-        const char *value = pref_value(p, PREFS[k]);
-        if (!value[0] || has_action(p, PREFS[k]) || p->action_count >= CONTACT_ACTION_COUNT) continue;
-        for (int i = p->action_count; i > added; i--) p->actions[i] = p->actions[i - 1];
-        p->actions[added++] = PREFS[k];
-        p->action_count++;
-    }
-    if (added) p->selected += added;                       /* what was highlighted stays highlighted */
+    add_prefs(p, PREFS, 3);
+}
+
+void contact_panel_set_transcript_prefs(ContactPanel *p, const char *show, const char *transcribe) {
+    str_copy(p->show_transcripts, sizeof(p->show_transcripts), show ? show : "");
+    str_copy(p->transcribe, sizeof(p->transcribe), transcribe ? transcribe : "");
+    static const ContactAction PREFS[] = { CONTACT_ACTION_SHOW_TRANSCRIPTS, CONTACT_ACTION_TRANSCRIBE };
+    add_prefs(p, PREFS, 2);
+}
+
+void contact_panel_set_tldr_pref(ContactPanel *p, const char *tldr) {
+    str_copy(p->tldr, sizeof(p->tldr), tldr ? tldr : "");
+    static const ContactAction PREFS[] = { CONTACT_ACTION_TLDR };
+    add_prefs(p, PREFS, 1);
 }
 
 PopupResult contact_panel_key(ContactPanel *p, int is_key, int ch) {
