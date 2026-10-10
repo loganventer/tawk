@@ -254,6 +254,8 @@ Each of these needs four things: an event or command in [PROTOCOL.md](../../PROT
 
 ## 8. Working with agents
 
+Built on 2026-10-10 in tawk 0.16.0: rules per contact, chats agents may not read, and codes and card numbers masked for agents. The two rows "Rules per contact" (here) and "Chats agents may not read" (section 7) became one card row, **Agents here**, with four choices, and "ask once a session" is what "as the account says" already does.
+
 | Feature | What the user gets | New parts | Notes |
 |---|---|---|---|
 | The owner's chat | Write to the agent from WhatsApp on your phone, and answer its requests there. See [The owner's chat](#the-owners-chat) below | Listed below | Off by default, set only in tawk |

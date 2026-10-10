@@ -383,6 +383,8 @@ Above the actions the card lists the chat's own settings. Enter on one steps it 
 | Transcribe voice notes | On or off. Off leaves this chat's voice notes untranscribed from now on and keeps the transcripts it has |
 | Voice note languages… | Opens a list of languages with a switch for each: the ones this chat's voice notes are spoken in |
 | TL;DR | On or off. On, this chat's long messages show as a summary that unfolds to the original (see [TL;DR mode](#tldr-mode)) |
+| Agents here | What agents may do in this chat, on top of what the account allows. Enter steps through: *as the account says*; *always ask me* (every send is yours to answer, each time, with no "for this session" and no agent answering its own); *read only* (agents read the chat and are refused any write, without you being asked); *hidden from agents* (the chat is not listed, read, searched or named, as if it did not exist). It holds for that person or group on all your numbers, and can only tighten what the account's level allows |
+| This is my chat with the agent | Only on your own "message yourself" chat. See [The owner's chat](#the-owners-chat) |
 
 Every action that removes or blocks something shows a confirmation with Cancel selected first. An export never replaces an existing file; a second export becomes `tawk chat with NAME (1).txt`. Only the messages stored on this computer are exported.
 

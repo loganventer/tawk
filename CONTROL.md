@@ -189,6 +189,16 @@ tawk asks with an event, sent to one client only whether or not it subscribed:
 
 Which client that is: the one you made your default agent in the Agents list while it is connected; else the only client connected with origin `mcp` that named `summaries` and is not paused; else, with several such and none chosen, nobody until you choose. A client that did not name the feature is never asked and does not count. A `summary_wanted` that is not answered with `set_summary` within 90 seconds goes to be asked for again. A client that lets two in a row go unanswered is not asked for five minutes, in case it was only busy, and is then tried again; any answer clears that. tawk then asks you in the "message yourself" chat of the account the chat is in, and the number you answer with chooses. The choice is kept in `default_agent` under `[automation]`, as the client's `label` with any ", pid N" taken out, so a client that wants to be recognised again keeps its label the same.
 
+### Rules for one chat, and hidden text
+
+You can give a chat a rule of its own on its contact card. A client is not told the rule; it sees what the rule does.
+
+- A chat *hidden from agents* is not in `list_chats` or `unread_summary`, is `not_found` when named, and sends no events, for every client.
+- In a *read only* chat every write answers `not_allowed`, and you are not asked.
+- In an *always ask* chat every write waits for you: `remember` does not cover the next one, and `approve` answers `not_allowed`.
+
+With `mask_codes` on, a client with origin `mcp` is given `[code]` in place of a one-time code and `[card number]` in place of a card number, in a message's `text`, its `reply_to.text`, its `link` title and description, and a chat's `preview`. A client with origin `cli` is given the text as it is.
+
 ### The owner's chat
 
 You can name the "message yourself" chat of one of your numbers as your chat with the agent, on that chat's contact card. A tawk that has the feature names `owner_chat` in the `features` of its hello, and a client that takes what you write there names `owner_chat` in the `features` of its own.
