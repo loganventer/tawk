@@ -151,6 +151,7 @@ void control_op_chat_info(ControlServer *s, ControlSession *session, const Contr
     cJSON_AddItemToObject(r, "chat", control_chat_json(s, session->origin, &chat));
     control_tag_transcribe(s, r, &chat);
     control_tag_tldr(s, r, &chat);
+    control_tag_tools(s, r, &chat);
     ContactProfile profile;
     if (s->deps.profiles && profile_manager_details(s->deps.profiles, chat.jid, 0, &profile) == 0) {
         cJSON_AddStringToObject(r, "about", chat.is_group ? profile.group_description : profile.about);

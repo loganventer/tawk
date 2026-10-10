@@ -496,7 +496,7 @@ int main(int argc, char **argv) {
     ControlServerDeps control_deps = { control_transport, approval_queue_prompt(approvals), active->messaging, active->profiles,
                                        active->scheduling, active->feed, automation, settings_mgr, active->accounts,
                                        active->statuses, active->calls, active->backend_name, control_path,
-                                       directory, roster, active->transcripts, active->summaries, owner_chat };
+                                       directory, roster, active->transcripts, active->summaries, labels, reminders, owner_chat };
     ControlServer *control = control_server_create(&control_deps);
     ICamera *camera = ffmpeg_camera_create();
     MediaManagerDeps media_deps = { opener, voice_player, recorder, camera, audio, s };

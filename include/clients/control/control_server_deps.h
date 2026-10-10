@@ -14,7 +14,9 @@
 #include "managers/settings_manager.h"
 #include "managers/status_feed_manager.h"
 #include "managers/status_manager.h"
+#include "managers/label_manager.h"
 #include "managers/owner_chat_manager.h"
+#include "managers/reminder_manager.h"
 #include "managers/summary_manager.h"
 #include "managers/transcript_manager.h"
 
@@ -40,6 +42,8 @@ typedef struct ControlServerDeps {
     AccountRosterManager *roster;
     TranscriptManager  *transcripts;      /* voice note transcripts; NULL when this tawk keeps none */
     SummaryManager     *summaries;        /* TL;DR summaries; NULL when this tawk keeps none */
+    LabelManager       *labels;           /* your labels on chats; NULL when this tawk keeps none */
+    ReminderManager    *reminders;        /* chats put aside; NULL when this tawk keeps none */
     OwnerChatManager   *owner;            /* the owner's chat; NULL when this tawk has none */
 } ControlServerDeps;
 

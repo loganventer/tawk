@@ -222,6 +222,15 @@ void control_owner_on_reaction(ControlServer *server, const LiveMessageRef *ref)
 void control_owner_tick(ControlServer *server, int64_t now_ms);
 /* Hands waiting messages to the agent that writes summaries, or asks you which agent that is. */
 void control_summaries_tick(ControlServer *server, int64_t now_ms);
+/* control_ops_tools.c: labels, chats put aside, and chats awaiting a reply. */
+void control_op_list_labels(ControlServer *server, ControlSession *session, const ControlRequest *req);
+void control_op_set_label(ControlServer *server, ControlSession *session, const ControlRequest *req);
+void control_op_list_reminders(ControlServer *server, ControlSession *session, const ControlRequest *req);
+void control_op_set_reminder(ControlServer *server, ControlSession *session, const ControlRequest *req);
+void control_op_cancel_reminder(ControlServer *server, ControlSession *session, const ControlRequest *req);
+void control_op_awaiting_replies(ControlServer *server, ControlSession *session, const ControlRequest *req);
+/* Adds "labels":[...] to an answer about `chat`, and "reminder":{"due_at"} when it is put aside. */
+void control_tag_tools(ControlServer *server, cJSON *object, const Chat *chat);
 /* control_ops_live.c */
 void control_op_subscribe(ControlServer *server, ControlSession *session, const ControlRequest *req);
 void control_op_unsubscribe(ControlServer *server, ControlSession *session, const ControlRequest *req);

@@ -39,6 +39,12 @@ static const ControlOpEntry OPS[] = {
     { "set_transcript",         control_op_set_transcript, 0 },
     { "get_summary",            control_op_get_summary, 1 },
     { "set_summary",            control_op_set_summary, 0 },
+    { "list_labels",            control_op_list_labels, 1 },
+    { "set_label",              control_op_set_label, 0 },
+    { "list_reminders",         control_op_list_reminders, 1 },
+    { "set_reminder",           control_op_set_reminder, 0 },
+    { "cancel_reminder",        control_op_cancel_reminder, 0 },
+    { "awaiting_replies",       control_op_awaiting_replies, 1 },
     { "set_chat",               control_op_set_chat, 0 },
     { "set_chat_theme",         control_op_set_chat_theme, 0 },
     { "clear_chat",             control_op_clear_chat, 0 },
@@ -254,6 +260,9 @@ static void hello(ControlServer *s, ControlSession *session, const ControlReques
     if (s->deps.transcripts) cJSON_AddItemToArray(features, cJSON_CreateString("transcripts"));
     if (s->deps.summaries) cJSON_AddItemToArray(features, cJSON_CreateString("summaries"));
     if (s->deps.owner) cJSON_AddItemToArray(features, cJSON_CreateString("owner_chat"));
+    if (s->deps.labels) cJSON_AddItemToArray(features, cJSON_CreateString("labels"));
+    if (s->deps.reminders) cJSON_AddItemToArray(features, cJSON_CreateString("reminders"));
+    cJSON_AddItemToArray(features, cJSON_CreateString("awaiting_replies"));
     if (s->deps.directory && s->deps.roster) {              /* this tawk serves each request from the account it names */
         cJSON_AddBoolToObject(r, "multi_account", 1);
         cJSON_AddItemToObject(r, "accounts", control_accounts_json(s));

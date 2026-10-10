@@ -134,11 +134,11 @@ Result:
 ```json
 {
   "protocol": 1,
-  "tawk": "0.19.0",
+  "tawk": "0.20.0",
   "access": "read",
   "account": {"jid": "27830000000@s.whatsapp.net", "name": "Logan"},
   "connected": true,
-  "features": ["transcripts", "summaries", "owner_chat"]
+  "features": ["transcripts", "summaries", "owner_chat", "labels", "reminders", "awaiting_replies"]
 }
 ```
 
@@ -198,6 +198,21 @@ You can give a chat a rule of its own on its contact card. A client is not told 
 - In an *always ask* chat every write waits for you: `remember` does not cover the next one, and `approve` answers `not_allowed`.
 
 With `mask_codes` on, a client with origin `mcp` is given `[code]` in place of a one-time code and `[card number]` in place of a card number, in a message's `text`, its `reply_to.text`, its `link` title and description, and a chat's `preview`. A client with origin `cli` is given the text as it is.
+
+### Labels, reminders and awaiting replies
+
+Your own labels on chats, the chats you put aside, and the chats where your last message is unanswered. All three are kept or worked out on this computer; none of these operations reaches WhatsApp. A tawk that has them names `labels`, `reminders` and `awaiting_replies` in the `features` of its hello.
+
+| Operation | Arguments | Result |
+|---|---|---|
+| `list_labels` | `chat` (optional) | `{"labels":["work","family"]}`: every label in use, or with `chat` that chat's labels and `"chat":{jid,name}` |
+| `set_label` | `chat`, `label` (both required), `on` (default true) | Puts the label on the chat or takes it off. A managing write: needs `manage` and is asked about. `{"labels":[...]}` as the chat then carries them. A label is up to 24 characters with no comma or slash, kept in lower case; `bad_request` otherwise |
+| `list_reminders` | | `{"reminders":[{"chat":{jid,name},"due_at":N}]}` for the chats the client may see; `due_at` 0 means until its person writes |
+| `set_reminder` | `chat` (required), and `when` (`9:00`, `tomorrow`, `+2h`, `fri 17:30`, `reply`) or `due_at` (epoch seconds ahead, 0 for until they write) | Puts the chat aside: it leaves your chat list until then, or sooner if its person writes. A write: needs `send` and is asked about. `{"due_at":N}` |
+| `cancel_reminder` | `chat` (required) | Brings the chat back. A write, asked about. `not_found` when it is not put aside |
+| `awaiting_replies` | `days` (1 to 60; default the `awaiting_days` setting) | `{"days":N,"chats":[chat]}`: the one-to-one chats where the newest message is yours, at least that many days old and at most two months, among the chats the client may see |
+
+`chat_info` also carries `"labels":[...]` and, for a chat put aside, `"reminder":{"due_at":N}`.
 
 ### The owner's chat
 
@@ -351,8 +366,8 @@ Chats that are locked, hidden or outside `chats` never produce notifications.
 ## Example
 
 ```text
-→ {"id":"1","op":"hello","args":{"client":"tawk","version":"0.19.0","protocol":1,"origin":"cli"}}
-← {"id":"1","ok":true,"result":{"protocol":1,"tawk":"0.19.0","access":"send","account":{"jid":"27830000000@s.whatsapp.net","name":"Logan"},"connected":true}}
+→ {"id":"1","op":"hello","args":{"client":"tawk","version":"0.20.0","protocol":1,"origin":"cli"}}
+← {"id":"1","ok":true,"result":{"protocol":1,"tawk":"0.20.0","access":"send","account":{"jid":"27830000000@s.whatsapp.net","name":"Logan"},"connected":true}}
 → {"id":"2","op":"unread_summary"}
 ← {"id":"2","ok":true,"result":{"total":2,"mentions":0,"chats":[{"jid":"27820000000@s.whatsapp.net","name":"Mom","is_group":false,"unread":2,"unread_mention":false,"muted":false,"pinned":true,"archived":false,"last_ts":1790000000,"preview":"See you at 6"}]}}
 → {"id":"3","op":"send_message","args":{"chat":"Mom","text":"On my way"}}

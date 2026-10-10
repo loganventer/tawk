@@ -19,6 +19,9 @@
 #include "resource_access/sqlite_chat_prefs_store.h"
 #include "resource_access/sqlite_summary_store.h"
 #include "resource_access/sqlite_sent_id_log.h"
+#include "resource_access/sqlite_label_store.h"
+#include "resource_access/sqlite_reminder_store.h"
+#include "resource_access/sqlite_awaiting_replies.h"
 #include "managers/owner_chat_manager.h"
 #include "resource_access/sqlite_transcript_store.h"
 #include "resource_access/ini_settings_store.h"
@@ -40,6 +43,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 static int failures = 0;
@@ -133,6 +137,8 @@ static IChatStore *chats;
 static IContactStore *people;
 static TranscriptManager *transcripts;
 static SummaryManager *summaries;
+static LabelManager *labels;
+static ReminderManager *reminders;
 
 static void tick(void) {
     ManagerChanges ch;
@@ -1414,6 +1420,75 @@ static void test_agent_rules(void) {
     clear_outbox();
 }
 
+/* Labels, chats put aside and chats awaiting a reply, as an agent reaches them. */
+static void test_chat_tools(void) {
+    for (int c = 1; c < next_conn; c++) inbox[inbox_count++] = (ControlInbound){ CONTROL_INBOUND_CLOSED, c, NULL };
+    tick();
+    while (approval_queue_at(queue, 0)) answer_first(0, NULL, 0);
+    int agent = next_conn++;
+    inbox[inbox_count++] = (ControlInbound){ CONTROL_INBOUND_OPENED, agent, NULL };
+    say(agent, "{\"id\":\"h\",\"op\":\"hello\",\"args\":{\"client\":\"helper\",\"protocol\":1,\"origin\":\"mcp\"}}");
+    cJSON *hello = reply("h");
+    CHECK(has_feature(result(hello), "labels") && has_feature(result(hello), "reminders") && has_feature(result(hello), "awaiting_replies"),
+          "hello names labels, reminders and awaiting replies");
+    cJSON_Delete(hello);
+    Settings s = *settings_manager_current(settings_mgr);
+    str_copy(s.automation_access, sizeof(s.automation_access), "manage");
+    settings_manager_apply(settings_mgr, &s);
+
+    say(agent, "{\"id\":\"t1\",\"op\":\"set_label\",\"args\":{\"chat\":\"" WORK "\",\"label\":\" Clients \"}}");
+    const ApprovalRequest *asked = approval_queue_at(queue, 0);
+    CHECK(asked && strstr(asked->action, "label it \"clients\""), "labelling a chat is a managing write: you are asked, in plain words");
+    answer_first(1, NULL, 0);
+    CHECK(said("t1", "\"labels\":[\"clients\"]"), "allowed, the chat carries the label, kept in lower case");
+    say(agent, "{\"id\":\"t2\",\"op\":\"list_labels\",\"args\":{}}");
+    CHECK(said("t2", "\"labels\":[\"clients\"]"), "the labels in use are listed");
+    say(agent, "{\"id\":\"t3\",\"op\":\"chat_info\",\"args\":{\"chat\":\"" WORK "\"}}");
+    CHECK(said("t3", "\"labels\":[\"clients\"]") && !said("t3", "\"reminder\""), "chat_info carries a chat's labels, and no reminder when it has none");
+    say(agent, "{\"id\":\"t4\",\"op\":\"set_label\",\"args\":{\"chat\":\"" WORK "\",\"label\":\"a,b\"}}");
+    cJSON *r = reply("t4");
+    CHECK(r && !strcmp(error_code(r), "bad_request") && approval_queue_at(queue, 0) == NULL, "a bad label is refused before you are asked");
+    cJSON_Delete(r);
+
+    say(agent, "{\"id\":\"t5\",\"op\":\"set_reminder\",\"args\":{\"chat\":\"" WORK "\",\"when\":\"+2h\"}}");
+    asked = approval_queue_at(queue, 0);
+    CHECK(asked && strstr(asked->action, "put it aside until"), "putting a chat aside is asked about too");
+    answer_first(1, NULL, 0);
+    CHECK(said("t5", "\"due_at\":") && reminder_manager_snoozed(reminders, WORK, NULL), "allowed, the chat is put aside");
+    say(agent, "{\"id\":\"t6\",\"op\":\"list_reminders\",\"args\":{}}");
+    CHECK(said("t6", WORK) && said("t6", "\"name\":\"Work\""), "and listed among the chats put aside");
+    say(agent, "{\"id\":\"t7\",\"op\":\"set_reminder\",\"args\":{\"chat\":\"" WORK "\",\"when\":\"last week\"}}");
+    r = reply("t7");
+    CHECK(r && !strcmp(error_code(r), "bad_request"), "a time that is not one is refused");
+    cJSON_Delete(r);
+    say(agent, "{\"id\":\"t8\",\"op\":\"cancel_reminder\",\"args\":{\"chat\":\"" WORK "\"}}");
+    answer_first(1, NULL, 0);
+    CHECK(!reminder_manager_snoozed(reminders, WORK, NULL), "cancelling brings it back");
+    say(agent, "{\"id\":\"t9\",\"op\":\"cancel_reminder\",\"args\":{\"chat\":\"" WORK "\"}}");
+    r = reply("t9");
+    CHECK(r && !strcmp(error_code(r), "not_found"), "and a chat that is not put aside has nothing to cancel");
+    cJSON_Delete(r);
+
+#define QUOTE "27820000077@s.whatsapp.net"
+    arrives("W8", QUOTE, "Can you send a quote?", 0);       /* weeks ago, by its timestamp; the chat now exists */
+    add_message("W9", QUOTE, "Did you get my quote?", 1, (int64_t)time(NULL) - 5 * 86400);
+    tick();
+    say(agent, "{\"id\":\"t10\",\"op\":\"awaiting_replies\",\"args\":{\"days\":3}}");
+    CHECK(said("t10", QUOTE) && !said("t10", MOMMY), "a chat whose last message is yours and five days old is awaiting a reply");
+    say(agent, "{\"id\":\"t11\",\"op\":\"awaiting_replies\",\"args\":{\"days\":10}}");
+    CHECK(!said("t11", QUOTE), "and is not when asked for ten days");
+    automation_manager_set_chat_rule(automation, QUOTE, CHAT_AGENT_HIDDEN);
+    say(agent, "{\"id\":\"t12\",\"op\":\"awaiting_replies\",\"args\":{\"days\":3}}");
+    CHECK(!said("t12", QUOTE), "a chat hidden from agents is left out of it");
+    automation_manager_set_chat_rule(automation, QUOTE, CHAT_AGENT_FOLLOW);
+
+    char clean[CHAT_LABEL_SIZE];
+    label_manager_toggle(labels, WORK, "clients", clean);
+    str_copy(s.automation_access, sizeof(s.automation_access), "send");
+    settings_manager_apply(settings_mgr, &s);
+    clear_outbox();
+}
+
 /* A message of yours in your own chat, as it arrives from your phone: quoting `quoted` when given, forwarded when asked. */
 static void from_phone(const char *id, const char *text, const char *quoted, int forwarded) {
     Event e;
@@ -1604,8 +1679,10 @@ int main(void) {
     add_message("M0", MOM, "Morning", 0, 1790000000);
     add_message("M1", MOM, "See you at 6", 0, 1790000100);
     add_message("M2", MOM, "Bring bread", 0, 1790000150);
+    IAwaitingReplies *awaiting = sqlite_awaiting_replies_create(db, ACCOUNT_ID_FIRST);
     MessagingManagerDeps deps = { &gw, messages, chats, contacts, aliases, reaction_store, receipts, &notifier, events,
-                                  settings_manager_current(settings_mgr), NULL, exporter, NULL, NULL, ACCOUNT_ID_FIRST, NULL };
+                                  settings_manager_current(settings_mgr), NULL, exporter, NULL, NULL, ACCOUNT_ID_FIRST, NULL,
+                                  NULL, NULL, awaiting };
     mm = messaging_manager_create(&deps);
     SchedulingManagerDeps sched_deps = { scheduled };
     SchedulingManager *scheduling = scheduling_manager_create(&sched_deps);
@@ -1621,11 +1698,15 @@ int main(void) {
     SummaryManagerDeps summary_deps = { summary_store, chat_prefs, sqlite_chat_prefs_store_summaries(chat_prefs),
                                         settings_manager_current(settings_mgr) };
     summaries = summary_manager_create(&summary_deps);
+    ILabelStore *label_store = sqlite_label_store_create(db);
+    labels = label_manager_create(label_store);
+    IReminderStore *reminder_store = sqlite_reminder_store_create(db);
+    reminders = reminder_manager_create(reminder_store);
     ISentIdLog *sent_ids = sqlite_sent_id_log_create(db);
     OwnerChatManagerDeps owner_deps = { sent_ids, settings_manager_current(settings_mgr) };
     OwnerChatManager *owner = owner_chat_manager_create(&owner_deps);
     ControlServerDeps control_deps = { &transport, approval_queue_prompt(queue), mm, NULL, scheduling, NULL, automation,
-                                       settings_mgr, NULL, NULL, NULL, "test", "/tmp/unused.sock", NULL, NULL, transcripts, summaries, owner };
+                                       settings_mgr, NULL, NULL, NULL, "test", "/tmp/unused.sock", NULL, NULL, transcripts, summaries, labels, reminders, owner };
     server = control_server_create(&control_deps);
 
 
@@ -1648,6 +1729,7 @@ int main(void) {
     test_admin_answers_its_own();
     test_someone_with_no_chat_yet();
     test_agent_rules();
+    test_chat_tools();
     test_owner_chat();                              /* before the rate is used up */
     test_rate();
     test_tldr();
