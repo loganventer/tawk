@@ -81,7 +81,7 @@ void settings_set_defaults(Settings *s) {
     s->automation_push_received = 1;
     s->automation_push_sent = 1;
     str_copy(s->transcribe_model, sizeof(s->transcribe_model), "large-v3-turbo");
-    str_copy(s->transcribe_languages, sizeof(s->transcribe_languages), "auto");
+    str_copy(s->transcribe_languages, sizeof(s->transcribe_languages), "af,en");
 
     str_copy(s->backend, sizeof(s->backend), "whatsmeow");
     /* Per-user files (XDG): chats and login in data, downloads in cache. */
