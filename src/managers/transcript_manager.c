@@ -3,6 +3,7 @@
 #include "engines/transcript_display_policy.h"
 #include "engines/transcript_validator.h"
 #include "engines/transcription_policy.h"
+#include "engines/voice_language_list.h"
 #include "utilities/str_util.h"
 
 #include <stdlib.h>
@@ -38,7 +39,8 @@ static void prefs_of(TranscriptManager *m, const char *jid, ChatPrefs *out) {
 }
 
 TranscriptSaveResult transcript_manager_save(TranscriptManager *m, const Message *message, const Chat *chat,
-                                             const char *language, const char *text, const char *model, const char *source) {
+                                             const char *language, const char *text, const char *model, const char *source,
+                                             int replace_all) {
     m->error[0] = '\0';
     ChatPrefs prefs;
     prefs_of(m, chat ? chat->jid : "", &prefs);
@@ -62,7 +64,9 @@ TranscriptSaveResult transcript_manager_save(TranscriptManager *m, const Message
     t.created_at = (int64_t)time(NULL);
     transcript_set_text(&t, text);
     if (t.text) transcript_validator_clean(t.text);
-    int rc = t.text && t.text[0] ? m->deps.store->save(m->deps.store, &t) : -1;
+    int usable = t.text && t.text[0];
+    if (usable && replace_all) m->deps.store->remove(m->deps.store, message->id);
+    int rc = usable ? m->deps.store->save(m->deps.store, &t) : -1;
     transcript_dispose(&t);
     if (rc != 0) {
         str_copy(m->error, sizeof(m->error), "The transcript could not be kept");
@@ -138,6 +142,20 @@ int transcript_manager_set_transcribing(TranscriptManager *m, const char *chat_j
     m->error[0] = '\0';
     if (!chat_jid || !chat_jid[0]) { str_copy(m->error, sizeof(m->error), "Open a chat first."); return -1; }
     return set(m, m->deps.choices->set_transcribe_off(m->deps.choices, chat_jid, !on));
+}
+
+void transcript_manager_languages(TranscriptManager *m, const char *chat_jid, char *out, unsigned long size) {
+    ChatPrefs prefs;
+    prefs_of(m, chat_jid, &prefs);
+    str_copy(out, size, prefs.voice_languages);
+}
+
+int transcript_manager_set_languages(TranscriptManager *m, const char *chat_jid, const char *languages) {
+    m->error[0] = '\0';
+    if (!chat_jid || !chat_jid[0]) { str_copy(m->error, sizeof(m->error), "Open a chat first."); return -1; }
+    char clean[64];
+    voice_language_list_clean(languages, clean, sizeof(clean));
+    return set(m, m->deps.choices->set_languages(m->deps.choices, chat_jid, clean));
 }
 
 void transcript_manager_want(TranscriptManager *m, const Message *message, const Chat *chat) {

@@ -11,6 +11,8 @@ typedef struct IChatTranscriptPrefs {
     int  (*set_show)(struct IChatTranscriptPrefs *self, const char *jid, ChatTranscriptChoice choice);
     /* off 1: nothing in this chat is transcribed from now on. */
     int  (*set_transcribe_off)(struct IChatTranscriptPrefs *self, const char *jid, int off);
+    /* The languages this chat's voice notes are spoken in, as codes joined by commas, or "" for any. */
+    int  (*set_languages)(struct IChatTranscriptPrefs *self, const char *jid, const char *languages);
 } IChatTranscriptPrefs;
 
 #endif

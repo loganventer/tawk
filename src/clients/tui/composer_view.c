@@ -122,6 +122,20 @@ static int move_vertical(ComposerView *v, int delta) {
     return 1;
 }
 
+void composer_view_move_word(ComposerView *v, int direction) {
+    if (direction < 0) {
+        while (v->cursor > 0 && iswspace((wint_t)v->text[v->cursor - 1])) v->cursor--;
+        while (v->cursor > 0 && !iswspace((wint_t)v->text[v->cursor - 1])) v->cursor--;
+    } else {
+        while (v->cursor < v->length && iswspace((wint_t)v->text[v->cursor])) v->cursor++;
+        while (v->cursor < v->length && !iswspace((wint_t)v->text[v->cursor])) v->cursor++;
+    }
+}
+
+void composer_view_move_end(ComposerView *v, int direction) {
+    v->cursor = direction < 0 ? 0 : v->length;
+}
+
 int composer_view_key(ComposerView *v, int is_key_code, int ch) {
     if (is_key_code) {
         switch (ch) {

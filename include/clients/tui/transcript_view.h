@@ -19,12 +19,11 @@ typedef struct TranscriptView {
 /* Looks the message's transcript up through `source` (which may be NULL). */
 void transcript_view_load(TranscriptView *view, const TranscriptSource *source, const Message *message, AccountId owner);
 void transcript_view_dispose(TranscriptView *view);
-/* The words wrapped to `cols`, at most `max_lines` of them; the caller frees
- * `*wrapped`. *cut is set when more follow. Returns how many lines are kept. */
-int  transcript_view_wrap(const TranscriptView *view, int cols, int max_lines, TextLine **wrapped, int *cut);
-/* One wrapped line, dimmed and in italics over `attr` (the bubble's colours);
- * `cut` ends it with an ellipsis, on the last line kept. */
-void transcript_view_draw_line(const TranscriptView *view, int y, int x, int room, size_t offset, size_t length, int cut, int attr);
+/* The words wrapped to `cols`, every line of them: a transcript is shown
+ * whole. The caller frees `*wrapped`. Returns how many lines there are. */
+int  transcript_view_wrap(const TranscriptView *view, int cols, TextLine **wrapped);
+/* One wrapped line, dimmed and in italics over `attr` (the bubble's colours). */
+void transcript_view_draw_line(const TranscriptView *view, int y, int x, int room, size_t offset, size_t length, int attr);
 /* The same row for a soft-locked chat: its shape only. */
 void transcript_view_draw_veiled(const TranscriptView *view, int y, int x, int room, size_t offset, size_t length, int attr);
 

@@ -81,6 +81,7 @@ static void handle_paste(TuiApp *app, const char *text) {
     if (profile_dialogs_is_open(&app->profile)) { profile_dialogs_paste(&app->profile, text); return; }
     if (status_feed_dialogs_replying(&app->feed)) { status_feed_dialogs_paste(&app->feed, text); return; }
     if (app->accounts_dialog.open) { accounts_dialog_paste(&app->accounts_dialog, text); app->dirty = 1; return; }
+    if (app->voice_languages.open) { chat_toggle_dialog_paste(&app->voice_languages, text); return; }
     if (app->self_chats.open) { chat_toggle_dialog_paste(&app->self_chats, text); return; }
     if (app->forward_picker.open) { chat_picker_paste(&app->forward_picker, text); return; }
     if (app->scheduled_list.open) {
@@ -219,6 +220,10 @@ static int handle_overlays_key(TuiApp *app, int is_key, int ch) {
         tui_app_accounts_request(app, accounts_dialog_key(&app->accounts_dialog, is_key, ch));
         return 1;
     }
+    if (app->voice_languages.open) {
+        tui_app_voice_languages_request(app, chat_toggle_dialog_key(&app->voice_languages, is_key, ch));
+        return 1;
+    }
     if (app->self_chats.open) {
         tui_app_self_chats_request(app, chat_toggle_dialog_key(&app->self_chats, is_key, ch));
         return 1;
@@ -350,6 +355,12 @@ static int handle_overlays_mouse(TuiApp *app, const MEVENT *ev, int wheel, int p
     }
     if (app->accounts_dialog.open) {
         if (press) tui_app_accounts_request(app, accounts_dialog_click(&app->accounts_dialog, y, x));
+        app->dirty = 1;
+        return 1;
+    }
+    if (app->voice_languages.open) {
+        if (wheel) chat_toggle_dialog_wheel(&app->voice_languages, wheel);
+        else if (press) tui_app_voice_languages_request(app, chat_toggle_dialog_click(&app->voice_languages, y, x));
         app->dirty = 1;
         return 1;
     }
@@ -534,10 +545,11 @@ static void handle_mouse_event(TuiApp *app, MEVENT ev) {
             if (quoted >= 0) { tui_app_go_to_quote(app, quoted); return; }     /* a click on a quote jumps to it */
             int idx = message_view_hit(&app->message_view, ev.y, ev.x);
             if (idx >= 0) {
-                app->focus = TUI_FOCUS_MESSAGES;
                 app->message_view.selected = idx;
                 tui_app_activate_message(app, idx);
             }
+            /* A click anywhere in the conversation leaves the cursor in the input, ready to type. */
+            if (messaging_manager_open_jid(app->deps.messaging)[0]) app->focus = TUI_FOCUS_COMPOSER;
         }
     } else if (ui_rect_contains(l->composer, ev.y, ev.x)) {
         if (wheel) composer_view_scroll(&app->composer, wheel);
@@ -735,8 +747,45 @@ static int edit_last_message(TuiApp *app) {
     return 1;
 }
 
+/* An arrow key held with Ctrl, Alt or Shift, as terminals report it: Shift as its own key code,
+ * Ctrl and the combinations as extended keys named kLFT5 and the like, Alt as Esc before the
+ * arrow, and Option+arrow on a Mac as Esc b and Esc f. Returns which arrow (KEY_LEFT and so
+ * on), or 0 for anything else. */
+static int modified_arrow(int is_key, int ch, int alt) {
+    if (alt && !is_key && (ch == 'b' || ch == 'f')) return ch == 'b' ? KEY_LEFT : KEY_RIGHT;
+    if (!is_key) return 0;
+    if (alt && (ch == KEY_LEFT || ch == KEY_RIGHT || ch == KEY_UP || ch == KEY_DOWN)) return ch;
+    if (ch == KEY_SLEFT) return KEY_LEFT;
+    if (ch == KEY_SRIGHT) return KEY_RIGHT;
+    if (ch == KEY_SR) return KEY_UP;
+    if (ch == KEY_SF) return KEY_DOWN;
+    const char *name = keyname(ch);
+    if (!name || name[0] != 'k' || strlen(name) != 5) return 0;         /* kLFT5, kRIT3, kUP5 is shorter */
+    if (!strncmp(name, "kLFT", 4)) return KEY_LEFT;
+    if (!strncmp(name, "kRIT", 4)) return KEY_RIGHT;
+    return 0;
+}
+
+/* The same for the two shorter names, kUP5 and kDN5 and their kin. */
+static int modified_vertical(int is_key, int ch) {
+    const char *name = is_key ? keyname(ch) : NULL;
+    if (!name || name[0] != 'k' || strlen(name) != 4) return 0;
+    if (!strncmp(name, "kUP", 3)) return KEY_UP;
+    if (!strncmp(name, "kDN", 3)) return KEY_DOWN;
+    return 0;
+}
+
 static void handle_composer(TuiApp *app, int is_key, int ch, int alt) {
     const Settings *s = settings(app);
+    /* With Ctrl, Alt or Shift held, the arrows step through what is typed a word at a time, and up and down go to its ends. */
+    int arrow = modified_arrow(is_key, ch, alt);
+    if (!arrow) arrow = modified_vertical(is_key, ch);
+    if (arrow && !media_manager_is_recording(app->deps.media)) {
+        if (arrow == KEY_LEFT || arrow == KEY_RIGHT) composer_view_move_word(&app->composer, arrow == KEY_LEFT ? -1 : 1);
+        else composer_view_move_end(&app->composer, arrow == KEY_UP ? -1 : 1);
+        app->dirty = 1;
+        return;
+    }
     if (media_manager_is_recording(app->deps.media)) {
         if (is_enter(is_key, ch)) tui_app_toggle_recording(app);
         else if (is_esc(is_key, ch)) {

@@ -33,7 +33,7 @@ static int prefs_get(IChatPrefsStore *self, const char *jid, ChatPrefs *out) {
     memset(out, 0, sizeof(*out));
     str_copy(out->jid, sizeof(out->jid), jid);
     sqlite3_stmt *st = NULL;
-    const char *sql = "SELECT send_account, merge, show_transcripts, transcribe_off, tldr FROM chat_prefs WHERE jid = ?";
+    const char *sql = "SELECT send_account, merge, show_transcripts, transcribe_off, tldr, voice_languages FROM chat_prefs WHERE jid = ?";
     if (sqlite3_prepare_v2(db_of(self), sql, -1, &st, NULL) != SQLITE_OK) return -1;
     sqlite3_bind_text(st, 1, jid, -1, SQLITE_TRANSIENT);
     if (sqlite3_step(st) == SQLITE_ROW) {
@@ -42,6 +42,7 @@ static int prefs_get(IChatPrefsStore *self, const char *jid, ChatPrefs *out) {
         out->show_transcripts = show_of(sqlite3_column_int(st, 2));
         out->transcribe_off = sqlite3_column_int(st, 3) != 0;
         out->tldr = sqlite3_column_int(st, 4) != 0;
+        str_copy(out->voice_languages, sizeof(out->voice_languages), (const char *)sqlite3_column_text(st, 5));
     }
     sqlite3_finalize(st);
     return 0;
@@ -68,6 +69,17 @@ static int transcripts_set_show(IChatTranscriptPrefs *self, const char *jid, Cha
 static int transcripts_set_transcribe_off(IChatTranscriptPrefs *self, const char *jid, int off) {
     return set_int_in((sqlite3 *)self->ctx, "INSERT INTO chat_prefs (jid, transcribe_off) VALUES (?1, ?2) "
                       "ON CONFLICT(jid) DO UPDATE SET transcribe_off = excluded.transcribe_off", jid, off ? 1 : 0);
+}
+
+static int transcripts_set_languages(IChatTranscriptPrefs *self, const char *jid, const char *languages) {
+    sqlite3 *db = (sqlite3 *)self->ctx;
+    sqlite3_stmt *st = NULL;
+    const char *sql = "INSERT INTO chat_prefs (jid, voice_languages) VALUES (?1, ?2) "
+                      "ON CONFLICT(jid) DO UPDATE SET voice_languages = excluded.voice_languages";
+    if (sqlite3_prepare_v2(db, sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    sqlite3_bind_text(st, 1, jid, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(st, 2, languages ? languages : "", -1, SQLITE_TRANSIENT);
+    return finish(db, st);
 }
 
 static int summaries_set_tldr(IChatSummaryPrefs *self, const char *jid, int on) {
@@ -111,8 +123,8 @@ static int prefs_forget_account(IChatPrefsStore *self, AccountId account) {
 static int prefs_reassign_jid(IChatPrefsStore *self, const char *from, const char *to) {
     /* What was chosen under the address that stays wins over the one that goes. */
     static const char *const SQL[] = {
-        "INSERT OR IGNORE INTO chat_prefs (jid, send_account, merge, show_transcripts, transcribe_off, tldr) "
-        "SELECT ?2, send_account, merge, show_transcripts, transcribe_off, tldr FROM chat_prefs WHERE jid = ?1",
+        "INSERT OR IGNORE INTO chat_prefs (jid, send_account, merge, show_transcripts, transcribe_off, tldr, voice_languages) "
+        "SELECT ?2, send_account, merge, show_transcripts, transcribe_off, tldr, voice_languages FROM chat_prefs WHERE jid = ?1",
         "DELETE FROM chat_prefs WHERE jid = ?1",
     };
     for (int i = 0; i < 2; i++) {
@@ -147,6 +159,7 @@ IChatPrefsStore *sqlite_chat_prefs_store_create(sqlite3 *db) {
     state->transcripts.ctx = db;
     state->transcripts.set_show = transcripts_set_show;
     state->transcripts.set_transcribe_off = transcripts_set_transcribe_off;
+    state->transcripts.set_languages = transcripts_set_languages;
     state->summaries.ctx = db;
     state->summaries.set_tldr = summaries_set_tldr;
     s->ctx = state;

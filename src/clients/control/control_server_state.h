@@ -176,7 +176,8 @@ void control_op_set_transcript(ControlServer *server, ControlSession *session, c
 void control_op_get_transcript(ControlServer *server, ControlSession *session, const ControlRequest *req);
 /* Tells one agent about older voice notes that wait for a transcript. */
 void control_transcripts_tick(ControlServer *server);
-/* Adds "transcribe":false to an answer or event about `chat` when its voice notes are not to be transcribed. */
+/* Adds "transcribe":false to an answer or event about `chat` when its voice notes are not to be
+ * transcribed, and "languages" when you said which languages they are spoken in. */
 void control_tag_transcribe(ControlServer *server, cJSON *object, const Chat *chat);
 /* control_ops_summaries.c */
 void control_op_set_summary(ControlServer *server, ControlSession *session, const ControlRequest *req);

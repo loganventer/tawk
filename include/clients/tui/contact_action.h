@@ -19,7 +19,8 @@ typedef enum ContactAction {
     CONTACT_ACTION_AGENT_ANSWERS,    /* whether an agent may answer here by itself */
     CONTACT_ACTION_SHOW_TRANSCRIPTS, /* whether the transcripts of its voice notes show */
     CONTACT_ACTION_TRANSCRIBE,       /* whether its voice notes are transcribed from now on */
-    CONTACT_ACTION_TLDR,             /* whether its long messages show as a summary */
+    CONTACT_ACTION_VOICE_LANGUAGES,  /* the languages its voice notes are spoken in; opens a list of switches */
+    CONTACT_ACTION_TLDR,             /* whether its messages show as a summary */
     CONTACT_ACTION_COUNT
 } ContactAction;
 

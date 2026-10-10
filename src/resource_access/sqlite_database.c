@@ -294,9 +294,16 @@ static const Migration MIGRATIONS[] = {
       "END;"
       /* Whether a person or group is in TL;DR mode. */
       "ALTER TABLE chat_prefs ADD COLUMN tldr INTEGER NOT NULL DEFAULT 0;" },
+    { 20,
+      /* Transcripts written before the transcriber worked out the language properly could be in the wrong
+       * one, or a translation. They are dropped, and written again as their voice notes are looked at. */
+      "DELETE FROM transcripts;"
+      /* The languages a person's or group's voice notes are spoken in ('af,en'), so a transcriber
+       * chooses among them; '' leaves it to the setting. */
+      "ALTER TABLE chat_prefs ADD COLUMN voice_languages TEXT NOT NULL DEFAULT '';" },
 };
 
-#define LATEST_VERSION 19
+#define LATEST_VERSION 20
 
 static int user_version(sqlite3 *db) {
     sqlite3_stmt *st = NULL;

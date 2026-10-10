@@ -68,6 +68,7 @@ static const char *pref_value(const ContactPanel *p, ContactAction a) {
         case CONTACT_ACTION_SHOW_TRANSCRIPTS: return p->show_transcripts;
         case CONTACT_ACTION_TRANSCRIBE:    return p->transcribe;
         case CONTACT_ACTION_TLDR:          return p->tldr;
+        case CONTACT_ACTION_VOICE_LANGUAGES: return p->voice_languages;
         default:                           return NULL;
     }
 }
@@ -99,11 +100,12 @@ void contact_panel_set_prefs(ContactPanel *p, const char *send_from, const char 
     add_prefs(p, PREFS, 3);
 }
 
-void contact_panel_set_transcript_prefs(ContactPanel *p, const char *show, const char *transcribe) {
+void contact_panel_set_transcript_prefs(ContactPanel *p, const char *show, const char *transcribe, const char *languages) {
     str_copy(p->show_transcripts, sizeof(p->show_transcripts), show ? show : "");
     str_copy(p->transcribe, sizeof(p->transcribe), transcribe ? transcribe : "");
-    static const ContactAction PREFS[] = { CONTACT_ACTION_SHOW_TRANSCRIPTS, CONTACT_ACTION_TRANSCRIBE };
-    add_prefs(p, PREFS, 2);
+    str_copy(p->voice_languages, sizeof(p->voice_languages), languages ? languages : "");
+    static const ContactAction PREFS[] = { CONTACT_ACTION_SHOW_TRANSCRIPTS, CONTACT_ACTION_TRANSCRIBE, CONTACT_ACTION_VOICE_LANGUAGES };
+    add_prefs(p, PREFS, 3);
 }
 
 void contact_panel_set_tldr_pref(ContactPanel *p, const char *tldr) {

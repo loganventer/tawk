@@ -35,6 +35,11 @@ void  composer_view_set_text(ComposerView *view, const char *utf8);
 /* Handles an editing key. Returns 1 when the key was consumed. ↑ and ↓
  * move between wrapped lines and return 0 at the first or last line. */
 int   composer_view_key(ComposerView *view, int is_key_code, int ch);
+/* Moves the cursor a word at a time: to the start of the word before it (-1)
+ * or past the end of the word after it (+1). */
+void  composer_view_move_word(ComposerView *view, int direction);
+/* Moves the cursor to the very start (-1) or the very end (+1) of what is typed. */
+void  composer_view_move_end(ComposerView *view, int direction);
 void  composer_view_insert(ComposerView *view, wchar_t ch);
 /* UTF-8 copy of the text; caller frees. */
 char *composer_view_text(const ComposerView *view);

@@ -97,6 +97,8 @@ struct TuiApp {
     SplashView          splash;               /* the start-up animation */
     ChatPicker          forward_picker;       /* choosing chats to forward a message to */
     ChatToggleDialog    self_chats;           /* the chats an admin agent may answer its own requests in */
+    ChatToggleDialog    voice_languages;      /* the languages one chat's voice notes are spoken in: the same list of switches */
+    char                voice_languages_jid[128];  /* the chat it was opened for */
     SendAccountDialog   send_accounts;        /* the contacts with a sending account of their own */
     AccountsDialog      accounts_dialog;      /* your accounts: add, name, link and remove them */
     UnreadTally         total_tally;          /* new notifications over every account, for the header and the title */
@@ -352,6 +354,12 @@ const TranscriptSource *tui_app_transcripts_for(TuiApp *app, const Chat *chat);
 void tui_app_refresh_transcript_prefs(TuiApp *app);
 void tui_app_step_show_transcripts(TuiApp *app, const char *jid);
 void tui_app_toggle_transcribing(TuiApp *app, const char *jid);
+/* The languages a chat's voice notes are spoken in: a list with a switch for each. */
+/* With no chat named it is the list for every chat that names none of its own (Settings, Chats). */
+void tui_app_open_voice_languages(TuiApp *app, const char *jid);
+void tui_app_voice_languages_summary(TuiApp *app, char *out, size_t size);
+void tui_app_voice_languages_render(TuiApp *app, UiRect area);
+void tui_app_voice_languages_request(TuiApp *app, PopupResult result);
 /* Whether a voice note has a transcript, and reading every one of them in full. */
 int  tui_app_has_transcript(TuiApp *app, const Message *message, AccountId owner);
 void tui_app_show_transcript(TuiApp *app, const Message *message, AccountId owner);

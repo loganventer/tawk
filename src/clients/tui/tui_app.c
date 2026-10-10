@@ -208,6 +208,7 @@ int tui_app_use_account(TuiApp *app, AccountId account) {
     app->scheduled_list.open = 0;
     app->forward_picker.open = 0;
     app->self_chats.open = 0;
+    app->voice_languages.open = 0;
     app->contact.open = 0;
     /* An account out of view has no chat open: its unread counts run again. */
     messaging_manager_open_chat(app->deps.messaging, "");
@@ -1132,6 +1133,9 @@ static void host_action(void *ctx, MenuAction action) {
         case MENU_ACTION_SELF_APPROVAL_CHATS:
             tui_app_open_self_chats(app);
             break;
+        case MENU_ACTION_VOICE_LANGUAGES:
+            tui_app_open_voice_languages(app, NULL);
+            break;
         case MENU_ACTION_ACCOUNTS:
             tui_app_open_accounts(app);
             break;
@@ -1244,6 +1248,7 @@ void tui_app_contact_action(TuiApp *app) {
         case CONTACT_ACTION_SHOW_TRANSCRIPTS: tui_app_step_show_transcripts(app, jid); break;
         case CONTACT_ACTION_TRANSCRIBE:    tui_app_toggle_transcribing(app, jid); break;
         case CONTACT_ACTION_TLDR:          tui_app_toggle_tldr(app, jid); break;
+        case CONTACT_ACTION_VOICE_LANGUAGES: tui_app_open_voice_languages(app, jid); break;
         case CONTACT_ACTION_SEARCH:     app->contact.open = 0; tui_app_open_search(app, ""); break;
         case CONTACT_ACTION_OPTIONS:    app->contact.open = 0; tui_app_open_chat_options(app, jid); break;
         case CONTACT_ACTION_SOFT_LOCK:  tui_app_toggle_soft_lock(app, jid); break;
@@ -1413,6 +1418,7 @@ static void host_info(void *ctx, MenuInfo info, char *out, size_t size) {
             break;
         }
         case MENU_INFO_SELF_CHATS:  tui_app_self_chats_summary(app, out, size); break;
+        case MENU_INFO_VOICE_LANGUAGES: tui_app_voice_languages_summary(app, out, size); break;
         default:                    out[0] = '\0'; break;
     }
 }

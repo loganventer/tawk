@@ -14,6 +14,7 @@
 #define WANTED_BURST      4
 #define WANTED_EVERY_MS   1500
 #define QUESTION_LIFE_MS  (10 * 60 * 1000)
+#define RETRY_ASK_MS      15000
 #define SUMMARY_MAX_CHARS 400
 
 static int label_chosen(ControlServer *s, const ControlSession *session) {
@@ -112,9 +113,12 @@ static void ask(ControlServer *s, const SummariserCandidate *c, int count, int64
     s->summary_asked_ms = now;                              /* asked or not, it is not tried again for a while */
     s->summary_ask_count = n;
     s->summary_asking = tell_yourself(s, question) == 0;
-    automation_manager_notice(s->deps.automation, s->summary_asking
-        ? "Several agents are connected: tawk asked you on WhatsApp which one writes TL;DR summaries (or choose your default agent in the Agents list with d)"
-        : "Several agents are connected: choose your default agent in the Agents list with d");
+    /* Not sent (this account is not connected yet, say): tried again shortly, not after the whole wait. */
+    if (!s->summary_asking) s->summary_asked_ms = now - QUESTION_LIFE_MS + RETRY_ASK_MS;
+    if (s->summary_asking) {
+        automation_manager_notice(s->deps.automation, "Several agents are connected: tawk asked you on WhatsApp which one writes "
+                                  "TL;DR summaries (or choose your default agent in the Agents list with d)");
+    }
 }
 
 /* The question is withdrawn when it is old, or when an agent it listed has gone. */

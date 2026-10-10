@@ -9,6 +9,15 @@
 void control_tag_transcribe(ControlServer *s, cJSON *object, const Chat *chat) {
     if (!s->deps.transcripts || !chat) return;
     if (!transcript_manager_transcribing(s->deps.transcripts, chat)) cJSON_AddBoolToObject(object, "transcribe", 0);
+    /* The languages you said this chat's voice notes are spoken in, for the transcriber to choose among. */
+    char list[64];
+    transcript_manager_languages(s->deps.transcripts, chat->jid, list, sizeof(list));
+    if (!list[0]) return;
+    cJSON *languages = cJSON_AddArrayToObject(object, "languages");
+    char *save = NULL;
+    for (char *code = strtok_r(list, ",", &save); code; code = strtok_r(NULL, ",", &save)) {
+        cJSON_AddItemToArray(languages, cJSON_CreateString(code));
+    }
 }
 
 static int available(ControlServer *s, const ControlSession *session, const ControlRequest *req) {
@@ -30,7 +39,8 @@ void control_op_set_transcript(ControlServer *s, ControlSession *session, const 
     char source[64];
     str_copy(source, sizeof(source), session->client);
     TranscriptSaveResult result = transcript_manager_save(s->deps.transcripts, &msg, chat, control_codec_string(req->args, "language"),
-                                                          text, control_codec_string(req->args, "model"), source);
+                                                          text, control_codec_string(req->args, "model"), source,
+                                                          control_codec_bool(req->args, "replace", 0));
     char chat_jid[128];
     str_copy(chat_jid, sizeof(chat_jid), msg.chat_jid);
     message_dispose(&msg);
@@ -81,6 +91,7 @@ void control_transcripts_tick(ControlServer *s) {
                 cJSON_AddStringToObject(c, "jid", chat->jid);
                 cJSON_AddStringToObject(c, "name", chat->name);
                 cJSON_AddStringToObject(evt, "message_id", id);
+                control_tag_transcribe(s, evt, chat);
                 control_tag_account(s, evt);
                 control_reply(s, conn, control_codec_event("transcript_wanted", evt));
             }

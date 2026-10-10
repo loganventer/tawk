@@ -34,22 +34,15 @@ void transcript_view_dispose(TranscriptView *v) {
     memset(v, 0, sizeof(*v));
 }
 
-int transcript_view_wrap(const TranscriptView *v, int cols, int max_lines, TextLine **wrapped, int *cut) {
+int transcript_view_wrap(const TranscriptView *v, int cols, TextLine **wrapped) {
     *wrapped = NULL;
-    *cut = 0;
     if (!v->found || cols < 1) return 0;
-    int n = utf8_wrap(v->transcript.text, cols, wrapped);
-    if (max_lines < 1) max_lines = 1;
-    if (n > max_lines) { n = max_lines; *cut = 1; }
-    return n;
+    return utf8_wrap(v->transcript.text, cols, wrapped);
 }
 
-void transcript_view_draw_line(const TranscriptView *v, int y, int x, int room, size_t offset, size_t length, int cut, int attr) {
+void transcript_view_draw_line(const TranscriptView *v, int y, int x, int room, size_t offset, size_t length, int attr) {
     if (!v->found || offset + length > strlen(v->transcript.text)) return;
-    int spoken = spoken_attr(attr);
-    if (!cut) { tui_text_n(y, x, room, v->transcript.text + offset, length, spoken); return; }
-    int used = tui_text_n(y, x, room - 2, v->transcript.text + offset, length, spoken);
-    tui_text(y, x + used, 2, " \xE2\x80\xA6", spoken);                  /* … */
+    tui_text_n(y, x, room, v->transcript.text + offset, length, spoken_attr(attr));
 }
 
 void transcript_view_draw_veiled(const TranscriptView *v, int y, int x, int room, size_t offset, size_t length, int attr) {

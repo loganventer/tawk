@@ -19,10 +19,12 @@ void               transcript_manager_destroy(TranscriptManager *mgr);
 const char        *transcript_manager_error(TranscriptManager *mgr);
 
 /* Keeps the words of `message`, a voice note in `chat`, replacing the
- * transcript it already has in that language. `source` names the program
- * that hands them over. */
+ * transcript it already has in that language. With `replace_all` it takes
+ * the place of every transcript the message has, in whatever language: a
+ * voice note written out again. `source` names the program that hands them over. */
 TranscriptSaveResult transcript_manager_save(TranscriptManager *mgr, const Message *message, const Chat *chat,
-                                             const char *language, const char *text, const char *model, const char *source);
+                                             const char *language, const char *text, const char *model, const char *source,
+                                             int replace_all);
 /* Every transcript a message has, newest first; the caller frees `*out` with transcript_array_free. */
 int  transcript_manager_find(TranscriptManager *mgr, const char *message_id, Transcript **out, int *count);
 /* The one to show, in the first of your transcription languages it has.
@@ -40,6 +42,12 @@ int  transcript_manager_transcribing(TranscriptManager *mgr, const Chat *chat);
 /* What you chose for the chat, whatever else stands in the way (a lock). */
 int  transcript_manager_transcribe_chosen(TranscriptManager *mgr, const char *chat_jid);
 int  transcript_manager_set_transcribing(TranscriptManager *mgr, const char *chat_jid, int on);
+
+/* The languages a chat's voice notes are spoken in ("af,en"; "" when any,
+ * as the setting says), and choosing them. A transcriber is told, and
+ * works out which of them each voice note is in. Codes it does not know are left out. */
+void transcript_manager_languages(TranscriptManager *mgr, const char *chat_jid, char *out, unsigned long size);
+int  transcript_manager_set_languages(TranscriptManager *mgr, const char *chat_jid, const char *languages);
 
 /* An older voice note that is looked at and has no transcript goes on the
  * list of those waiting for one, once: only while voice notes are transcribed

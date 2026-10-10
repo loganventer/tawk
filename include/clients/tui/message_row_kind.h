@@ -23,7 +23,7 @@ typedef enum MessageRowKind {
     MESSAGE_ROW_STATUS_TEXT,   /* a line of that status's words (on its colour) or caption */
     MESSAGE_ROW_TLDR_HEAD,     /* "▸ TL;DR" over a long message's summary, or "▾ TL;DR" over the original: the line that folds it */
     MESSAGE_ROW_TLDR,          /* a line of the summary */
-    MESSAGE_ROW_TRANSCRIPT     /* a line of a voice note's transcript, in its bubble under the play line (meta_inline: more follow, so it ends on an ellipsis) */
+    MESSAGE_ROW_TRANSCRIPT     /* a line of a voice note's transcript, in its bubble under the play line */
 } MessageRowKind;
 
 #endif

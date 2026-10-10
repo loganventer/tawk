@@ -58,7 +58,7 @@ static int use_pixel_images(TuiApp *app, const Settings *s, int beside_contact) 
     return !((app->contact.open && !beside_contact) || app->reader.open || app->theme_picker.open || app->search.open || app->message_menu.open ||
              app->emoji_picker.open || app->options.open || app->attach_menu.open || app->camera_view.open || app->message_info.open || app->palette.open ||
              app->file_picker.open || app->settings_panel.open || profile_dialogs_is_open(&app->profile) ||
-             app->status_composer.open || status_feed_dialogs_is_open(&app->feed) || app->forward_picker.open || app->self_chats.open || app->scheduled_list.open || app->agents.open ||
+             app->status_composer.open || status_feed_dialogs_is_open(&app->feed) || app->forward_picker.open || app->self_chats.open || app->voice_languages.open || app->scheduled_list.open || app->agents.open ||
              app->accounts_dialog.open || app->send_accounts.open || health.show_overlay || typing_command);
 }
 
@@ -178,7 +178,6 @@ void tui_render_frame(TuiApp *app, int64_t now) {
             .formatter = &app->formatter,
             .statuses = &app->status_source,
             .transcripts = tui_app_transcripts_for(app, chat),
-            .transcript_lines = s->transcript_lines,
             .summaries = tui_app_summaries_for(app, chat),
         };
         ScheduledMessage *scheduled = NULL;
@@ -271,6 +270,8 @@ void tui_render_frame(TuiApp *app, int64_t now) {
         tui_app_accounts_render(app, l->body);
     } else if (app->scheduled_list.open) {
         tui_app_scheduled_render(app, l->body);
+    } else if (app->voice_languages.open) {
+        tui_app_voice_languages_render(app, l->body);
     } else if (app->self_chats.open) {
         int n = 0;
         const Chat *all = messaging_manager_chats(mm, &n);
@@ -348,6 +349,8 @@ void tui_render_frame(TuiApp *app, int64_t now) {
         where = app->agents.caret;
     } else if (app->accounts_dialog.open) {
         where = app->accounts_dialog.caret;
+    } else if (app->voice_languages.open) {
+        where = app->voice_languages.caret;
     } else if (app->self_chats.open) {
         where = app->self_chats.caret;
     } else if (app->forward_picker.open) {

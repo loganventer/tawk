@@ -9,7 +9,9 @@
 #include "engines/transcript_choice.h"
 #include "engines/transcript_display_policy.h"
 #include "engines/transcript_validator.h"
+#include "core/voice_language.h"
 #include "engines/transcription_policy.h"
+#include "engines/voice_language_list.h"
 #include "managers/transcript_manager.h"
 #include "resource_access/sqlite_chat_prefs_store.h"
 #include "resource_access/sqlite_database.h"
@@ -105,6 +107,13 @@ static void test_engines(void) {
     chat.soft_locked = 0;
     chat.is_locked = 1;
     CHECK(!transcription_policy_allows(&chat, &prefs) && !transcription_policy_allows(NULL, &prefs), "never a locked one, or none");
+    char list[64];
+    CHECK(voice_language_list_clean(" AF, en,af , xx,,klingon", list, sizeof(list)) == 2 && strcmp(list, "af,en") == 0,
+          "a list of languages is kept clean: known codes, lower case, each once, in the order given");
+    CHECK(voice_language_list_clean("", list, sizeof(list)) == 0 && list[0] == '\0' && voice_language_list_clean(NULL, list, sizeof(list)) == 0,
+          "and an empty one stays empty");
+    CHECK(voice_language_find("af") && strcmp(voice_language_find("AF")->name, "Afrikaans") == 0 && !voice_language_find("xx") &&
+          voice_language_count() > 90, "the languages a transcriber can tell apart are known by name");
     message_dispose(&audio);
     message_dispose(&text);
 }
@@ -195,9 +204,9 @@ static void test_manager(sqlite3 *db) {
     messages->save(messages, &b);
     messages->save(messages, &c);
 
-    CHECK(transcript_manager_save(mgr, &a, &mom, "EN", "  Hello\tthere \x1b ", "large-v3", "tawk-mcp") == TRANSCRIPT_SAVED, "a transcript is kept");
+    CHECK(transcript_manager_save(mgr, &a, &mom, "EN", "  Hello\tthere \x1b ", "large-v3", "tawk-mcp", 0) == TRANSCRIPT_SAVED, "a transcript is kept");
     CHECK(transcript_manager_take_changed(mgr) && !transcript_manager_take_changed(mgr), "the change is reported once");
-    CHECK(transcript_manager_save(mgr, &a, &mom, "af", "Hallo daar", "large-v3", "tawk-mcp") == TRANSCRIPT_SAVED, "and one in another language");
+    CHECK(transcript_manager_save(mgr, &a, &mom, "af", "Hallo daar", "large-v3", "tawk-mcp", 0) == TRANSCRIPT_SAVED, "and one in another language");
     Transcript best;
     transcript_init(&best);
     int others = -1;
@@ -212,8 +221,16 @@ static void test_manager(sqlite3 *db) {
     transcript_init(&best);
     CHECK(transcript_manager_best(mgr, "M2", &best, NULL) != 0, "a voice note without one has none to show");
     transcript_dispose(&best);
-    CHECK(transcript_manager_save(mgr, &text, &mom, "af", "Hallo", "", "") == TRANSCRIPT_REFUSED && transcript_manager_error(mgr)[0],
+    CHECK(transcript_manager_save(mgr, &text, &mom, "af", "Hallo", "", "", 0) == TRANSCRIPT_REFUSED && transcript_manager_error(mgr)[0],
           "a text message is refused, with a reason");
+
+    CHECK(transcript_manager_save(mgr, &a, &mom, "af", "Hallo daar, hoe gaan dit", "large-v3", "tawk-mcp", 1) == TRANSCRIPT_SAVED, "a voice note is written out again");
+    Transcript *again = NULL;
+    int again_count = 0;
+    transcript_manager_find(mgr, "M1", &again, &again_count);
+    CHECK(again_count == 1 && strcmp(again[0].text, "Hallo daar, hoe gaan dit") == 0, "which takes the place of every transcript it had");
+    transcript_array_free(again, again_count);
+    transcript_manager_save(mgr, &a, &mom, "en", "Hello there", "large-v3", "tawk-mcp", 0);
 
     /* showing: the setting and the chat's own choice */
     CHECK(transcript_manager_shown(mgr, MOM) && transcript_manager_display_choice(mgr, MOM) == CHAT_TRANSCRIPT_FOLLOW, "shown while the setting is on");
@@ -234,7 +251,7 @@ static void test_manager(sqlite3 *db) {
     CHECK(transcript_manager_transcribing(mgr, &mom) && transcript_manager_transcribe_chosen(mgr, MOM), "a chat is transcribed to begin with");
     CHECK(transcript_manager_set_transcribing(mgr, MOM, 0) == 0 && !transcript_manager_transcribing(mgr, &mom) &&
           !transcript_manager_transcribe_chosen(mgr, MOM) && transcript_manager_transcribing(mgr, &work), "one chat can be switched off");
-    CHECK(transcript_manager_save(mgr, &b, &mom, "af", "Nuwe stemnota", "", "tawk-mcp") == TRANSCRIPT_OFF, "a new transcript for it is refused");
+    CHECK(transcript_manager_save(mgr, &b, &mom, "af", "Nuwe stemnota", "", "tawk-mcp", 0) == TRANSCRIPT_OFF, "a new transcript for it is refused");
     transcript_init(&best);
     CHECK(transcript_manager_best(mgr, "M2", &best, NULL) != 0, "and nothing is kept");
     transcript_dispose(&best);
@@ -242,11 +259,11 @@ static void test_manager(sqlite3 *db) {
     CHECK(transcript_manager_best(mgr, "M1", &best, NULL) == 0 && strcmp(best.text, "Hello there") == 0,
           "the transcripts it already had are still there");
     transcript_dispose(&best);
-    CHECK(transcript_manager_save(mgr, &c, &work, "", "Stand-up in five", "", "tawk-mcp") == TRANSCRIPT_SAVED, "another chat carries on");
+    CHECK(transcript_manager_save(mgr, &c, &work, "", "Stand-up in five", "", "tawk-mcp", 0) == TRANSCRIPT_SAVED, "another chat carries on");
     CHECK(transcript_manager_set_transcribing(mgr, MOM, 1) == 0 &&
-          transcript_manager_save(mgr, &b, &mom, "af", "Nuwe stemnota", "", "tawk-mcp") == TRANSCRIPT_SAVED, "and it can be switched on again");
+          transcript_manager_save(mgr, &b, &mom, "af", "Nuwe stemnota", "", "tawk-mcp", 0) == TRANSCRIPT_SAVED, "and it can be switched on again");
     mom.soft_locked = 1;
-    CHECK(transcript_manager_save(mgr, &b, &mom, "en", "New voice note", "", "tawk-mcp") == TRANSCRIPT_OFF && transcript_manager_transcribe_chosen(mgr, MOM),
+    CHECK(transcript_manager_save(mgr, &b, &mom, "en", "New voice note", "", "tawk-mcp", 0) == TRANSCRIPT_OFF && transcript_manager_transcribe_chosen(mgr, MOM),
           "a soft-locked chat takes none, whatever was chosen");
     mom.soft_locked = 0;
 
@@ -277,12 +294,26 @@ static void test_manager(sqlite3 *db) {
     message_dispose(&old);
     message_dispose(&mine);
 
+    /* the languages a chat's voice notes are spoken in */
+    char spoken[64];
+    transcript_manager_languages(mgr, MOM, spoken, sizeof(spoken));
+    CHECK(spoken[0] == '\0', "a chat names no languages to begin with: the transcriber works it out");
+    CHECK(transcript_manager_set_languages(mgr, MOM, "en, AF,zz") == 0, "languages can be switched on for a chat");
+    transcript_manager_languages(mgr, MOM, spoken, sizeof(spoken));
+    CHECK(strcmp(spoken, "en,af") == 0, "kept clean, in the order chosen");
+    transcript_manager_languages(mgr, WORK, spoken, sizeof(spoken));
+    CHECK(spoken[0] == '\0', "for that chat alone");
+    CHECK(transcript_manager_set_languages(mgr, MOM, "") == 0, "and all switched off again");
+    transcript_manager_languages(mgr, MOM, spoken, sizeof(spoken));
+    CHECK(spoken[0] == '\0', "which leaves it to the transcriber");
+    transcript_manager_set_languages(mgr, "1234@lid", "af");
+
     /* what you chose survives the chat turning out to have another address */
     ChatPrefs got;
     transcript_manager_set_display_choice(mgr, "1234@lid", CHAT_TRANSCRIPT_ALWAYS);
     transcript_manager_set_transcribing(mgr, "1234@lid", 0);
     CHECK(prefs->reassign_jid(prefs, "1234@lid", "27820000005@s.whatsapp.net") == 0 &&
-          prefs->get(prefs, "27820000005@s.whatsapp.net", &got) == 0 && got.show_transcripts == CHAT_TRANSCRIPT_ALWAYS && got.transcribe_off == 1,
+          prefs->get(prefs, "27820000005@s.whatsapp.net", &got) == 0 && got.show_transcripts == CHAT_TRANSCRIPT_ALWAYS && got.transcribe_off == 1 && strcmp(got.voice_languages, "af") == 0,
           "the choices move with the chat");
 
     /* the conversation's view of one */
@@ -295,15 +326,15 @@ static void test_manager(sqlite3 *db) {
     view.found = 1;
     view.transcript = shown;
     TextLine *lines = NULL;
-    int cut = 0;
-    int kept = transcript_view_wrap(&view, 10, 3, &lines, &cut);
-    CHECK(kept == 3 && cut == 1 && lines[0].offset == 0, "a long transcript is cut to the lines allowed, and says so");
+    int kept = transcript_view_wrap(&view, 10, &lines);
+    CHECK(kept >= 6 && lines[0].offset == 0 && lines[kept - 1].offset + lines[kept - 1].length == strlen(shown.text),
+          "a long transcript is wrapped whole, down to its last word");
     free(lines);
-    kept = transcript_view_wrap(&view, 80, 3, &lines, &cut);
-    CHECK(kept == 1 && cut == 0, "a short one is shown whole");
+    kept = transcript_view_wrap(&view, 80, &lines);
+    CHECK(kept == 1, "a short one is one line");
     free(lines);
     view.found = 0;
-    kept = transcript_view_wrap(&view, 80, 3, &lines, &cut);
+    kept = transcript_view_wrap(&view, 80, &lines);
     CHECK(kept == 0 && lines == NULL, "and none gives no lines");
     transcript_dispose(&shown);
 
@@ -356,7 +387,6 @@ static void test_conversation(void) {
     memset(&ctx, 0, sizeof(ctx));
     ctx.title = "Mom";
     ctx.playing_path = "";
-    ctx.transcript_lines = 2;
     UiRect rect = { 0, 0, 40, 100 };
     MessageView view;
     message_view_init(&view);
@@ -387,12 +417,7 @@ static void test_conversation(void) {
         if (at) found_dim = (mvinch(y, (int)(at - line)) & A_DIM) != 0;
     }
     CHECK(found_dim, "in grey, apart from the voice note's own line");
-    CHECK(!on_screen("lastword"), "cut to the lines allowed");
-
-    erase();
-    ctx.transcript_lines = 40;
-    message_view_render(&view, rect, msgs, 2, &ctx);
-    CHECK(on_screen("lastword") && view.row_count > rows_with, "more lines show more of it");
+    CHECK(on_screen("lastword"), "all of it, down to the last word: a transcript is never cut");
 
     erase();
     ctx.transcripts = NULL;

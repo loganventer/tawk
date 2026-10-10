@@ -1165,6 +1165,24 @@ static void test_transcripts(void) {
     CHECK(r && transcript_count(r) == 1, "while the one it already had is still there");
     cJSON_Delete(r);
     transcript_manager_set_transcribing(transcripts, MOM, 1);
+    say(conn, "{\"id\":\"t13\",\"op\":\"set_transcript\",\"args\":{\"message_id\":\"V1\",\"language\":\"en\",\"text\":\"Hello my child\"}}");
+    say(conn, "{\"id\":\"t14\",\"op\":\"get_transcript\",\"args\":{\"message_id\":\"V1\"}}");
+    r = reply("t14");
+    CHECK(r && transcript_count(r) == 2, "another language is kept beside the first");
+    cJSON_Delete(r);
+    say(conn, "{\"id\":\"t15\",\"op\":\"set_transcript\",\"args\":{\"message_id\":\"V1\",\"language\":\"af\",\"text\":\"Hallo my kind, weer\",\"replace\":true}}");
+    say(conn, "{\"id\":\"t16\",\"op\":\"get_transcript\",\"args\":{\"message_id\":\"V1\"}}");
+    r = reply("t16");
+    CHECK(r && transcript_count(r) == 1, "written out again with replace, it takes the place of them all");
+    cJSON_Delete(r);
+
+    transcript_manager_set_languages(transcripts, MOM, "af,en");
+    say(conn, "{\"id\":\"t17\",\"op\":\"chat_info\",\"args\":{\"chat\":\"" MOM "\"}}");
+    r = reply("t17");
+    const cJSON *spoken = r ? cJSON_GetObjectItemCaseSensitive(result(r), "languages") : NULL;
+    CHECK(cJSON_GetArraySize(spoken) == 2 && !strcmp(cJSON_GetArrayItem(spoken, 0)->valuestring, "af") &&
+          !strcmp(cJSON_GetArrayItem(spoken, 1)->valuestring, "en"), "a chat whose languages you named says which, for the transcriber");
+    cJSON_Delete(r);
 
     /* An older voice note you looked at, with no transcript, is handed to an agent to transcribe. */
     clear_outbox();
@@ -1180,8 +1198,15 @@ static void test_transcripts(void) {
     message_dispose(&looked_at);
     tick();
     int told = 0;
-    for (int i = 0; i < outbox_count; i++) told += strstr(outbox[i], "\"evt\":\"transcript_wanted\"") && strstr(outbox[i], "\"message_id\":\"V2\"");
+    int with_languages = 0;
+    for (int i = 0; i < outbox_count; i++) {
+        int it = strstr(outbox[i], "\"evt\":\"transcript_wanted\"") && strstr(outbox[i], "\"message_id\":\"V2\"");
+        told += it;
+        with_languages += it && strstr(outbox[i], "\"languages\":[\"af\",\"en\"]");
+    }
     CHECK(told == 1, "one agent is told, once");
+    CHECK(with_languages == 1, "with the languages the chat's voice notes are spoken in");
+    transcript_manager_set_languages(transcripts, MOM, "");
     automatic.transcribe_auto = 0;
     settings_manager_apply(settings_mgr, &automatic);
     clear_outbox();

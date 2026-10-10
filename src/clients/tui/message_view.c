@@ -470,15 +470,11 @@ static void layout(MessageView *v, UiRect r, const Message *msgs, int count, con
         if (status_widest > inner) inner = status_widest;
         if (brief && utf8_columns(summary_view_head(folded)) > inner) inner = utf8_columns(summary_view_head(folded));
         for (int k = 0; k < n_brief; k++) if (brief_lines[k].columns > inner) inner = brief_lines[k].columns;
-        /* A voice note's transcript: a few lines of its words, in the same bubble under the play line. */
+        /* A voice note's transcript: all of its words, in the same bubble under the play line. */
         const TranscriptView *spoken = transcript_of(v, i);
         TextLine *spoken_lines = NULL;
-        int spoken_cut = 0;
-        int n_spoken = spoken ? transcript_view_wrap(spoken, max_inner, ctx->transcript_lines, &spoken_lines, &spoken_cut) : 0;
-        for (int k = 0; k < n_spoken; k++) {
-            int cols = spoken_lines[k].columns + (spoken_cut && k == n_spoken - 1 ? 2 : 0);
-            if (cols > inner) inner = cols;
-        }
+        int n_spoken = spoken ? transcript_view_wrap(spoken, max_inner, &spoken_lines) : 0;
+        for (int k = 0; k < n_spoken; k++) if (spoken_lines[k].columns > inner) inner = spoken_lines[k].columns;
         if (show_sender && utf8_columns(m->sender_name) > inner) inner = utf8_columns(m->sender_name);
         int forwarded = m->forwarded && !m->deleted;
         if (forwarded && utf8_columns(FORWARDED_LABEL) > inner) inner = utf8_columns(FORWARDED_LABEL);
@@ -502,8 +498,7 @@ static void layout(MessageView *v, UiRect r, const Message *msgs, int count, con
         for (int t = 0; thumb && t < thumb->rows; t++) push_row(v, (MessageRow){ i, MESSAGE_ROW_THUMB, x, width, 0, 0, 0, t });
         if (media[0]) push_row(v, (MessageRow){ i, MESSAGE_ROW_MEDIA, x, width, 0, 0, 0, 0 });
         for (int k = 0; k < n_spoken; k++) {
-            int cut = spoken_cut && k == n_spoken - 1;
-            push_row(v, (MessageRow){ i, MESSAGE_ROW_TRANSCRIPT, x, width, spoken_lines[k].offset, spoken_lines[k].length, cut, 0 });
+            push_row(v, (MessageRow){ i, MESSAGE_ROW_TRANSCRIPT, x, width, spoken_lines[k].offset, spoken_lines[k].length, 0, 0 });
         }
         free(spoken_lines);
         if (has_link) {
@@ -745,7 +740,7 @@ static void draw_row(const MessageView *v, const MessageRow *row, int y, UiRect 
         }
         case MESSAGE_ROW_TRANSCRIPT: {
             const TranscriptView *spoken = transcript_of(v, row->message);
-            if (spoken) transcript_view_draw_line(spoken, y, x + 1, room, row->offset, row->length, row->meta_inline, bubble);
+            if (spoken) transcript_view_draw_line(spoken, y, x + 1, room, row->offset, row->length, bubble);
             break;
         }
         case MESSAGE_ROW_LINK_TITLE:

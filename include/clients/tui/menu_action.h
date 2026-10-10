@@ -11,7 +11,8 @@ typedef enum MenuAction {
     MENU_ACTION_CLEAR_LOGS,
     MENU_ACTION_RETRY_CONNECTION,
     MENU_ACTION_SELF_APPROVAL_CHATS,  /* choose the chats an admin agent may answer its own requests in */
-    MENU_ACTION_ACCOUNTS              /* your accounts: add, name, link and remove them */
+    MENU_ACTION_ACCOUNTS,             /* your accounts: add, name, link and remove them */
+    MENU_ACTION_VOICE_LANGUAGES       /* the languages voice notes are spoken in, for every chat that names none of its own */
 } MenuAction;
 
 #endif

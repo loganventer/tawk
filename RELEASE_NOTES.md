@@ -4,6 +4,17 @@ What changed in each version of tawk, newest first. `tawk --update` shows every 
 
 Each version has a section headed `## <version> (<date>)`, with one line for each change you would notice.
 
+## 0.14.2 (2026-10-10)
+
+- A transcript is shown whole. It is no longer cut to six lines, and the "Transcript lines" setting is gone.
+- Voice note languages. A voice note is written out in the language spoken, and you can say which languages those are. Settings, Chats has "Voice note languages" with "Choose the languages…": a list of every language with a switch for each, for all chats. A chat's contact card has "Voice note languages…" with the same list for that chat alone, which comes first. With languages switched on, the transcriber chooses among them for each voice note; with none, it chooses among all. tawk-mcp 0.10.2 does the choosing, and writes a note that mixes a language with English in that language, where it used to produce an English translation.
+- Transcripts written before this version are dropped when tawk starts, since their language could be wrong, and are written again as their voice notes are looked at. A voice note that is written out again replaces the transcript it had.
+- Summaries are asked for in the language the message is written in.
+- Every message of a TL;DR chat is summarised without changing a setting: the length setting has a new name in the settings file (`tldr_from_chars`), so the 300 that 0.14.0 wrote there no longer applies.
+- In the input, the arrows held with Ctrl, Alt or Shift step a word at a time, and up and down held with them go to the start and the end of what you typed. Option with the arrows does the same on a Mac.
+- A click anywhere in the conversation leaves the cursor in the input, ready to type. A click on a message still opens, plays or unfolds it.
+- Fixed: tawk's question about which agent writes summaries could fail silently just after start, while the account was still connecting, and was then not tried again for ten minutes. It is now tried again after fifteen seconds.
+
 ## 0.14.1 (2026-10-10)
 
 - In a chat with TL;DR on, every message from someone else is now summarised, not only long ones. "TL;DR from (characters)" under Settings, Chats is 0 by default, which means every message; raise it to summarise only longer ones. If you ran 0.14.0, your settings file still says 300: set it to 0 there.

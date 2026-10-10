@@ -33,13 +33,14 @@ typedef struct ContactPanel {
     char          show_transcripts[48];
     char          transcribe[24];
     char          tldr[16];
+    char          voice_languages[96];
 } ContactPanel;
 
 void          contact_panel_open(ContactPanel *panel, const Chat *chat, int blocked);
 /* Says how this chat's own settings stand, adding their actions the first time. An empty text leaves one out. */
 void          contact_panel_set_prefs(ContactPanel *panel, const char *send_from, const char *merge, const char *agent_answers);
 /* The same for its two settings about voice note transcripts. */
-void          contact_panel_set_transcript_prefs(ContactPanel *panel, const char *show, const char *transcribe);
+void          contact_panel_set_transcript_prefs(ContactPanel *panel, const char *show, const char *transcribe, const char *languages);
 /* And for TL;DR mode. */
 void          contact_panel_set_tldr_pref(ContactPanel *panel, const char *tldr);
 PopupResult   contact_panel_key(ContactPanel *panel, int is_key_code, int ch);

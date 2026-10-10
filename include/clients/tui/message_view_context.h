@@ -45,7 +45,6 @@ typedef struct MessageViewContext {
     int                 badge_count;
     /* The transcripts of voice notes, shown under them; NULL shows none (the setting, or this chat's own choice). */
     const TranscriptSource *transcripts;
-    int                 transcript_lines;   /* lines of one shown before it is cut */
     /* The TL;DR summaries of long messages, shown in their place until unfolded; NULL in a chat that is not in TL;DR mode. */
     const SummarySource *summaries;
 } MessageViewContext;

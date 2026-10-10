@@ -3,7 +3,7 @@
 # Run `make help` for every target and option.
 
 APP        ?= tawk
-VERSION    ?= 0.14.1
+VERSION    ?= 0.14.2
 # The commit this build comes from, so `tawk --update` can tell whether it is current.
 COMMIT     ?= $(shell git rev-parse HEAD 2>/dev/null)
 
@@ -257,6 +257,7 @@ TESTS := $(BUILD)/tests/pty_idle_action_test $(BUILD)/tests/ncurses_mouse_queue_
          $(BUILD)/tests/presence_event_test \
          $(BUILD)/tests/transcript_test \
          $(BUILD)/tests/summary_test \
+         $(BUILD)/tests/composer_words_test \
          $(BUILD)/tests/status_answer_test $(BUILD)/tests/message_search_test \
          $(BUILD)/tests/control_transport_test $(BUILD)/tests/control_protocol_test $(BUILD)/tests/status_photo_viewer_test \
          $(BUILD)/tests/status_auto_advance_test $(BUILD)/tests/message_window_test \
@@ -328,6 +329,10 @@ $(BUILD)/tests/database_crypt_test: $(BUILD)/tests/database_crypt_test.o $(filte
 	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
 
 $(BUILD)/tests/schedule_test: $(BUILD)/tests/schedule_test.o $(filter-out $(BUILD)/src/main.o,$(OBJ)) $(LINK_WM)
+	$(call step,LD,$@)
+	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
+
+$(BUILD)/tests/composer_words_test: $(BUILD)/tests/composer_words_test.o $(filter-out $(BUILD)/src/main.o,$(OBJ)) $(LINK_WM)
 	$(call step,LD,$@)
 	$(Q)$(CC) $(LDFLAGS) -o $@ $(filter %.o,$^) $(LINK_WM) $(LDLIBS)
 
