@@ -39,6 +39,7 @@ typedef struct ControlSession {
     int           wait_count;
     int           summaries_answered;
     int           summaries_missed;
+    int64_t       passed_over_until_ms;    /* not asked for summaries until then: it let several go unanswered */
     ControlAllowance allowances[CONTROL_SESSION_ALLOWANCES];
     int           allowance_count;
 } ControlSession;

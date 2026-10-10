@@ -134,7 +134,7 @@ Result:
 ```json
 {
   "protocol": 1,
-  "tawk": "0.14.4",
+  "tawk": "0.14.5",
   "access": "read",
   "account": {"jid": "27830000000@s.whatsapp.net", "name": "Logan"},
   "connected": true,
@@ -187,7 +187,7 @@ tawk asks with an event, sent to one client only whether or not it subscribed:
 
 - `{"evt":"summary_wanted","chat":{"jid","name"},"message":message,"max_chars":400}` for a text message in the chat, yours or someone else's (every one while `tldr_from_chars` is 0, else those at least that many characters long), in a chat in TL;DR mode that the client may see. It is sent when the message arrives, for the chat's long messages of the last `tldr_back_days` days when its TL;DR is switched on or it is first shown, and for an older one when you look at it in tawk; once for each message while tawk runs, four at once and then one every second and a half.
 
-Which client that is: the one you made your default agent in the Agents list while it is connected; else the only client connected with origin `mcp` that named `summaries` and is not paused; else, with several such and none chosen, nobody until you choose. A client that did not name the feature is never asked and does not count. A client that is sent two `summary_wanted` events and answers neither with `set_summary` within 90 seconds, having never answered one, is not asked again; its unanswered messages go to another client. tawk then asks you in the "message yourself" chat of the account the chat is in, and the number you answer with chooses. The choice is kept in `default_agent` under `[automation]`, as the client's `label` with any ", pid N" taken out, so a client that wants to be recognised again keeps its label the same.
+Which client that is: the one you made your default agent in the Agents list while it is connected; else the only client connected with origin `mcp` that named `summaries` and is not paused; else, with several such and none chosen, nobody until you choose. A client that did not name the feature is never asked and does not count. A `summary_wanted` that is not answered with `set_summary` within 90 seconds goes to be asked for again. A client that lets two in a row go unanswered is not asked for five minutes, in case it was only busy, and is then tried again; any answer clears that. tawk then asks you in the "message yourself" chat of the account the chat is in, and the number you answer with chooses. The choice is kept in `default_agent` under `[automation]`, as the client's `label` with any ", pid N" taken out, so a client that wants to be recognised again keeps its label the same.
 
 ### Writing
 
@@ -333,8 +333,8 @@ Chats that are locked, hidden or outside `chats` never produce notifications.
 ## Example
 
 ```text
-→ {"id":"1","op":"hello","args":{"client":"tawk","version":"0.14.4","protocol":1,"origin":"cli"}}
-← {"id":"1","ok":true,"result":{"protocol":1,"tawk":"0.14.4","access":"send","account":{"jid":"27830000000@s.whatsapp.net","name":"Logan"},"connected":true}}
+→ {"id":"1","op":"hello","args":{"client":"tawk","version":"0.14.5","protocol":1,"origin":"cli"}}
+← {"id":"1","ok":true,"result":{"protocol":1,"tawk":"0.14.5","access":"send","account":{"jid":"27830000000@s.whatsapp.net","name":"Logan"},"connected":true}}
 → {"id":"2","op":"unread_summary"}
 ← {"id":"2","ok":true,"result":{"total":2,"mentions":0,"chats":[{"jid":"27820000000@s.whatsapp.net","name":"Mom","is_group":false,"unread":2,"unread_mention":false,"muted":false,"pinned":true,"archived":false,"last_ts":1790000000,"preview":"See you at 6"}]}}
 → {"id":"3","op":"send_message","args":{"chat":"Mom","text":"On my way"}}

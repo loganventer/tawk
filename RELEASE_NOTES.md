@@ -4,6 +4,10 @@ What changed in each version of tawk, newest first. `tawk --update` shows every 
 
 Each version has a section headed `## <version> (<date>)`, with one line for each change you would notice.
 
+## 0.14.5 (2026-10-10)
+
+- Fixed: summaries could stop for good. An agent that let two requests go unanswered was passed over until it reconnected, and an agent that was only busy with other work, or the only one connected, was switched off that way. It is now passed over for five minutes and then tried again, and any summary it hands back clears it at once.
+
 ## 0.14.4 (2026-10-10)
 
 - TL;DR covers both sides of a chat. With it on, your own messages are summarised as well as the other person's, new ones and those of the last 30 days.

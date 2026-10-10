@@ -6,6 +6,7 @@
 #include "control_server_state.h"
 #include "engines/agent_question.h"
 #include "engines/summariser_choice.h"
+#include "utilities/clock_util.h"
 #include "utilities/str_util.h"
 
 #include <stdio.h>
@@ -13,7 +14,8 @@
 
 #define WANTED_BURST      4
 #define ANSWER_WAIT_MS    90000     /* how long an agent has to hand a summary back */
-#define MISSES_ALLOWED    2         /* unanswered requests after which an agent that never answered is passed over */
+#define MISSES_ALLOWED    2         /* unanswered requests in a row after which an agent is passed over for a while */
+#define PASSED_OVER_MS    (5 * 60 * 1000)   /* and for how long: it may only have been busy */
 #define WANTED_EVERY_MS   1500
 #define QUESTION_LIFE_MS  (10 * 60 * 1000)
 #define RETRY_ASK_MS      15000
@@ -28,7 +30,8 @@ static int label_chosen(ControlServer *s, const ControlSession *session) {
 }
 
 static int eligible(const ControlSession *session) {
-    return session->greeted && session->origin == CONTROL_ORIGIN_MCP && !session->paused && session->can_summarise;
+    return session->greeted && session->origin == CONTROL_ORIGIN_MCP && !session->paused && session->can_summarise &&
+           clock_now_ms() >= session->passed_over_until_ms;
 }
 
 int control_summariser_is(ControlServer *s, const ControlSession *session) {
@@ -145,6 +148,8 @@ static void await_summary(ControlServer *s, ControlSession *session, const char 
 
 void control_summary_answered(ControlSession *session, const char *message_id) {
     session->summaries_answered++;
+    session->summaries_missed = 0;                          /* it answers: whatever it missed before is forgiven */
+    session->passed_over_until_ms = 0;
     for (int i = 0; i < session->wait_count; i++) {
         if (strcmp(session->waits[i].message_id, message_id) != 0) continue;
         memmove(&session->waits[i], &session->waits[i + 1], (size_t)(session->wait_count - i - 1) * sizeof(session->waits[0]));
@@ -169,12 +174,14 @@ static void review_waits(ControlServer *s, int64_t now) {
             control_serve_account(s, back);
         }
         session->wait_count = kept;
-        if (session->can_summarise && session->summaries_answered == 0 && session->summaries_missed >= MISSES_ALLOWED) {
-            session->can_summarise = 0;
-            session->summariser = 0;
+        if (session->can_summarise && session->summaries_missed >= MISSES_ALLOWED && now >= session->passed_over_until_ms) {
+            /* For a while only: an agent in the middle of other work answers when it is done, and one that
+             * hears nothing is simply passed over again each time it is tried. */
+            session->summaries_missed = 0;
+            session->passed_over_until_ms = now + PASSED_OVER_MS;
             char notice[240];
-            snprintf(notice, sizeof(notice), "%.50s%s%.50s does not answer tawk's requests for summaries (it may not take channel events), "
-                     "so another agent is asked", session->client, session->label[0] ? ", " : "", session->label);
+            snprintf(notice, sizeof(notice), "%.50s%s%.50s is not answering tawk's requests for summaries (busy, or it takes no channel "
+                     "events), so another agent is asked for the next five minutes", session->client, session->label[0] ? ", " : "", session->label);
             automation_manager_notice(s->deps.automation, notice);
             s->changed = 1;
         }
