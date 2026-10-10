@@ -89,6 +89,7 @@ If something does not work, run `tawk --doctor`. It checks the terminal, your fi
 - **Shift+Enter** (or Alt+Enter) starts a new line in a message; Enter sends it.
 - Pinned chats have their own group at the top of the list. Enter on a group header, or ← and →, folds and unfolds it.
 - **Ctrl+R** records a voice note in the open chat; Enter sends it.
+- With an agent connected through [tawk-mcp](https://github.com/loganventer/tawk-mcp), voice notes show their words under them (**Alt+T** steps this for the open chat), and a chat's contact card has **TL;DR** to show long messages as a short summary; Enter unfolds one.
 - Emoticons such as `:)` and `<3` become emoji when you type a space, and `(pizza)` becomes 🍕; type `(hu` to pick from matching emoji. Turn this off under Settings, Chats, Emoticons to emoji.
 - When someone calls, tawk rings with a prompt: **d** declines, Enter or Esc closes it so you can answer on your phone. tawk cannot carry the call itself.
 - Drag a file from your file manager onto the terminal window to send it, or press **Ctrl+O** to pick one.

@@ -20,6 +20,7 @@ The screenshots in this manual were taken from tawk running on a demo account wi
 - [Emoji](#emoji)
 - [Search](#search)
 - [Voice notes](#voice-notes)
+- [TL;DR mode](#tldr-mode)
 - [Sending files](#sending-files)
 - [The photo viewer](#the-photo-viewer)
 - [Notifications](#notifications)

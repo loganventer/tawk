@@ -1,6 +1,6 @@
 # Plan: the next features for tawk and tawk-mcp
 
-Status: section 1 (transcripts in the conversation) and TL;DR mode are built in both repositories on the branch `feature/inline-transcripts`, with tests, as tawk 0.13.0 and 0.14.0 and tawk-mcp 0.9.0 and 0.10.0, and not yet committed or merged. Everything else is proposed. This is the one plan for both repositories, written against tawk 0.12.0 (`f169989`) and tawk-mcp 0.8.1 (`c6724f0`), the newest `main` of each on 10 October 2026. The first feature, voice note transcripts shown in the conversation, is planned in full. The rest are planned to the level of what each adds, where its parts go and what has to be decided first.
+Status: section 1 (transcripts in the conversation) and TL;DR mode are built and merged in both repositories, with tests, as tawk 0.13.0 and 0.14.0 (pull request 11) and tawk-mcp 0.9.0 and 0.10.0 (pull request 15). Everything else is proposed. This is the one plan for both repositories, written against tawk 0.12.0 (`f169989`) and tawk-mcp 0.8.1 (`c6724f0`), the newest `main` of each on 10 October 2026. The first feature, voice note transcripts shown in the conversation, is planned in full. The rest are planned to the level of what each adds, where its parts go and what has to be decided first.
 
 ## Table of Contents
 

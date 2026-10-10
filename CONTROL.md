@@ -370,4 +370,4 @@ An account whose level is *off* is not listed and cannot be named. Naming it ans
 
 ## Versions
 
-The protocol version is 1. Fields may be added to results and notifications without a new version, so clients must ignore fields they do not know. Removing or changing a field, or changing an operation's meaning, raises the version.
+The protocol version is 1. Fields may be added to results and notifications without a new version, so clients must ignore fields they do not know. Operations and events are added the same way, and `features` in the answer to `hello` names the groups a client can rely on: `transcripts` since tawk 0.13.0, `summaries` since 0.14.0. A client that meets an event it does not know ignores it. Removing or changing a field, or changing an operation's meaning, raises the version.

@@ -24,9 +24,9 @@ tawk is one C11 program arranged in [iDesign](https://www.idesign.net/) layers. 
 |---|---|---|---|
 | Composition | `composition` | Builds one account's components and owns the set of running accounts. Part of the composition root | Everything, as `main.c` does |
 | Client | `clients/tui`, `clients/control`, `clients/cli` | `tui`: the ncurses UI (widgets, input, slash commands, layout, the settings panel, the Chats and Agentic tabs). `control`: the control socket client that serves tawk-mcp and the shell commands ([CONTROL.md](CONTROL.md)). `cli`: the `--doctor` setup check, the `--update` installer, `--encrypt`, `--decrypt` and `--change-passphrase`, `--backup` and `--restore`, the start-up passphrase prompt, and `tawk send`, `tail`, `unread` and `status-line` | Managers, and the contracts the composition root hands it |
-| Managers | `managers` | Use cases: messaging and connection supervision, profiles and profile pictures, your own profile, posting statuses, the status feed, messages scheduled for later, incoming calls, media, settings, encrypting the database, encrypted backups, the rules and log for agents (automation), plus the composite event observer that hands backend events to the managers that listen for them | Engines, contracts |
-| Engines | `engines` | Business rules with no I/O: backoff, circuit breaker, notification policy, chat visibility, idle tracking, message ids, media type detection, emoticon conversion, network fingerprints and change detection, profile field and status post validation, finding a URL in text, the status background palette, matching chats against a search, reading when a scheduled message should go, the backup manifest and which archive members a restore accepts, and for agents: the automation policy (who sees which chats, which writes are asked about, which settings stay out of reach, risk, and which of its own requests a client may answer with access admin), the hourly quota for those, resolving a chat named by an agent, the rate limiter and confirmation tokens | Core, utilities |
-| Resource access | `resource_access` | SQLite stores (messages, chats, contacts, reactions, receipts, JID aliases, profiles, statuses, scheduled messages, the automation log), database encryption with SQLCipher (`sqlite_database_crypt`, `sqlite_key`), the caching decorators, INI settings store, JSON theme repository, TSV emoji catalog, the text chat exporter, WhatsApp gateways, the JSON protocol codec | Core, utilities |
+| Managers | `managers` | Use cases: messaging and connection supervision, profiles and profile pictures, your own profile, posting statuses, the status feed, messages scheduled for later, incoming calls, media, settings, encrypting the database, encrypted backups, voice note transcripts and TL;DR summaries (keeping what is handed over, and each chat's choices about them), the rules and log for agents (automation), plus the composite event observer that hands backend events to the managers that listen for them | Engines, contracts |
+| Engines | `engines` | Business rules with no I/O: backoff, circuit breaker, notification policy, chat visibility, idle tracking, message ids, media type detection, emoticon conversion, network fingerprints and change detection, profile field and status post validation, finding a URL in text, the status background palette, matching chats against a search, reading when a scheduled message should go, the backup manifest and which archive members a restore accepts, and for agents: the automation policy (who sees which chats, which writes are asked about, which settings stay out of reach, risk, and which of its own requests a client may answer with access admin), the hourly quota for those, resolving a chat named by an agent, the rate limiter and confirmation tokens; and for transcripts and TL;DR: what may be kept (`transcript_validator`, `summary_validator`), what shows and what is transcribed or summarised (`transcript_display_policy`, `transcription_policy`, `summary_policy`, `transcript_choice`), which agent writes summaries (`summariser_choice`) and the question about that (`agent_question`) | Core, utilities |
+| Resource access | `resource_access` | SQLite stores (messages, chats, contacts, reactions, receipts, JID aliases, profiles, statuses, scheduled messages, the automation log, transcripts, summaries), database encryption with SQLCipher (`sqlite_database_crypt`, `sqlite_key`), the caching decorators, INI settings store, JSON theme repository, TSV emoji catalog, the text chat exporter, WhatsApp gateways, the JSON protocol codec | Core, utilities |
 | Infrastructure | `infrastructure` | Operating-system integration: audio backends and players, recorder, media opener, screensaver, terminal title, OSC 52 clipboard, clipboard pictures, video frames (ffmpeg), the camera (ffmpeg), PDF pages (poppler), the network monitor (getifaddrs), the terminal passphrase prompt, tar archives and openssl file encryption for backups, the control socket's listening end and the shell commands' calling end (Unix domain sockets), notifiers, media cache janitor | Core, utilities |
 | Contracts | `contracts` | Interfaces between layers | Core |
 | Core | `core` | Domain types: Message, Chat, Contact, ContactProfile, IncomingCall, Receipt, StatusUpdate, StatusPost, Event, Settings, Theme, Emoji and their enums, plus small value types such as QuoteRef, ReactionTarget, HistoryAnchor, DeleteRequest and TypingState, and helpers such as `message_file_name` (a safe file name for saving a message's file) and the shared icons in `icon_glyphs.h` | Utilities |
@@ -460,7 +460,7 @@ Neither backend retries anything. They report `connection` events with a reason,
 
 ## Storage
 
-SQLite in WAL mode holds the tables `messages`, `chats`, `contacts`, `reactions`, `message_receipts`, `jid_aliases`, `profiles`, `statuses`, `scheduled_messages` and `automation_log`, plus the FTS5 index `messages_fts` over message text. All statements use bound parameters. Upserts merge rather than overwrite: an empty name never replaces a known one, older timestamps never replace newer ones, message status only moves forward, and local preferences (pinned, muted, tone, draft, chat theme, soft lock) are never touched by sync. A message deleted for everyone keeps its row with `deleted` set; a message deleted for me is removed with `DELETE`, and the FTS5 trigger drops it from the index. `caching_message_store` keeps the latest page of recently opened chats in an LRU and invalidates a chat whenever anything in it changes; `caching_contact_store` caches display-name lookups. `recent` grows its result as rows arrive instead of reserving room for the whole limit, so a chat export, which asks for every message, costs only what the chat holds.
+SQLite in WAL mode holds the tables `messages`, `chats`, `contacts`, `reactions`, `message_receipts`, `jid_aliases`, `profiles`, `statuses`, `scheduled_messages`, `automation_log`, `accounts`, `chat_prefs`, `transcripts` and `summaries`, plus the FTS5 index `messages_fts` over message text. All statements use bound parameters. Upserts merge rather than overwrite: an empty name never replaces a known one, older timestamps never replace newer ones, message status only moves forward, and local preferences (pinned, muted, tone, draft, chat theme, soft lock) are never touched by sync. A message deleted for everyone keeps its row with `deleted` set; a message deleted for me is removed with `DELETE`, and the FTS5 trigger drops it from the index. `caching_message_store` keeps the latest page of recently opened chats in an LRU and invalidates a chat whenever anything in it changes; `caching_contact_store` caches display-name lookups. `recent` grows its result as rows arrive instead of reserving room for the whole limit, so a chat export, which asks for every message, costs only what the chat holds.
 
 The `profiles` table keeps what WhatsApp says about a contact or group. `save_details` writes the about text, business and group fields and `fetched_at`, but never the picture columns or `blocked`; `set_picture` records a downloaded file (or `picture_none`); `forget_picture` clears both picture paths when the picture changed; and `set_blocklist` clears every `blocked` flag and sets it again for each JID in the list, in one transaction. Group members are stored in `participants` as one `jid<TAB>admin` line per member.
 
@@ -490,7 +490,7 @@ The schema is versioned with `PRAGMA user_version`. `sqlite_database.c` creates 
 | 18 | The `transcripts` table: `account_id`, `message_id`, `language`, `text`, `model`, `source` and `created_at`, keyed by the first three, with the triggers `transcripts_message_removed` and `transcripts_message_deleted` on `messages` that remove a message's transcripts when its row is deleted or marked deleted for everyone; and `show_transcripts` and `transcribe_off` on `chat_prefs` |
 | 19 | The `summaries` table: `account_id`, `message_id`, `text`, `model`, `source` and `created_at`, keyed by the first two, with the triggers `summaries_message_removed` and `summaries_message_changed` on `messages` that remove a message's summary when its row is deleted, when it is marked deleted for everyone, and when its text changes; and `tldr` on `chat_prefs` |
 
-Before the first migration of an upgrade runs, the database is copied to `tawk.db.pre-v<N>` (once, 0600), so a failed upgrade can be rolled back by hand. The schema after version 16 is below. The tables declare no foreign keys; the relationships are by value (a message's `chat_jid` matches a chat's `jid`, a reaction's or receipt's `message_id` matches a message's `id`, a status's `author_jid` matches a contact's `jid`, a profile's `jid` matches a chat's or contact's `jid`, and an alias maps a LID to the phone number JID used everywhere else). `messages_fts` is an external-content FTS5 table over `messages.text`, keyed by the message `rowid` and kept in step by the triggers `messages_fts_ai`, `messages_fts_ad` and `messages_fts_au`.
+Before the first migration of an upgrade runs, the database is copied to `tawk.db.pre-v<N>` (once, 0600), so a failed upgrade can be rolled back by hand. The schema after version 19 is below (the account column that version 17 put in every key is left out of the older tables for room). The tables declare no foreign keys; the relationships are by value (a message's `chat_jid` matches a chat's `jid`, a reaction's or receipt's `message_id` matches a message's `id`, a status's `author_jid` matches a contact's `jid`, a profile's `jid` matches a chat's or contact's `jid`, and an alias maps a LID to the phone number JID used everywhere else). `messages_fts` is an external-content FTS5 table over `messages.text`, keyed by the message `rowid` and kept in step by the triggers `messages_fts_ai`, `messages_fts_ad` and `messages_fts_au`.
 
 ```mermaid
 erDiagram
@@ -504,6 +504,9 @@ erDiagram
     messages ||--|| messages_fts : "rowid"
     jid_aliases }o--o| chats : "canonical = jid"
     chats |o--o| profiles : "jid"
+    messages ||--o{ transcripts : "id = message_id"
+    messages ||--o| summaries : "id = message_id"
+    chats |o--o| chat_prefs : "jid, across accounts"
 
     chats {
         TEXT jid PK
@@ -600,6 +603,31 @@ erDiagram
         INTEGER due_at "indexed with state"
         INTEGER created_at
         INTEGER state "waiting, sent, failed, cancelled"
+    }
+    transcripts {
+        INTEGER account_id PK "v18"
+        TEXT message_id PK
+        TEXT language PK "'' when not known"
+        TEXT text
+        TEXT model
+        TEXT source "the program that handed it over"
+        INTEGER created_at
+    }
+    summaries {
+        INTEGER account_id PK "v19"
+        TEXT message_id PK
+        TEXT text
+        TEXT model
+        TEXT source
+        INTEGER created_at
+    }
+    chat_prefs {
+        TEXT jid PK "v17, the same for every account"
+        INTEGER send_account
+        INTEGER merge
+        INTEGER show_transcripts "v18: 0 follows the setting, 1 always, 2 never"
+        INTEGER transcribe_off "v18"
+        INTEGER tldr "v19"
     }
     jid_aliases {
         TEXT alias PK "the LID"

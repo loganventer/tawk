@@ -25,6 +25,8 @@
 - [The camera](#the-camera)
 - [Saving files](#saving-files)
 - [Voice notes](#voice-notes)
+- [Transcripts](#transcripts)
+- [TL;DR summaries](#tldr-summaries)
 - [Reconnecting](#reconnecting)
 - [Screensaver](#screensaver)
 - [Encrypted chats](#encrypted-chats)
@@ -670,6 +672,54 @@ flowchart LR
 ```
 
 The audio backend only describes commands. The recorder connects the capture command to ffmpeg with a pipe; stopping sends an interrupt to the capture side, ffmpeg sees the end of input and finishes the Ogg file cleanly. Playback asks the same backend how to play a file and runs it in the background, tracked so a second click stops it.
+
+## Transcripts
+
+tawk transcribes nothing. tawk-mcp does, with a Whisper model on your computer, and hands each finished transcript to tawk, which keeps it in the `transcripts` table and draws it in the voice note's own bubble.
+
+```mermaid
+sequenceDiagram
+    participant WA as WhatsApp
+    participant T as tawk
+    participant M as tawk-mcp
+    WA->>T: a voice note arrives
+    T->>M: message event ("transcribe":false when the chat is switched off)
+    Note over M: skipped when switched off, or when automatic transcription is off
+    M->>T: download_media
+    T-->>M: the file's path
+    Note over M: Whisper, one pass for each language
+    M->>T: set_transcript (message_id, language, text, model)
+    Note over T: transcription_policy and transcript_validator,<br/>then the transcripts table
+    T-->>M: {} or transcripts_off
+    Note over T: the next frame draws the words under the play line
+```
+
+What shows is decided when a frame is drawn: `transcript_display_policy` takes the "Voice note transcripts" setting and the chat's own choice from `chat_prefs`, and the conversation is handed a `TranscriptSource` or none. Hiding transcripts therefore removes nothing. Whether a chat is transcribed at all is `transcription_policy`: the chat's switch, and never a locked or soft-locked chat; it is asked when a transcript arrives, and tawk tells the transcriber beforehand so that no audio is read for nothing. A voice note you scroll to that has no transcript is put on a short waiting list by `TranscriptManager` and told to one agent as `transcript_wanted`, once while tawk runs. Two triggers on `messages` remove a message's transcripts when it is deleted.
+
+## TL;DR summaries
+
+A chat you put in TL;DR mode shows each long message as a summary. The words come from the model of an agent you connected; tawk decides which messages, which agent, and what to keep.
+
+```mermaid
+sequenceDiagram
+    participant U as You
+    participant T as tawk
+    participant A as the default agent
+    U->>T: TL;DR on, on the contact card
+    Note over T: summary_policy: text, from someone else,<br/>at least tldr_min_chars long
+    Note over T: the last tldr_back_days days go on the waiting list,<br/>newest first; new arrivals and what you scroll to follow
+    T->>A: summary_wanted (the message, max_chars)
+    Note over A: its model writes one paragraph
+    A->>T: set_summary (message_id, text, model)
+    Note over T: summary_validator, then the summaries table
+    Note over T: the bubble shows ▸ TL;DR and the summary
+    U->>T: Enter on the message
+    Note over T: ▾ TL;DR · original, the full text; Enter folds it back
+```
+
+Which agent is asked is `summariser_choice`: the one you made your default agent (the Agents list, `d`) while it is connected; else the only agent connected; else nobody yet. In that last case the control client sends a numbered list of the connected agents to your own "message yourself" chat through the messaging manager, and reads your answer from the live messages it already follows: a bare number, from you, in that chat, while the question is out. It then remembers the agent by its label without the process id (`default_agent`), and confirms in the same chat. Requests are paced, four at once and then one every second and a half, so a month of a busy chat does not flood the agent.
+
+The summary never replaces the message. `message_view` swaps the message's text rows for the summary rows while it is folded and keeps a small set of unfolded message ids; copy, reply, forward and search read the original. A trigger removes a summary when its message is deleted or its text is edited.
 
 ## Reconnecting
 
