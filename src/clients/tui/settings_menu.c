@@ -171,7 +171,8 @@ static const MenuNode SELF_APPROVAL[] = {
 /* How an agent's transcriber (tawk-mcp) writes out voice notes. tawk only holds the choices. */
 static const MenuNode TRANSCRIPTION[] = {
     FIELD(SETTING_CATEGORY_AUTOMATION, "transcribe_model"),
-    FIELD(SETTING_CATEGORY_AUTOMATION, "transcribe_languages"),
+    INFO("Voice note languages", MENU_INFO_VOICE_LANGUAGES),
+    ACTION("\xF0\x9F\x97\xA3", "Choose the languages\xE2\x80\xA6", MENU_ACTION_VOICE_LANGUAGES),
     FIELD(SETTING_CATEGORY_AUTOMATION, "transcribe_auto"),
     TEXT("tawk-mcp does the transcribing, on this computer, when it is started with --transcribe"),
     TEXT("Several languages give one transcription each, for voice notes that mix them"),

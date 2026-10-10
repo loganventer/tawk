@@ -12,6 +12,8 @@
 #include <string.h>
 
 #define WANTED_BURST      4
+#define ANSWER_WAIT_MS    90000     /* how long an agent has to hand a summary back */
+#define MISSES_ALLOWED    2         /* unanswered requests after which an agent that never answered is passed over */
 #define WANTED_EVERY_MS   1500
 #define QUESTION_LIFE_MS  (10 * 60 * 1000)
 #define RETRY_ASK_MS      15000
@@ -129,6 +131,56 @@ static void review_question(ControlServer *s, int64_t now) {
     if (gone) s->summary_asking = 0;
 }
 
+/* Remembers that `session` was asked, so an agent that never answers can be told from one that does. */
+static void await_summary(ControlServer *s, ControlSession *session, const char *message_id, int64_t now) {
+    if (session->wait_count == CONTROL_SESSION_WAITS) {
+        memmove(&session->waits[0], &session->waits[1], (CONTROL_SESSION_WAITS - 1) * sizeof(session->waits[0]));
+        session->wait_count--;
+    }
+    ControlSummaryWait *wait = &session->waits[session->wait_count++];
+    str_copy(wait->message_id, sizeof(wait->message_id), message_id);
+    wait->account = s->account;
+    wait->asked_ms = now;
+}
+
+void control_summary_answered(ControlSession *session, const char *message_id) {
+    session->summaries_answered++;
+    for (int i = 0; i < session->wait_count; i++) {
+        if (strcmp(session->waits[i].message_id, message_id) != 0) continue;
+        memmove(&session->waits[i], &session->waits[i + 1], (size_t)(session->wait_count - i - 1) * sizeof(session->waits[0]));
+        session->wait_count--;
+        return;
+    }
+}
+
+/* A summary that was not handed back in time goes back on the list for another agent. An agent
+ * that let several go and never handed one back does not hear tawk's requests (a client that
+ * takes no channel events, say): it is passed over from then on, and you are told. */
+static void review_waits(ControlServer *s, int64_t now) {
+    for (int i = 0; i < s->session_count; i++) {
+        ControlSession *session = &s->sessions[i];
+        int kept = 0;
+        for (int k = 0; k < session->wait_count; k++) {
+            ControlSummaryWait *wait = &session->waits[k];
+            if (now - wait->asked_ms < ANSWER_WAIT_MS) { session->waits[kept++] = *wait; continue; }
+            session->summaries_missed++;
+            AccountId back = s->account;
+            if (control_serve_account(s, wait->account) == 0 && s->deps.summaries) summary_manager_requeue(s->deps.summaries, wait->message_id);
+            control_serve_account(s, back);
+        }
+        session->wait_count = kept;
+        if (session->can_summarise && session->summaries_answered == 0 && session->summaries_missed >= MISSES_ALLOWED) {
+            session->can_summarise = 0;
+            session->summariser = 0;
+            char notice[240];
+            snprintf(notice, sizeof(notice), "%.50s%s%.50s does not answer tawk's requests for summaries (it may not take channel events), "
+                     "so another agent is asked", session->client, session->label[0] ? ", " : "", session->label);
+            automation_manager_notice(s->deps.automation, notice);
+            s->changed = 1;
+        }
+    }
+}
+
 static void send_wanted(ControlServer *s, int conn, const Message *msg, const Chat *chat) {
     char sender[128];
     control_sender_name(s, msg, sender, sizeof(sender));
@@ -161,6 +213,8 @@ static void hand_out(ControlServer *s, int64_t now) {
         SummariserVerdict verdict = summariser_choice_pick(c, n, &conn);
         if (verdict == SUMMARISER_USE) {
             send_wanted(s, conn, &msg, chat);
+            ControlSession *asked = control_session_of(s, conn);
+            if (asked) await_summary(s, asked, msg.id, now);
             s->summary_tokens--;
             summary_manager_drop_wanted(mgr);
             message_dispose(&msg);
@@ -175,6 +229,7 @@ static void hand_out(ControlServer *s, int64_t now) {
 
 void control_summaries_tick(ControlServer *s, int64_t now) {
     review_question(s, now);
+    review_waits(s, now);
     while (s->summary_tokens < WANTED_BURST && now - s->summary_refill_ms >= WANTED_EVERY_MS) {
         s->summary_tokens++;
         s->summary_refill_ms += WANTED_EVERY_MS;

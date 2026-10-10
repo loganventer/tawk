@@ -4,11 +4,13 @@
 #include <stdint.h>
 
 #include "clients/control/control_allowance.h"
+#include "clients/control/control_summary_wait.h"
 #include "clients/control/control_watch.h"
 #include "core/control_origin.h"
 
 #define CONTROL_SESSION_CHATS      64
 #define CONTROL_SESSION_ALLOWANCES 16
+#define CONTROL_SESSION_WAITS      8
 
 /* One connected client: who it said it is and what it subscribed to. */
 typedef struct ControlSession {
@@ -30,6 +32,13 @@ typedef struct ControlSession {
     int           summariser;              /* you chose it to write TL;DR summaries */
     int           can_transcribe;          /* it said it transcribes voice notes tawk asks about */
     int           can_summarise;           /* it said it writes summaries tawk asks for */
+    char          version[24];             /* the client's own version, as it said in hello */
+    /* The summaries it was asked for and has not handed back, how many it ever handed back, and how
+     * many it let go unanswered: one that answers none is not asked again. */
+    ControlSummaryWait waits[CONTROL_SESSION_WAITS];
+    int           wait_count;
+    int           summaries_answered;
+    int           summaries_missed;
     ControlAllowance allowances[CONTROL_SESSION_ALLOWANCES];
     int           allowance_count;
 } ControlSession;

@@ -4,6 +4,14 @@ What changed in each version of tawk, newest first. `tawk --update` shows every 
 
 Each version has a section headed `## <version> (<date>)`, with one line for each change you would notice.
 
+## 0.14.3 (2026-10-10)
+
+- Fixed: with two agents connected, voice notes could still come out as English translations, and summaries never arrived. tawk handed a voice note to the first agent that could transcribe, which could be a session still running an older tawk-mcp; it now hands it to the one running the newest. And an agent that is asked for summaries and never hands one back (a session that takes no channel events) is passed over after two unanswered requests, which go to another agent; tawk tells you when it does this.
+- The transcripts written so far are dropped once more when tawk starts, since some came from the older transcriber, and are written again as their voice notes are looked at.
+- English is the only voice note language switched on to begin with. Switch on the others you hear under Settings, Chats, Voice note languages, or for one chat on its contact card. A settings file from an earlier version keeps what it says (usually `auto`, which is every language) until you choose.
+- A chat's list of languages opens with the ones that apply to it switched on, so you see what it uses now.
+- Settings, Automation, Voice note transcription has the same list of switches for the languages, where it had a line of text to type codes into.
+
 ## 0.14.2 (2026-10-10)
 
 - A transcript is shown whole. It is no longer cut to six lines, and the "Transcript lines" setting is gone.

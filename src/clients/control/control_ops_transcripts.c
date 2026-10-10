@@ -1,6 +1,7 @@
 /* Voice note transcripts over the control socket. tawk transcribes nothing:
  * a transcriber hands the words over here, and reads back what is kept. */
 #include "control_server_state.h"
+#include "engines/client_version.h"
 #include "utilities/str_util.h"
 
 #include <stdio.h>
@@ -62,13 +63,16 @@ void control_op_set_transcript(ControlServer *s, ControlSession *session, const 
 
 #define WANTED_PER_TICK 2
 
-/* The first connected agent that is not paused: any of them can transcribe, and one is enough. */
+/* One agent is enough, and the newest does it: a session still running an older transcriber
+ * writes worse transcripts than one that was updated. */
 static int transcriber(ControlServer *s) {
+    const ControlSession *best = NULL;
     for (int i = 0; i < s->session_count; i++) {
         const ControlSession *c = &s->sessions[i];
-        if (c->greeted && c->origin == CONTROL_ORIGIN_MCP && !c->paused && c->can_transcribe) return c->conn;
+        if (!c->greeted || c->origin != CONTROL_ORIGIN_MCP || c->paused || !c->can_transcribe) continue;
+        if (!best || client_version_compare(c->version, best->version) > 0) best = c;
     }
-    return -1;
+    return best ? best->conn : -1;
 }
 
 /* Older voice notes you looked at that have no transcript: {"evt":"transcript_wanted","chat":{jid,name},"message_id"}

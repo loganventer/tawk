@@ -40,6 +40,9 @@ void summary_manager_want(SummaryManager *mgr, const Message *message, const Cha
  * have no summary. Done once for a chat while tawk runs, and again after its
  * TL;DR is switched on. Returns how many were added. */
 int  summary_manager_backfill(SummaryManager *mgr, const Chat *chat, int64_t now);
+/* Puts a message back at the head of the list: the agent that was asked for
+ * its summary did not answer, so another is asked. */
+void summary_manager_requeue(SummaryManager *mgr, const char *message_id);
 /* The message that has waited longest (returns 0 when none waits), and taking it off the list. */
 int  summary_manager_next_wanted(SummaryManager *mgr, char *message_id, size_t size);
 void summary_manager_drop_wanted(SummaryManager *mgr);

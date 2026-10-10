@@ -144,6 +144,14 @@ int summary_manager_backfill(SummaryManager *m, const Chat *chat, int64_t now) {
     return added;
 }
 
+void summary_manager_requeue(SummaryManager *m, const char *message_id) {
+    if (!message_id || !message_id[0] || listed(m->waiting, m->waiting_count, message_id)) return;
+    if (m->waiting_count == WAITING_MAX) m->waiting_count--;                 /* the newest gives up its place */
+    memmove(m->waiting[1], m->waiting[0], (size_t)m->waiting_count * sizeof(m->waiting[0]));
+    str_copy(m->waiting[0], sizeof(m->waiting[0]), message_id);
+    m->waiting_count++;
+}
+
 int summary_manager_next_wanted(SummaryManager *m, char *message_id, size_t size) {
     if (m->waiting_count == 0) return 0;
     str_copy(message_id, size, m->waiting[0]);

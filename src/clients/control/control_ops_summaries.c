@@ -39,6 +39,7 @@ void control_op_set_summary(ControlServer *s, ControlSession *session, const Con
                               result == SUMMARY_SAVED ? "a message's TL;DR" : why, outcome);
     switch (result) {
         case SUMMARY_SAVED:
+            control_summary_answered(session, control_codec_string(req->args, "message_id"));
             s->changed = 1;
             control_reply(s, session->conn, control_codec_ok(req->id, NULL));
             break;

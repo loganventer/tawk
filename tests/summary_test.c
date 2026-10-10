@@ -6,6 +6,7 @@
 #include "clients/tui/tui_palette.h"
 #include "contracts/i_message_store.h"
 #include "engines/agent_question.h"
+#include "engines/client_version.h"
 #include "engines/summariser_choice.h"
 #include "engines/summary_policy.h"
 #include "engines/summary_validator.h"
@@ -117,6 +118,11 @@ static void test_engines(void) {
     CHECK(strcmp(key, "dev (stdio)") == 0, "an agent is remembered by its label without the process id");
     agent_question_label_key("home (http)", key, sizeof(key));
     CHECK(strcmp(key, "home (http)") == 0, "a label without one stays as it is");
+    CHECK(client_version_compare("0.10.2", "0.10.1") > 0 && client_version_compare("0.9.9", "0.10.0") < 0 &&
+          client_version_compare("0.10.2", "0.10.2") == 0 && client_version_compare("1.0.0", "0.99.9") > 0,
+          "the newer of two versions is told by its numbers, not its letters");
+    CHECK(client_version_compare("0.10.2", "") > 0 && client_version_compare(NULL, "0.1.0") < 0 && client_version_compare("", NULL) == 0,
+          "and a client that gives no version is older than one that does");
     message_dispose(&longer);
     message_dispose(&shorter);
     message_dispose(&voice);

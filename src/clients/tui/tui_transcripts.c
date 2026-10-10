@@ -152,7 +152,10 @@ void tui_app_open_voice_languages(TuiApp *app, const char *jid) {
     chat_toggle_dialog_open(&app->voice_languages,
                             for_chat ? "Languages spoken in this chat's voice notes" : "Languages spoken in voice notes, for every chat that names none",
                             all_label);
-    if (for_chat) transcript_manager_languages(mgr, jid, list, sizeof(list));
+    /* A chat that named none opens with the ones Settings, Chats says switched on: what applies to it now. */
+    char own[64] = "";
+    if (for_chat) transcript_manager_languages(mgr, jid, own, sizeof(own));
+    if (own[0]) str_copy(list, sizeof(list), own);
     if (!list[0]) chat_toggle_dialog_set_all(&app->voice_languages, 1);
     char *save = NULL;
     for (char *code = strtok_r(list, ",", &save); code; code = strtok_r(NULL, ",", &save)) {

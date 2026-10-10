@@ -185,6 +185,8 @@ void control_op_get_summary(ControlServer *server, ControlSession *session, cons
 /* Adds "tldr":true to an answer about `chat` when it is in TL;DR mode. */
 void control_tag_tldr(ControlServer *server, cJSON *object, const Chat *chat);
 /* control_summariser.c: which agent writes TL;DR summaries, and telling it which messages wait for one. */
+/* `session` handed back the summary of `message_id`. */
+void control_summary_answered(ControlSession *session, const char *message_id);
 /* Whether `session` is the one you chose. */
 int  control_summariser_is(ControlServer *server, const ControlSession *session);
 /* You chose the agent on `conn` in the Agents tab; choosing it again takes the choice back. */

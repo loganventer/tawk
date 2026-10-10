@@ -301,9 +301,13 @@ static const Migration MIGRATIONS[] = {
       /* The languages a person's or group's voice notes are spoken in ('af,en'), so a transcriber
        * chooses among them; '' leaves it to the setting. */
       "ALTER TABLE chat_prefs ADD COLUMN voice_languages TEXT NOT NULL DEFAULT '';" },
+    { 21,
+      /* Until this version tawk could hand a voice note to a session still running an older transcriber,
+       * which wrote some of them as English translations. Those are dropped too, to be written again. */
+      "DELETE FROM transcripts;" },
 };
 
-#define LATEST_VERSION 20
+#define LATEST_VERSION 21
 
 static int user_version(sqlite3 *db) {
     sqlite3_stmt *st = NULL;

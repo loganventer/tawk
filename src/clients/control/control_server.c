@@ -200,6 +200,9 @@ static void hello(ControlServer *s, ControlSession *session, const ControlReques
     } else if (strcmp(session->client, "tawk-mcp") == 0 && client_version_at_least(control_codec_string(req->args, "version"), 0, 10)) {
         session->can_transcribe = session->can_summarise = 1;
     }
+    const char *version = control_codec_string(req->args, "version");
+    str_copy(session->version, sizeof(session->version), version ? version : "");
+    str_strip_controls(session->version);
     session->greeted = 1;
     s->changed = 1;
     if (parsed == CONTROL_ORIGIN_MCP) {
