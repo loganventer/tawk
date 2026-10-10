@@ -48,6 +48,12 @@ typedef struct ChatListView {
     /* With several accounts listed, the mark of each, in the order of a row's `accounts` bits. */
     AccountBadge  badges[ACCOUNT_MAX];
     int           badge_count;        /* 0 or 1: rows carry no badge */
+    /* Narrowing: the chats left out (one byte each, in the order of the chat array; NULL: none),
+     * the words for what is shown ("" when nothing narrows it), and whether Enter on those words asked for all chats again. */
+    const unsigned char *hidden;
+    int           hidden_count;
+    char          narrowed[64];
+    int           widen_asked;
     ChatListEntry entries[CHAT_LIST_MAX_ENTRIES];
     int           entry_count;
 } ChatListView;

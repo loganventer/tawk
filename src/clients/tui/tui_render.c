@@ -144,6 +144,7 @@ void tui_render_frame(TuiApp *app, int64_t now) {
     } else {
         int count = 0;
         const Chat *chats = tui_app_chat_rows(app, &count);
+        tui_app_narrow_rows(app, chats, count);
         if (l->sidebar.w) {
             app->chat_list.compact = strcmp(s->chat_list_style, "compact") == 0;
             app->chat_list.spacing = s->chat_spacing;

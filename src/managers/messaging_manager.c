@@ -12,6 +12,7 @@
 #include "engines/mention_matcher.h"
 #include "engines/message_id_generator.h"
 #include "engines/notification_policy.h"
+#include "engines/reminder_rule.h"
 #include "engines/presence_tracker.h"
 #include "engines/recipient_reference_parser.h"
 #include "engines/url_finder.h"
@@ -992,6 +993,13 @@ ChatAlertLevel messaging_manager_alert_level(MessagingManager *m, const char *ji
     ChatPrefs prefs;
     if (!m->deps.chat_prefs || !jid || m->deps.chat_prefs->get(m->deps.chat_prefs, jid, &prefs) != 0) return CHAT_ALERT_ALL;
     return prefs.alerts;
+}
+
+int messaging_manager_awaiting(MessagingManager *m, int days, char (*jids)[128], int max) {
+    if (!m->deps.awaiting) return 0;
+    int64_t now = (int64_t)time(NULL);
+    int n = m->deps.awaiting->list(m->deps.awaiting, now - (int64_t)60 * 24 * 60 * 60, reminder_rule_awaiting_before(now, days), jids, max);
+    return n > 0 ? n : 0;
 }
 
 int messaging_manager_set_alert_level(MessagingManager *m, const char *jid, ChatAlertLevel level) {

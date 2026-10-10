@@ -320,9 +320,19 @@ static const Migration MIGRATIONS[] = {
     { 24,
       /* Which of a chat's messages alert you: 0 all of them, 1 only one that mentions you. */
       "ALTER TABLE chat_prefs ADD COLUMN alerts INTEGER NOT NULL DEFAULT 0;" },
+    { 25,
+      /* Your own labels on chats, and the chats you put aside until a time or until their person writes. */
+      "CREATE TABLE chat_labels ("
+      "  jid TEXT NOT NULL,"
+      "  label TEXT NOT NULL,"
+      "  PRIMARY KEY (jid, label));"
+      "CREATE TABLE chat_reminders ("
+      "  jid TEXT PRIMARY KEY,"
+      "  due_at INTEGER NOT NULL DEFAULT 0,"
+      "  created_at INTEGER NOT NULL DEFAULT 0);" },
 };
 
-#define LATEST_VERSION 24
+#define LATEST_VERSION 25
 
 static int user_version(sqlite3 *db) {
     sqlite3_stmt *st = NULL;

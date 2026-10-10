@@ -4,6 +4,15 @@ What changed in each version of tawk, newest first. `tawk --update` shows every 
 
 Each version has a section headed `## <version> (<date>)`, with one line for each change you would notice.
 
+## 0.19.0 (2026-10-10)
+
+Tools for a long chat list.
+
+- **Narrow the list** with `/filter`: `unread`, `groups`, `direct`, `awaiting`, `snoozed` or `label NAME`. The list then starts with a row saying what it shows; Enter on that row, or `/filter off`, shows every chat again. Typing in the search box still looks through every chat.
+- **Awaiting a reply** (`/filter awaiting`): the one-to-one chats where the last message is yours and has gone unanswered for 3 days (Settings, Chats, "Awaiting a reply after"), up to two months back. Read from the messages tawk already keeps.
+- **Labels of your own.** `/label work` puts the label on the open chat, and the same again takes it off; `/labels` lists them; `/filter label work` shows its chats. A chat's labels are on its contact card. Labels are kept on this computer and hold for a person or group on all your numbers.
+- **Put a chat aside** with `/remind 9:00`, `/remind tomorrow`, `/remind +2h`, `/remind fri 17:30` or `/remind reply`. It leaves the list until then, or sooner if its person writes, and comes back with a notice. `/filter snoozed` shows what is put aside, the contact card shows until when, and `/remind off` brings a chat back.
+
 ## 0.18.0 (2026-10-10)
 
 Safer at rest.

@@ -36,6 +36,8 @@ typedef struct ContactPanel {
     char          owner_chat[16];
     char          agent_rule[32];
     char          alerts[32];
+    char          labels[160];
+    char          reminder[96];
     char          voice_languages[96];
 } ContactPanel;
 
@@ -52,6 +54,8 @@ void          contact_panel_set_owner_pref(ContactPanel *panel, const char *owne
 void          contact_panel_set_agent_rule_pref(ContactPanel *panel, const char *rule);
 /* Which of this chat's messages alert you, in words. */
 void          contact_panel_set_alerts_pref(ContactPanel *panel, const char *alerts);
+/* This chat's labels, and whether it is put aside; "" hides a row. */
+void          contact_panel_set_tools_prefs(ContactPanel *panel, const char *labels, const char *reminder);
 PopupResult   contact_panel_key(ContactPanel *panel, int is_key_code, int ch);
 PopupResult   contact_panel_click(ContactPanel *panel, int y, int x);
 void          contact_panel_wheel(ContactPanel *panel, int delta);

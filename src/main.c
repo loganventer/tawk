@@ -16,6 +16,10 @@
 #include "composition/account_host.h"
 #include "resource_access/sqlite_account_roster_reader.h"
 #include "resource_access/sqlite_sent_id_log.h"
+#include "resource_access/sqlite_label_store.h"
+#include "resource_access/sqlite_reminder_store.h"
+#include "managers/label_manager.h"
+#include "managers/reminder_manager.h"
 #include "managers/owner_chat_manager.h"
 #include "composition/backend_gateway_factory.h"
 #include "infrastructure/audio/audio_backend_factory.h"
@@ -478,6 +482,10 @@ int main(int argc, char **argv) {
     IAdminTokenStore *admin_tokens = file_admin_token_store_create(admin_token_file);
     AutomationManagerDeps automation_deps = { automation_log, s, admin_tokens, sqlite_chat_prefs_store_agents(chat_prefs) };
     AutomationManager *automation = automation_manager_create(&automation_deps);
+    ILabelStore *label_store = sqlite_label_store_create(db);
+    LabelManager *labels = label_store ? label_manager_create(label_store) : NULL;
+    IReminderStore *reminder_store = sqlite_reminder_store_create(db);
+    ReminderManager *reminders = reminder_store ? reminder_manager_create(reminder_store) : NULL;
     ISentIdLog *sent_ids = sqlite_sent_id_log_create(db);
     OwnerChatManagerDeps owner_deps = { sent_ids, s };
     OwnerChatManager *owner_chat = sent_ids ? owner_chat_manager_create(&owner_deps) : NULL;
@@ -510,7 +518,7 @@ int main(int argc, char **argv) {
         .automation = automation, .approvals = approvals, .frame_hook = control ? control_server_frame_hook(control) : NULL,
         .directory = directory, .roster = roster, .active_account = active->id,
         .transcripts = active->transcripts, .summaries = active->summaries,
-        .crypt = crypt,
+        .crypt = crypt, .labels = labels, .reminders = reminders,
     };
     TuiApp *tui = tui_app_create(&tdeps);
     int exit_code = tui ? tui_app_run(tui) : 1;
@@ -519,6 +527,10 @@ int main(int argc, char **argv) {
      * that is waiting on back-pressure so it can shut down. */
     tui_app_destroy(tui);
     control_server_destroy(control);
+    label_manager_destroy(labels);
+    if (label_store) label_store->destroy(label_store);
+    reminder_manager_destroy(reminders);
+    if (reminder_store) reminder_store->destroy(reminder_store);
     if (owner_chat) owner_chat_manager_destroy(owner_chat);
     if (sent_ids) sent_ids->destroy(sent_ids);
     if (control_transport) control_transport->destroy(control_transport);

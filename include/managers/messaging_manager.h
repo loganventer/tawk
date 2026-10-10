@@ -170,6 +170,9 @@ const char *messaging_manager_user_jid(MessagingManager *mgr);
 /* Which of a chat's messages alert you, and setting it. It holds for that person or group on all your numbers. */
 ChatAlertLevel messaging_manager_alert_level(MessagingManager *mgr, const char *jid);
 int            messaging_manager_set_alert_level(MessagingManager *mgr, const char *jid, ChatAlertLevel level);
+/* The one-to-one chats where your last message is at least `days` days old and unanswered (and no
+ * older than two months). Writes up to `max` JIDs and returns how many. */
+int            messaging_manager_awaiting(MessagingManager *mgr, int days, char (*jids)[128], int max);
 void        messaging_manager_request_pairing(MessagingManager *mgr, const char *phone);
 void        messaging_manager_request_qr(MessagingManager *mgr);
 void        messaging_manager_logout(MessagingManager *mgr);

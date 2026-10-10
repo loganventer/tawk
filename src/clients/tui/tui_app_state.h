@@ -6,6 +6,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "core/chat_filter_kind.h"
+#include "core/chat_label.h"
 #include "clients/tui/lock_screen.h"
 #include "clients/tui/chat_list_view.h"
 #include "clients/tui/unified_chat_list.h"
@@ -151,6 +153,15 @@ struct TuiApp {
 
     /* Loop, idle and presence */
     IdleTracker         idle;
+    /* What the chat list is narrowed to, the chats that leaves out, and the chats awaiting a reply as last looked up. */
+    ChatFilterKind      narrow;
+    char                narrow_label[CHAT_LABEL_SIZE];
+    unsigned char      *chat_hidden;
+    int                 chat_hidden_size;
+    char              (*awaiting)[128];
+    int                 awaiting_count;
+    int64_t             awaiting_at_ms;
+    int64_t             reminders_checked_ms;
     LockScreen          lock;                 /* everything is hidden until the passphrase is typed */
     int                 running;
     int                 active;
@@ -406,6 +417,15 @@ void tui_app_scheduled_request(TuiApp *app, ScheduledListRequest request);
 void tui_app_scheduled_render(TuiApp *app, UiRect area);
 /* Sends what is due while connected; call once per loop. */
 void tui_app_scheduling_tick(TuiApp *app);
+/* tui_chat_tools.c: narrowing the chat list, labels, and chats put aside with a reminder. */
+void tui_app_narrow_rows(TuiApp *app, const Chat *chats, int count);
+void tui_app_set_narrow(TuiApp *app, const char *args);
+void tui_app_toggle_label(TuiApp *app, const char *jid, const char *label);
+void tui_app_list_labels(TuiApp *app);
+void tui_app_remind(TuiApp *app, const char *jid, const char *args);
+void tui_app_reminders_tick(TuiApp *app, int64_t now_ms);
+void tui_app_refresh_tools_prefs(TuiApp *app);
+void tui_app_chat_tools_free(TuiApp *app);
 
 /* tui_commands.c */
 const SlashCommand *tui_commands_all(int *count);

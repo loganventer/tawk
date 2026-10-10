@@ -13,6 +13,7 @@
 #include "resource_access/sqlite_scheduled_message_store.h"
 #include "resource_access/sqlite_status_store.h"
 #include "resource_access/sqlite_chat_prefs_store.h"
+#include "resource_access/sqlite_awaiting_replies.h"
 #include "resource_access/sqlite_summary_store.h"
 #include "resource_access/sqlite_transcript_store.h"
 #include "utilities/event_queue.h"
@@ -44,6 +45,7 @@ struct AccountRuntime {
     IScheduledMessageStore *scheduled_store;
     ITranscriptStore       *transcript_store;
     ISummaryStore          *summary_store;
+    IAwaitingReplies       *awaiting;
 
     /* Backend */
     EventQueue      *events;
@@ -84,6 +86,7 @@ AccountRuntime *account_runtime_create(const AccountRuntimeParams *p, const Acco
     rt->scheduled_store = sqlite_scheduled_message_store_create(p->db, id);
     rt->transcript_store = sqlite_transcript_store_create(p->db, id);
     rt->summary_store = sqlite_summary_store_create(p->db, id);
+    rt->awaiting = sqlite_awaiting_replies_create(p->db, id);
 
     rt->events = event_queue_create(EVENT_QUEUE_SIZE);
     GatewayParts parts;
@@ -129,7 +132,7 @@ AccountRuntime *account_runtime_create(const AccountRuntimeParams *p, const Acco
     rt->network = ifaddrs_network_monitor_create();
     MessagingManagerDeps messaging_deps = { rt->gateway, rt->messages, rt->chats, rt->contacts, rt->aliases, rt->reactions, rt->receipts,
                                             p->notifier, rt->events, s, rt->observers, p->exporter, rt->network, liker,
-                                            id, rt->label, p->chat_prefs, sqlite_chat_prefs_store_alerts(p->chat_prefs) };
+                                            id, rt->label, p->chat_prefs, sqlite_chat_prefs_store_alerts(p->chat_prefs), rt->awaiting };
     rt->services.messaging = messaging_manager_create(&messaging_deps);
     if (!rt->services.messaging) {
         account_runtime_destroy(rt);
@@ -163,6 +166,7 @@ void account_runtime_destroy(AccountRuntime *rt) {
     if (rt->scheduled_store) rt->scheduled_store->destroy(rt->scheduled_store);
     if (rt->transcript_store) rt->transcript_store->destroy(rt->transcript_store);
     if (rt->summary_store) rt->summary_store->destroy(rt->summary_store);
+    if (rt->awaiting) rt->awaiting->destroy(rt->awaiting);
     if (rt->aliases) rt->aliases->destroy(rt->aliases);
     if (rt->contacts) rt->contacts->destroy(rt->contacts);
     if (rt->chats) rt->chats->destroy(rt->chats);

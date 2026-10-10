@@ -34,6 +34,11 @@ static ChatFolder folder_of(const Chat *c) {
 
 static int matches(const ChatListView *v, const Chat *c) { return chat_match_filter(c, v->filter); }
 
+/* Left out by what the list is narrowed to. Typing in the search box looks through every chat again. */
+static int left_out(const ChatListView *v, int i) {
+    return !v->filter[0] && v->hidden && i < v->hidden_count && v->hidden[i];
+}
+
 static void push(ChatListView *v, ChatListEntry e) {
     if (v->entry_count < CHAT_LIST_MAX_ENTRIES) v->entries[v->entry_count++] = e;
 }
@@ -45,13 +50,14 @@ void chat_list_view_init(ChatListView *v) {
 
 void chat_list_view_sync(ChatListView *v, const Chat *chats, int count) {
     v->entry_count = 0;
+    if (v->narrowed[0] && !v->filter[0]) push(v, (ChatListEntry){ CHAT_LIST_ENTRY_NARROWED, -1, 0, 0 });
     if (v->folder == CHAT_FOLDER_CHATS && !v->filter[0]) {
         ChatListEntry archived = { CHAT_LIST_ENTRY_ARCHIVED, -1, 0, 0 };
         ChatListEntry locked = { CHAT_LIST_ENTRY_LOCKED, -1, 0, 0 };
         for (int i = 0; i < count; i++) {
             ChatFolder f = folder_of(&chats[i]);
             ChatListEntry *e = f == CHAT_FOLDER_ARCHIVED ? &archived : f == CHAT_FOLDER_LOCKED ? &locked : NULL;
-            if (!e) continue;
+            if (!e || left_out(v, i)) continue;
             e->count++;
             if (chats[i].unread > 0) e->unread++;
         }
@@ -65,7 +71,7 @@ void chat_list_view_sync(ChatListView *v, const Chat *chats, int count) {
     int grouped = v->folder == CHAT_FOLDER_CHATS && !v->filter[0];
     ChatListEntry pinned = { CHAT_LIST_ENTRY_PINNED, -1, 0, 0 }, others = { CHAT_LIST_ENTRY_OTHERS, -1, 0, 0 };
     for (int i = 0; grouped && i < count; i++) {
-        if (folder_of(&chats[i]) != CHAT_FOLDER_CHATS) continue;
+        if (folder_of(&chats[i]) != CHAT_FOLDER_CHATS || left_out(v, i)) continue;
         ChatListEntry *g = chats[i].is_pinned ? &pinned : &others;
         g->count++;
         if (chats[i].unread > 0) g->unread++;
@@ -79,7 +85,7 @@ void chat_list_view_sync(ChatListView *v, const Chat *chats, int count) {
             /* A filter searches every folder, so archived chats can still be found. */
             if (!v->filter[0] && folder_of(&chats[i]) != v->folder) continue;
             if (v->filter[0] && !chat_match_searchable(&chats[i], v->folder == CHAT_FOLDER_LOCKED)) continue;
-            if (!matches(v, &chats[i])) continue;
+            if (!matches(v, &chats[i]) || left_out(v, i)) continue;
             if (grouped && (chats[i].is_pinned != 0) != want_pinned) continue;
             push(v, (ChatListEntry){ CHAT_LIST_ENTRY_CHAT, i, 0, 0 });
         }
@@ -135,6 +141,7 @@ const char *chat_list_view_activate(ChatListView *v, const Chat *chats, int coun
         case CHAT_LIST_ENTRY_ARCHIVED: enter_folder(v, CHAT_FOLDER_ARCHIVED, chats, count); return NULL;
         case CHAT_LIST_ENTRY_LOCKED:   enter_folder(v, CHAT_FOLDER_LOCKED, chats, count); return NULL;
         case CHAT_LIST_ENTRY_BACK:     enter_folder(v, CHAT_FOLDER_CHATS, chats, count); return NULL;
+        case CHAT_LIST_ENTRY_NARROWED: v->widen_asked = 1; return NULL;
         case CHAT_LIST_ENTRY_PINNED:   v->pinned_collapsed = !v->pinned_collapsed; chat_list_view_sync(v, chats, count); return NULL;
         case CHAT_LIST_ENTRY_OTHERS:   v->others_collapsed = !v->others_collapsed; chat_list_view_sync(v, chats, count); return NULL;
         default:                       return chats[e->chat].jid;
@@ -327,6 +334,10 @@ static void render_folder(const ChatListView *v, const ChatListEntry *e, int y, 
         case CHAT_LIST_ENTRY_LOCKED:
             snprintf(title, sizeof(title), MARGIN "\xF0\x9F\x94\x92  Locked chats");
             snprintf(sub, sizeof(sub), MARGIN "%d chat%s", e->count, e->count == 1 ? "" : "s");
+            break;
+        case CHAT_LIST_ENTRY_NARROWED:
+            snprintf(title, sizeof(title), MARGIN "\xE2\x9B\x83  Showing: %.48s", v->narrowed);
+            snprintf(sub, sizeof(sub), MARGIN "Enter here shows every chat");
             break;
         default:
             snprintf(title, sizeof(title), MARGIN "\xE2\x86\x90  %s", v->folder == CHAT_FOLDER_ARCHIVED ? "Archived" : "Locked chats");

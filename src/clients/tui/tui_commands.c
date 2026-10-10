@@ -87,6 +87,27 @@ static void cmd_unarchive(TuiApp *app, const char *args) {
     if (jid) { messaging_manager_set_archived(app->deps.messaging, jid, 0); tui_app_toast(app, "Moved back to chats", 0); }
 }
 
+static void cmd_filter(TuiApp *app, const char *args) { tui_app_set_narrow(app, args); }
+
+static void cmd_label(TuiApp *app, const char *args) {
+    const char *jid = open_chat_or_warn(app);
+    if (!jid) return;
+    if (!args || !*args) { tui_app_list_labels(app); return; }
+    char copy[128];
+    str_copy(copy, sizeof(copy), jid);
+    tui_app_toggle_label(app, copy, args);
+}
+
+static void cmd_labels(TuiApp *app, const char *args) { (void)args; tui_app_list_labels(app); }
+
+static void cmd_remind(TuiApp *app, const char *args) {
+    const char *jid = open_chat_or_warn(app);
+    if (!jid) return;
+    char copy[128];
+    str_copy(copy, sizeof(copy), jid);
+    tui_app_remind(app, copy, args);
+}
+
 static void cmd_tone(TuiApp *app, const char *args) {
     const char *jid = open_chat_or_warn(app);
     if (!jid) return;
@@ -206,6 +227,10 @@ static const SlashCommand COMMANDS[] = {
     { "statuses",    "",                     "see your and your contacts' statuses", cmd_statuses },
     { "later",       "<when> <text>",        "send a message later: 18:00, +30m, tomorrow 9:00", cmd_later },
     { "scheduled",   "",                     "messages waiting to be sent later", cmd_scheduled },
+    { "filter",      "[unread|groups|direct|awaiting|snoozed|label NAME|off]", "narrow the chat list", cmd_filter },
+    { "label",       "<name>",               "put a label on this chat, or take it off", cmd_label },
+    { "labels",      "",                     "list your labels",                cmd_labels },
+    { "remind",      "<when>|reply|off",     "put this chat aside until a time, or until they write", cmd_remind },
     { "agents",      "",                     "the Agentic tab: agents' requests, who is connected, the log (F3)", cmd_agents },
     { "clear",       "",                     "clear the input and draft",       cmd_clear },
     { "settings",    "",                     "open settings",                   cmd_settings },

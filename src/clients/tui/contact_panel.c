@@ -71,6 +71,8 @@ static const char *pref_value(const ContactPanel *p, ContactAction a) {
         case CONTACT_ACTION_OWNER_CHAT:    return p->owner_chat;
         case CONTACT_ACTION_AGENT_RULE:    return p->agent_rule;
         case CONTACT_ACTION_ALERTS:        return p->alerts;
+        case CONTACT_ACTION_LABELS:        return p->labels;
+        case CONTACT_ACTION_REMINDER:      return p->reminder;
         case CONTACT_ACTION_VOICE_LANGUAGES: return p->voice_languages;
         default:                           return NULL;
     }
@@ -133,6 +135,13 @@ void contact_panel_set_alerts_pref(ContactPanel *p, const char *alerts) {
     str_copy(p->alerts, sizeof(p->alerts), alerts ? alerts : "");
     static const ContactAction PREFS[] = { CONTACT_ACTION_ALERTS };
     add_prefs(p, PREFS, 1);
+}
+
+void contact_panel_set_tools_prefs(ContactPanel *p, const char *labels, const char *reminder) {
+    str_copy(p->labels, sizeof(p->labels), labels ? labels : "");
+    str_copy(p->reminder, sizeof(p->reminder), reminder ? reminder : "");
+    static const ContactAction PREFS[] = { CONTACT_ACTION_LABELS, CONTACT_ACTION_REMINDER };
+    add_prefs(p, PREFS, 2);
 }
 
 PopupResult contact_panel_key(ContactPanel *p, int is_key, int ch) {

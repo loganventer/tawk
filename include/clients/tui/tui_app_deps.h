@@ -20,6 +20,8 @@
 #include "managers/account_manager.h"
 #include "managers/automation_manager.h"
 #include "managers/database_crypt_manager.h"
+#include "managers/label_manager.h"
+#include "managers/reminder_manager.h"
 #include "managers/media_manager.h"
 #include "managers/messaging_manager.h"
 #include "managers/call_manager.h"
@@ -39,6 +41,8 @@ typedef struct TuiAppDeps {
     MediaManager          *media;
     SettingsManager       *settings;
     IIdleAction           *screensaver;
+    LabelManager          *labels;                /* your labels on chats; may be NULL */
+    ReminderManager       *reminders;             /* chats put aside; may be NULL */
     DatabaseCryptManager  *crypt;                 /* whether your chats are encrypted, and what opens them; may be NULL */
     IAudioPlayer          *sound_player;
     IEmojiCatalog         *emoji;

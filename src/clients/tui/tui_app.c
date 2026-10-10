@@ -1251,6 +1251,13 @@ void tui_app_contact_action(TuiApp *app) {
         case CONTACT_ACTION_OWNER_CHAT:    tui_app_toggle_owner_chat(app, jid); break;
         case CONTACT_ACTION_AGENT_RULE:    tui_app_step_agent_rule(app, jid); break;
         case CONTACT_ACTION_ALERTS:        tui_app_step_alerts(app, jid); break;
+        case CONTACT_ACTION_LABELS:
+            tui_app_toast(app, "Type /label NAME in this chat to put a label on it, or the same again to take it off. /labels lists them; /filter label NAME shows its chats.", 0);
+            break;
+        case CONTACT_ACTION_REMINDER:
+            if (app->deps.reminders && reminder_manager_snoozed(app->deps.reminders, jid, NULL)) tui_app_remind(app, jid, "off");
+            else tui_app_toast(app, "Type /remind 9:00, /remind tomorrow, /remind +2h or /remind reply in this chat to put it aside until then.", 0);
+            break;
         case CONTACT_ACTION_VOICE_LANGUAGES: tui_app_open_voice_languages(app, jid); break;
         case CONTACT_ACTION_SEARCH:     app->contact.open = 0; tui_app_open_search(app, ""); break;
         case CONTACT_ACTION_OPTIONS:    app->contact.open = 0; tui_app_open_chat_options(app, jid); break;
@@ -1688,6 +1695,7 @@ void tui_app_destroy(TuiApp *app) {
     search_overlay_close(&app->search);
     text_reader_close(&app->reader);
     thumbnail_cache_destroy(app->thumbs);
+    tui_app_chat_tools_free(app);
     sixel_image_cache_destroy(app->sixels);
     free(app);
 }
@@ -1766,6 +1774,7 @@ int tui_app_run(TuiApp *app) {
         if (app->toast[0] && now > app->toast_until_ms) { app->toast[0] = '\0'; app->dirty = 1; }
         if (idle_tracker_is_idle(&app->idle, 2)) set_active(app, 0);
         update_tab(app, now);
+        tui_app_reminders_tick(app, now);
         tui_app_lock_tick(app, now);
         if (!tui_app_locked(app)) maybe_screensaver(app);
         follow_camera(app, now);
