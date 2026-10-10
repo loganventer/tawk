@@ -89,7 +89,7 @@ static MessagingManager *manager(IMessageGateway *gw, IStatusLiker *liker, sqlit
     void *all[7] = { messages, chats, contacts, aliases, reactions, receipts, exporter };
     memcpy(stores, all, sizeof(all));
     MessagingManagerDeps deps = { gw, messages, chats, contacts, aliases, reactions, receipts, notifier, events,
-                                  settings, NULL, exporter, NULL, liker, ACCOUNT_ID_FIRST, NULL };
+                                  settings, NULL, exporter, NULL, liker, ACCOUNT_ID_FIRST, NULL, NULL, NULL, NULL };
     return messaging_manager_create(&deps);
 }
 

@@ -1696,7 +1696,7 @@ int main(void) {
     transcripts = transcript_manager_create(&transcript_deps);
     ISummaryStore *summary_store = sqlite_summary_store_create(db, ACCOUNT_ID_FIRST);
     SummaryManagerDeps summary_deps = { summary_store, chat_prefs, sqlite_chat_prefs_store_summaries(chat_prefs),
-                                        settings_manager_current(settings_mgr) };
+                                        settings_manager_current(settings_mgr), NULL };
     summaries = summary_manager_create(&summary_deps);
     ILabelStore *label_store = sqlite_label_store_create(db);
     labels = label_manager_create(label_store);

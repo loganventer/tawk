@@ -191,7 +191,7 @@ void control_write(ControlServer *s, ControlSession *session, ControlPending *p)
         return;
     }
     int retry = 0;
-    char key[128];
+    char key[CONTROL_ALLOWANCE_KEY_SIZE];
     allowance_key(p, key, sizeof(key));
     AutomationVerdict v = automation_manager_check_write(s->deps.automation, session->origin, p->kind, clock_now_ms(), &retry);
     if (v == AUTOMATION_VERDICT_REFUSE) {
@@ -349,7 +349,7 @@ static void settle(ControlServer *s, int at, ApprovalAnswer *answer) {
             p->edited = 1;
         }
         ControlSession *session = control_session_of(s, p->conn);
-        char key[128];
+        char key[CONTROL_ALLOWANCE_KEY_SIZE];
         allowance_key(p, key, sizeof(key));
         if (answer->remember && session && p->kind != WRITE_KIND_DESTRUCTIVE &&
             !chat_agent_rules_always_asks(automation_manager_chat_rule(s->deps.automation, p->chat_jid))) control_session_allow(session, p->op, key);

@@ -3,6 +3,7 @@
 #include "utilities/path_util.h"
 #include "utilities/platform.h"
 #include "utilities/process_util.h"
+#include "utilities/str_util.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -210,7 +211,7 @@ static void known_as(const DoctorInputs *in, int id, char *out, size_t size) {
         const Account *a = &in->accounts[i];
         if (a->id != id) continue;
         char number[64];
-        snprintf(number, sizeof(number), "%s", a->jid);
+        str_copy(number, sizeof(number), a->jid);
         char *at = strchr(number, '@');
         if (at) *at = '\0';
         snprintf(out, size, "%s%s%s%s", a->label, number[0] ? ", " : "", number, a->is_primary ? ", primary" : "");

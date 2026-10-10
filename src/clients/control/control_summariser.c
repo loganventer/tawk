@@ -183,7 +183,7 @@ static void review_waits(ControlServer *s, int64_t now) {
              * hears nothing is simply passed over again each time it is tried. */
             session->summaries_missed = 0;
             session->passed_over_until_ms = now + PASSED_OVER_MS;
-            char notice[240];
+            char notice[256];
             snprintf(notice, sizeof(notice), "%.50s%s%.50s is not answering tawk's requests for summaries (busy, or it takes no channel "
                      "events), so another agent is asked for the next five minutes", session->client, session->label[0] ? ", " : "", session->label);
             automation_manager_notice(s->deps.automation, notice);

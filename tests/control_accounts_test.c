@@ -174,7 +174,7 @@ static void make_world(World *w, sqlite3 *db, AccountId id, IChatExporter *expor
     w->receipts = sqlite_receipt_store_create(db, id);
     w->scheduled = sqlite_scheduled_message_store_create(db, id);
     MessagingManagerDeps deps = { &w->gateway, w->messages, w->chats, w->contacts, w->aliases, w->reactions, w->receipts, &notifier,
-                                  w->events, settings_manager_current(settings_mgr), NULL, exporter, NULL, NULL, id, NULL };
+                                  w->events, settings_manager_current(settings_mgr), NULL, exporter, NULL, NULL, id, NULL, NULL, NULL, NULL };
     w->messaging = messaging_manager_create(&deps);
     SchedulingManagerDeps sched = { w->scheduled };
     w->scheduling = scheduling_manager_create(&sched);
@@ -661,7 +661,7 @@ int main(void) {
     incoming(&worlds[1], "W1", MOM, "from work");
 
     IAutomationLog *log = sqlite_automation_log_create(db);
-    AutomationManagerDeps automation_deps = { log, settings_manager_current(settings_mgr), &admin_tokens };
+    AutomationManagerDeps automation_deps = { log, settings_manager_current(settings_mgr), &admin_tokens, NULL };
     automation = automation_manager_create(&automation_deps);
     queue = approval_queue_create();
     /* The server looks for its socket file now and then; an ordinary file stands in for it. */
@@ -671,7 +671,7 @@ int main(void) {
     if (stand_in) fclose(stand_in);
     ControlServerDeps control_deps = { &transport, approval_queue_prompt(queue), worlds[0].messaging, NULL, worlds[0].scheduling, NULL,
                                        automation, settings_mgr, NULL, NULL, NULL, "test", socket_path, &directory, roster,
-                                       worlds[0].transcripts, NULL };
+                                       worlds[0].transcripts, NULL, NULL, NULL, NULL };
     server = control_server_create(&control_deps);
     tick();
     tick();

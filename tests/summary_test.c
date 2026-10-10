@@ -144,9 +144,9 @@ static void test_store_and_manager(sqlite3 *db) {
     settings_set_defaults(&settings);
     CHECK(settings.tldr_min_chars == 0, "out of the box, every message of a TL;DR chat is summarised");
     settings.tldr_min_chars = 300;                          /* the checks below are about a length you set */
-    SummaryManagerDeps deps = { store, prefs, sqlite_chat_prefs_store_summaries(prefs), &settings };
+    SummaryManagerDeps deps = { store, prefs, sqlite_chat_prefs_store_summaries(prefs), &settings, NULL };
     SummaryManager *mgr = summary_manager_create(&deps);
-    SummaryManagerDeps missing = { store, prefs, NULL, &settings };
+    SummaryManagerDeps missing = { store, prefs, NULL, &settings, NULL };
     CHECK(mgr != NULL && summary_manager_create(&missing) == NULL, "the manager needs every part");
 
     Chat mom;

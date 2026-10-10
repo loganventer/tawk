@@ -131,7 +131,7 @@ static void test_manager(void) {
     IReceiptStore *receipts = sqlite_receipt_store_create(db, ACCOUNT_ID_FIRST);
     IChatExporter *exporter = text_chat_exporter_create();
     MessagingManagerDeps deps = { &gateway, messages, chats, contacts, aliases, reactions, receipts, &notifier, events,
-                                  &settings, NULL, exporter, NULL, NULL, ACCOUNT_ID_FIRST, NULL };
+                                  &settings, NULL, exporter, NULL, NULL, ACCOUNT_ID_FIRST, NULL, NULL, NULL, NULL };
     MessagingManager *m = messaging_manager_create(&deps);
     ManagerChanges ch;
 

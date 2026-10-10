@@ -207,7 +207,7 @@ void automation_manager_tick(AutomationManager *m) {
         return;
     }
     if (m->admin_token[0]) return;
-    char a[40], b[40];
+    char a[33], b[33];   /* 32 hex digits each */
     if (confirmation_token_generate(a, sizeof(a)) != 0 || confirmation_token_generate(b, sizeof(b)) != 0) return;
     char token[ADMIN_TOKEN_SIZE];
     snprintf(token, sizeof(token), "%s%s", a, b);
