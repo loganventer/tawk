@@ -2,6 +2,7 @@
 #include "engines/schedule_time_parser.h"
 
 #include <ctype.h>
+#include <stddef.h>
 #include <strings.h>
 
 int reminder_rule_parse(const char *text, int64_t now, int64_t *due) {

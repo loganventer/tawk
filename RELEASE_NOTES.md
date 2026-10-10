@@ -4,6 +4,10 @@ What changed in each version of tawk, newest first. `tawk --update` shows every 
 
 Each version has a section headed `## <version> (<date>)`, with one line for each change you would notice.
 
+## 0.20.1 (2026-10-10)
+
+- Fixed: tawk 0.19.0 and 0.20.0 did not build on Linux, WSL included. `src/engines/reminder_rule.c` used `NULL` without including `<stddef.h>`; macOS headers happen to supply it and glibc's do not.
+
 ## 0.20.0 (2026-10-10)
 
 - Agents can reach the chat list tools. New control operations `list_labels`, `set_label`, `list_reminders`, `set_reminder`, `cancel_reminder` and `awaiting_replies`, and `labels` and `reminder` in `chat_info`. Labelling a chat is a managing write and putting one aside is a write, so you are asked about each; reading follows the chats an agent may see, and a chat hidden from agents appears in none of them. With tawk-mcp 0.12.0 these are the tools of the same names.
