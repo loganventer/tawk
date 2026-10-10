@@ -102,6 +102,10 @@ typedef struct Settings {
     char transcribe_model[24];     /* the Whisper model an agent's transcriber uses for voice notes */
     char transcribe_languages[64]; /* the languages it writes them in: codes separated by commas, or auto */
     int  transcribe_auto;          /* voice notes other people send are transcribed as they arrive */
+    char owner_chat[16];              /* the account whose "message yourself" chat is your chat with the agent, as its id; empty: none */
+    int  owner_replies_per_hour;      /* how many answers an agent may send there by itself in an hour */
+    int  owner_approvals;             /* waiting requests are put to you there too */
+    int  owner_card_wait;             /* seconds a request waits in tawk first */
     char default_agent[64];           /* your default agent, by its label: the one tawk turns to by itself (it writes TL;DR summaries); empty: none chosen */
 
     /* Advanced */

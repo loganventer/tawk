@@ -31,6 +31,9 @@ typedef struct ControlPending {
     char          *text;              /* owned, may be NULL: words to send or post */
     cJSON         *args;              /* owned copy of the checked arguments */
     int64_t        expires_ms;
+    int64_t        asked_ms;          /* when you were first asked */
+    int            carded;            /* it was put to you in the owner's chat, or never will be */
+    char           card_id[64];       /* the message that put it to you there, "" when none */
 } ControlPending;
 
 void control_pending_init(ControlPending *pending, const char *request_id, const char *op, WriteKind kind, ControlExecute execute);

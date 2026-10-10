@@ -41,7 +41,10 @@ static void finish(ControlServer *s, const ControlPending *p, AutomationOutcome 
         failure.code = "offline";
         str_copy(failure.why, sizeof(failure.why), "tawk is not connected to WhatsApp right now");
     }
+    uint64_t before = messaging_manager_live_last(s->deps.messaging);
     cJSON *r = failure.why[0] ? NULL : p->execute(s, p, &failure);
+    /* Whatever a client puts into the owner's chat is remembered as tawk's, so it is never read back as your words. */
+    if (r && control_owner_here(s, p->chat_jid)) control_owner_note_since(s, before, SENT_KIND_REPLY, 0);
     if (!r) {
         record(s, p, AUTOMATION_OUTCOME_FAILED);
         control_fail(s, p->conn, p->request_id, failure.code ? failure.code : "failed", failure.why[0] ? failure.why : "It could not be done");
@@ -86,17 +89,9 @@ static void chat_place(ControlServer *s, const char *jid, char *out, size_t size
     else str_copy(out, size, name);
 }
 
-/* Moves `p` to the list waiting for your answer, and asks. */
-static void ask(ControlServer *s, ControlPending *p) {
-    if (s->pending_count >= CONTROL_MAX_PENDING || !s->deps.approvals) {
-        record(s, p, AUTOMATION_OUTCOME_FAILED);
-        control_fail(s, p->conn, p->request_id, "failed", "Too many requests are already waiting for an answer");
-        control_pending_dispose(p);
-        return;
-    }
+/* Shows `p` in tawk's own window, as it stands now. */
+static void prompt(ControlServer *s, ControlPending *p) {
     ApprovalRisk risk = automation_manager_risk(s->deps.automation, p->op, p->kind);
-    p->approval_id = ++s->next_approval;
-    p->expires_ms = clock_now_ms() + automation_manager_answer_window_ms(s->deps.automation, risk);
     ApprovalRequest req;
     memset(&req, 0, sizeof(req));
     req.id = p->approval_id;
@@ -112,9 +107,26 @@ static void ask(ControlServer *s, ControlPending *p) {
     req.editable = p->editable;
     req.danger = p->kind == WRITE_KIND_DESTRUCTIVE;
     req.risk = risk;
-    req.asked_ms = clock_now_ms();
+    req.asked_ms = p->asked_ms;
     req.expires_ms = p->expires_ms;
     s->deps.approvals->ask(s->deps.approvals, &req);
+}
+
+/* Moves `p` to the list waiting for your answer, and asks. */
+static void ask(ControlServer *s, ControlPending *p) {
+    if (s->pending_count >= CONTROL_MAX_PENDING || !s->deps.approvals) {
+        record(s, p, AUTOMATION_OUTCOME_FAILED);
+        control_fail(s, p->conn, p->request_id, "failed", "Too many requests are already waiting for an answer");
+        control_pending_dispose(p);
+        return;
+    }
+    ApprovalRisk risk = automation_manager_risk(s->deps.automation, p->op, p->kind);
+    p->approval_id = ++s->next_approval;
+    p->asked_ms = clock_now_ms();
+    p->expires_ms = p->asked_ms + automation_manager_answer_window_ms(s->deps.automation, risk);
+    p->carded = 0;
+    p->card_id[0] = '\0';
+    prompt(s, p);
     s->pending[s->pending_count++] = *p;
     s->changed = 1;
     cJSON *evt = cJSON_CreateObject();
@@ -187,6 +199,8 @@ void control_write(ControlServer *s, ControlSession *session, ControlPending *p)
     } else if (p->kind == WRITE_KIND_DESTRUCTIVE) {
         hold(s, p);
         return;
+    } else if (v == AUTOMATION_VERDICT_ASK && control_owner_reply(s, session, p)) {
+        finish(s, p, AUTOMATION_OUTCOME_DONE);             /* an answer to you in the owner's chat reaches nobody else */
     } else if (v == AUTOMATION_VERDICT_ASK && (p->new_chat || !control_session_allows(session, p->op, key))) {
         ask(s, p);                                         /* a first message to someone is asked about whatever was allowed before */
         return;
@@ -311,30 +325,67 @@ void control_op_approve(ControlServer *s, ControlSession *session, const Control
     control_reply(s, session->conn, control_codec_ok(req->id, r));
 }
 
+/* Your answer to the waiting request at `at`, wherever you gave it. */
+static void settle(ControlServer *s, int at, ApprovalAnswer *answer) {
+    ControlPending *p = &s->pending[at];
+    if (answer->approved) {
+        if (answer->text && p->editable && (!p->text || strcmp(answer->text, p->text) != 0)) {
+            free(p->text);
+            p->text = answer->text;
+            answer->text = NULL;
+            p->edited = 1;
+        }
+        ControlSession *session = control_session_of(s, p->conn);
+        char key[128];
+        allowance_key(p, key, sizeof(key));
+        if (answer->remember && session && p->kind != WRITE_KIND_DESTRUCTIVE) control_session_allow(session, p->op, key);
+        carry_out(s, p, AUTOMATION_OUTCOME_APPROVED);
+    } else {
+        record(s, p, AUTOMATION_OUTCOME_DECLINED);
+        control_fail(s, p->conn, p->request_id, "declined", "Declined by the user");
+    }
+    remove_pending(s, at);
+}
+
+ControlPending *control_writes_pending(ControlServer *s, int approval_id) {
+    int at = find_pending(s, approval_id);
+    return at >= 0 ? &s->pending[at] : NULL;
+}
+
+int control_writes_answer(ControlServer *s, int approval_id, int approved) {
+    int at = find_pending(s, approval_id);
+    if (at < 0) return -1;
+    if (s->deps.approvals) s->deps.approvals->withdraw(s->deps.approvals, approval_id);   /* it leaves tawk's window too */
+    ApprovalAnswer answer;
+    memset(&answer, 0, sizeof(answer));
+    answer.id = approval_id;
+    answer.approved = approved;
+    settle(s, at, &answer);
+    return 0;
+}
+
+int control_writes_retext(ControlServer *s, int approval_id, const char *text) {
+    int at = find_pending(s, approval_id);
+    if (at < 0 || !text || !text[0] || !s->pending[at].editable || strlen(text) > CONTROL_MAX_TEXT_BYTES) return -1;
+    ControlPending *p = &s->pending[at];
+    char *copy = str_dup(text);
+    if (!copy) return -1;
+    free(p->text);
+    p->text = copy;
+    p->edited = 1;
+    if (s->deps.approvals) {                                 /* tawk's window shows the new words */
+        s->deps.approvals->withdraw(s->deps.approvals, approval_id);
+        prompt(s, p);
+    }
+    s->changed = 1;
+    return 0;
+}
+
 void control_writes_tick(ControlServer *s, int64_t now_ms) {
     ApprovalAnswer answer;
     while (s->deps.approvals && s->deps.approvals->take_answer(s->deps.approvals, &answer)) {
         int at = find_pending(s, answer.id);
-        if (at >= 0) {
-            ControlPending *p = &s->pending[at];
-            if (answer.approved) {
-                if (answer.text && p->editable && (!p->text || strcmp(answer.text, p->text) != 0)) {
-                    free(p->text);
-                    p->text = answer.text;
-                    answer.text = NULL;
-                    p->edited = 1;
-                }
-                ControlSession *session = control_session_of(s, p->conn);
-                char key[128];
-                allowance_key(p, key, sizeof(key));
-                if (answer.remember && session && p->kind != WRITE_KIND_DESTRUCTIVE) control_session_allow(session, p->op, key);
-                carry_out(s, p, AUTOMATION_OUTCOME_APPROVED);
-            } else {
-                record(s, p, AUTOMATION_OUTCOME_DECLINED);
-                control_fail(s, p->conn, p->request_id, "declined", "Declined in tawk");
-            }
-            remove_pending(s, at);
-        }
+        if (at >= 0) settle(s, at, &answer);
         approval_answer_dispose(&answer);
     }
     for (int i = s->pending_count - 1; i >= 0; i--) {

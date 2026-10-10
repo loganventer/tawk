@@ -305,9 +305,18 @@ static const Migration MIGRATIONS[] = {
       /* Until this version tawk could hand a voice note to a session still running an older transcriber,
        * which wrote some of them as English translations. Those are dropped too, to be written again. */
       "DELETE FROM transcripts;" },
+    { 22,
+      /* The owner's chat: the ids of what tawk itself sent into it, so that what is left there is yours. */
+      "CREATE TABLE sent_ids ("
+      "  account_id INTEGER NOT NULL,"
+      "  message_id TEXT NOT NULL,"
+      "  kind INTEGER NOT NULL DEFAULT 0,"
+      "  ref INTEGER NOT NULL DEFAULT 0,"
+      "  at INTEGER NOT NULL DEFAULT 0,"
+      "  PRIMARY KEY (account_id, message_id));" },
 };
 
-#define LATEST_VERSION 21
+#define LATEST_VERSION 22
 
 static int user_version(sqlite3 *db) {
     sqlite3_stmt *st = NULL;

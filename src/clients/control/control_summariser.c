@@ -34,6 +34,8 @@ static int eligible(const ControlSession *session) {
            clock_now_ms() >= session->passed_over_until_ms;
 }
 
+int control_default_agent_is(ControlServer *s, const ControlSession *session) { return label_chosen(s, session); }
+
 int control_summariser_is(ControlServer *s, const ControlSession *session) {
     return eligible(session) && (session->summariser || label_chosen(s, session));
 }
@@ -95,7 +97,9 @@ static int tell_yourself(ControlServer *s, const char *text) {
     OutgoingText out;
     memset(&out, 0, sizeof(out));
     out.text = text;
+    uint64_t before = messaging_manager_live_last(s->deps.messaging);
     if (messaging_manager_send_text_to(s->deps.messaging, self, &out) != 0) return -1;
+    control_owner_note_since(s, before, SENT_KIND_NOTE, 0);   /* in the owner's chat, tawk's own lines are not your words */
     s->summary_ask_account = s->account;
     return 0;
 }
@@ -265,14 +269,16 @@ static int take_answer(ControlServer *s, const Message *msg) {
     return 1;
 }
 
-void control_summaries_on_message(ControlServer *s, const LiveMessageRef *ref) {
+int control_summaries_on_message(ControlServer *s, const LiveMessageRef *ref) {
     SummaryManager *mgr = s->deps.summaries;
-    if (!mgr && !s->summary_asking) return;
+    if (!mgr && !s->summary_asking) return 0;
     Message msg;
-    if (messaging_manager_get(s->deps.messaging, ref->id, &msg) != 0) return;
-    if (!take_answer(s, &msg) && mgr) {                     /* what you send is summarised too */
+    if (messaging_manager_get(s->deps.messaging, ref->id, &msg) != 0) return 0;
+    int answered = take_answer(s, &msg);
+    if (!answered && mgr) {                                 /* what you send is summarised too */
         const Chat *chat = control_visible_chat(s, msg.chat_jid);
         if (chat) summary_manager_want(mgr, &msg, chat);
     }
     message_dispose(&msg);
+    return answered;
 }

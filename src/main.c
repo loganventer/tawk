@@ -15,6 +15,8 @@
 #include "clients/tui/tui_notifier.h"
 #include "composition/account_host.h"
 #include "resource_access/sqlite_account_roster_reader.h"
+#include "resource_access/sqlite_sent_id_log.h"
+#include "managers/owner_chat_manager.h"
 #include "composition/backend_gateway_factory.h"
 #include "infrastructure/audio/audio_backend_factory.h"
 #include "infrastructure/composite_notifier.h"
@@ -471,6 +473,9 @@ int main(int argc, char **argv) {
     IAdminTokenStore *admin_tokens = file_admin_token_store_create(admin_token_file);
     AutomationManagerDeps automation_deps = { automation_log, s, admin_tokens };
     AutomationManager *automation = automation_manager_create(&automation_deps);
+    ISentIdLog *sent_ids = sqlite_sent_id_log_create(db);
+    OwnerChatManagerDeps owner_deps = { sent_ids, s };
+    OwnerChatManager *owner_chat = sent_ids ? owner_chat_manager_create(&owner_deps) : NULL;
     ApprovalQueue *approvals = approval_queue_create();
     IControlTransport *control_transport = unix_control_transport_create();
     char control_path[600];
@@ -478,7 +483,7 @@ int main(int argc, char **argv) {
     ControlServerDeps control_deps = { control_transport, approval_queue_prompt(approvals), active->messaging, active->profiles,
                                        active->scheduling, active->feed, automation, settings_mgr, active->accounts,
                                        active->statuses, active->calls, active->backend_name, control_path,
-                                       directory, roster, active->transcripts, active->summaries };
+                                       directory, roster, active->transcripts, active->summaries, owner_chat };
     ControlServer *control = control_server_create(&control_deps);
     ICamera *camera = ffmpeg_camera_create();
     MediaManagerDeps media_deps = { opener, voice_player, recorder, camera, audio, s };
@@ -508,6 +513,8 @@ int main(int argc, char **argv) {
      * that is waiting on back-pressure so it can shut down. */
     tui_app_destroy(tui);
     control_server_destroy(control);
+    if (owner_chat) owner_chat_manager_destroy(owner_chat);
+    if (sent_ids) sent_ids->destroy(sent_ids);
     if (control_transport) control_transport->destroy(control_transport);
     approval_queue_destroy(approvals);
     automation_manager_destroy(automation);

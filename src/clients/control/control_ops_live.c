@@ -223,7 +223,13 @@ static void push_live(ControlServer *s) {
     uint64_t *cursor = live_cursor(s);
     int n = messaging_manager_live_since(s->deps.messaging, *cursor, refs, LIVE_PER_TICK);
     for (int i = 0; i < n; i++) {
-        if (refs[i].kind == LIVE_KIND_MESSAGE) { control_summaries_on_message(s, &refs[i]); send_message(s, &refs[i]); }
+        if (refs[i].kind == LIVE_KIND_MESSAGE) {
+            /* Your answer to a question of tawk's, or your words in the owner's chat, go where they are meant and nowhere else. */
+            if (!control_summaries_on_message(s, &refs[i]) && !control_owner_on_message(s, &refs[i])) send_message(s, &refs[i]);
+        } else if (refs[i].kind == LIVE_KIND_REACTION) {
+            control_owner_on_reaction(s, &refs[i]);
+            send_activity(s, &refs[i]);
+        }
         else if (refs[i].kind == LIVE_KIND_PRESENCE) control_presence_send(s, find_chat(s, refs[i].chat_jid), &refs[i]);
         else send_activity(s, &refs[i]);
         *cursor = refs[i].seq;

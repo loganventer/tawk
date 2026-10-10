@@ -50,6 +50,7 @@ struct ControlServer {
     /* Requests for summaries go out a few at once and then one every so often, so a chat's older messages do not flood an agent. */
     int                 summary_tokens;
     int64_t             summary_refill_ms;
+    int64_t             owner_told_ms;        /* when you were last told that no agent hears the owner's chat */
 };
 
 /* ---- accounts (control_accounts.c) ---- */
@@ -115,6 +116,12 @@ void control_op_confirm(ControlServer *server, ControlSession *session, const Co
 void control_op_cancel_confirmation(ControlServer *server, ControlSession *session, const ControlRequest *req);
 /* Access admin: a client answers its own waiting request, showing the admin token. */
 void control_op_approve(ControlServer *server, ControlSession *session, const ControlRequest *req);
+/* Your answer to a waiting request, given somewhere other than tawk's own window: 0 when it was waiting. */
+int  control_writes_answer(ControlServer *server, int approval_id, int approved);
+/* Changes the words of a waiting request, as you may in tawk's window: 0 when it was waiting and may be changed. */
+int  control_writes_retext(ControlServer *server, int approval_id, const char *text);
+/* The waiting request with that approval id, or NULL. */
+ControlPending *control_writes_pending(ControlServer *server, int approval_id);
 void control_writes_tick(ControlServer *server, int64_t now_ms);
 void control_writes_forget(ControlServer *server, int conn);
 
@@ -191,8 +198,24 @@ void control_summary_answered(ControlSession *session, const char *message_id);
 int  control_summariser_is(ControlServer *server, const ControlSession *session);
 /* You chose the agent on `conn` in the Agents tab; choosing it again takes the choice back. */
 void control_summariser_choose(ControlServer *server, int conn);
-/* A message arrived in the account being served: it may be one to summarise, or your answer to tawk's question. */
-void control_summaries_on_message(ControlServer *server, const LiveMessageRef *ref);
+/* A message arrived in the account being served: it may be one to summarise, or your answer to
+ * tawk's question, in which case 1 is returned and it is nothing else. */
+int  control_summaries_on_message(ControlServer *server, const LiveMessageRef *ref);
+/* Whether `session` is the agent you chose as your default. */
+int  control_default_agent_is(ControlServer *server, const ControlSession *session);
+/* control_owner.c: the owner's chat, where you and the agent talk on WhatsApp. */
+/* Whether `chat_jid`, in the account being served, is the owner's chat. */
+int  control_owner_here(ControlServer *server, const char *chat_jid);
+/* Whether a write is an agent's answer to you there that may go out unasked; a yes counts against this hour. */
+int  control_owner_reply(ControlServer *server, const ControlSession *session, const ControlPending *pending);
+/* Remembers the messages the account being served put into the owner's chat since `before`. */
+void control_owner_note_since(ControlServer *server, uint64_t before, SentKind kind, int ref);
+/* A message in the account being served: 1 when it was your words to the agent, or your answer to a request. */
+int  control_owner_on_message(ControlServer *server, const LiveMessageRef *ref);
+/* A reaction in the account being served: a thumb on a request's card answers it. */
+void control_owner_on_reaction(ControlServer *server, const LiveMessageRef *ref);
+/* Puts the requests that have waited long enough to you in the owner's chat. */
+void control_owner_tick(ControlServer *server, int64_t now_ms);
 /* Hands waiting messages to the agent that writes summaries, or asks you which agent that is. */
 void control_summaries_tick(ControlServer *server, int64_t now_ms);
 /* control_ops_live.c */

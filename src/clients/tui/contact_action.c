@@ -18,6 +18,7 @@ static const char *const LABELS[CONTACT_ACTION_COUNT] = {
     "\xF0\x9F\x8E\x99  Transcribe voice notes",
     "\xF0\x9F\x97\xA3  Voice note languages\xE2\x80\xA6",
     "\xE2\x9C\x82  TL;DR (summarise messages)",
+    "\xF0\x9F\x92\xAC  This is my chat with the agent",
 };
 
 const char *contact_action_label(ContactAction a) {

@@ -33,6 +33,7 @@ typedef struct ContactPanel {
     char          show_transcripts[48];
     char          transcribe[24];
     char          tldr[16];
+    char          owner_chat[16];
     char          voice_languages[96];
 } ContactPanel;
 
@@ -43,6 +44,8 @@ void          contact_panel_set_prefs(ContactPanel *panel, const char *send_from
 void          contact_panel_set_transcript_prefs(ContactPanel *panel, const char *show, const char *transcribe, const char *languages);
 /* And for TL;DR mode. */
 void          contact_panel_set_tldr_pref(ContactPanel *panel, const char *tldr);
+/* Whether this chat is your chat with the agent; "" for any chat but your own "message yourself" one, which hides the row. */
+void          contact_panel_set_owner_pref(ContactPanel *panel, const char *owner_chat);
 PopupResult   contact_panel_key(ContactPanel *panel, int is_key_code, int ch);
 PopupResult   contact_panel_click(ContactPanel *panel, int y, int x);
 void          contact_panel_wheel(ContactPanel *panel, int delta);

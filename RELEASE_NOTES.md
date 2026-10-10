@@ -4,6 +4,19 @@ What changed in each version of tawk, newest first. `tawk --update` shows every 
 
 Each version has a section headed `## <version> (<date>)`, with one line for each change you would notice.
 
+## 0.15.0 (2026-10-10)
+
+The owner's chat: talk to your agent, and answer its requests, from WhatsApp on your phone.
+
+- Open your own "message yourself" chat, press its contact card, and switch on **This is my chat with the agent**. It is off until you do, and an agent cannot switch it on.
+- What you type there on your phone reaches your agent as your own words. Anything forwarded, quoted, or not typed text (a voice note, a file) is passed on as data, never as an instruction, and what you write in any other chat never is.
+- The agent answers you there by itself, with no approval: a message to yourself reaches nobody else. It has its own limit per hour (60), and every answer is in the Agentic tab's log.
+- A send to anyone else still waits for you, and after 20 seconds unanswered in tawk it is also put to you in the owner's chat as a card with the exact words. Reply to the card with `y` or `n`, or react with a thumbs up or down. Reply with other words and they replace the text, which is read back on a new card before anything goes.
+- Deletes, blocks, settings and profile changes, and a first message to someone new are never put to you there and cannot be allowed from WhatsApp.
+- tawk tells your messages from the agent's by remembering what it sent, since both carry your number. It does not check which of your devices wrote a message: anyone at a device linked to that number can instruct the agent within these limits.
+- Needs tawk-mcp 0.11.0 or later for the agent to hear you. Approving from WhatsApp works with any client.
+- New settings under Automation: `owner_chat`, `owner_replies_per_hour`, `owner_approvals`, `owner_card_wait`. New control event `owner_message`, and `owner_chat` in the `features` of hello.
+
 ## 0.14.5 (2026-10-10)
 
 - Fixed: summaries could stop for good. An agent that let two requests go unanswered was passed over until it reconnected, and an agent that was only busy with other work, or the only one connected, was switched off that way. It is now passed over for five minutes and then tried again, and any summary it hands back clears it at once.

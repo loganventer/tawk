@@ -344,6 +344,9 @@ const SummarySource *tui_app_summaries_for(TuiApp *app, const Chat *chat);
 /* The contact card's TL;DR row: what it shows, and switching it. */
 void tui_app_refresh_summary_prefs(TuiApp *app);
 void tui_app_toggle_tldr(TuiApp *app, const char *jid);
+/* tui_owner_chat.c: the card row that names your own chat as your chat with the agent. */
+void tui_app_refresh_owner_pref(TuiApp *app);
+void tui_app_toggle_owner_chat(TuiApp *app, const char *jid);
 /* Unfolds a summarised message to its original, or folds it back; 0 when the message has no summary. */
 int  tui_app_toggle_summary(TuiApp *app, int index);
 /* Voice note transcripts (tui_transcripts.c). */

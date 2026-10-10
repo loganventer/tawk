@@ -21,6 +21,7 @@ typedef enum ContactAction {
     CONTACT_ACTION_TRANSCRIBE,       /* whether its voice notes are transcribed from now on */
     CONTACT_ACTION_VOICE_LANGUAGES,  /* the languages its voice notes are spoken in; opens a list of switches */
     CONTACT_ACTION_TLDR,             /* whether its messages show as a summary */
+    CONTACT_ACTION_OWNER_CHAT,       /* whether this, your own chat, is your chat with the agent */
     CONTACT_ACTION_COUNT
 } ContactAction;
 

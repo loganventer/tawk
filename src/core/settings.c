@@ -77,6 +77,9 @@ void settings_set_defaults(Settings *s) {
     str_copy(s->automation_access, sizeof(s->automation_access), "read");
     s->automation_rate = 5;
     s->automation_self_per_hour = 20;
+    s->owner_replies_per_hour = 60;
+    s->owner_approvals = 1;
+    s->owner_card_wait = 20;
     str_copy(s->automation_disclaimer_text, sizeof(s->automation_disclaimer_text), "\xF0\x9F\xA4\x96 Created with my AI assistant");
     s->automation_push_received = 1;
     s->automation_push_sent = 1;

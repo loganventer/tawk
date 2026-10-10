@@ -189,13 +189,14 @@ static void hello(ControlServer *s, ControlSession *session, const ControlReques
     str_strip_controls(session->label);
     /* What the client can do for tawk when tawk asks: named in "features", or known from the version of a tawk-mcp that did not say. */
     const cJSON *can = cJSON_GetObjectItemCaseSensitive(req->args, "features");
-    session->can_transcribe = session->can_summarise = 0;
+    session->can_transcribe = session->can_summarise = session->can_owner = 0;
     if (cJSON_IsArray(can)) {
         const cJSON *f;
         cJSON_ArrayForEach(f, can) {
             if (!cJSON_IsString(f)) continue;
             if (strcmp(f->valuestring, "transcripts") == 0) session->can_transcribe = 1;
             if (strcmp(f->valuestring, "summaries") == 0) session->can_summarise = 1;
+            if (strcmp(f->valuestring, "owner_chat") == 0) session->can_owner = 1;
         }
     } else if (strcmp(session->client, "tawk-mcp") == 0 && client_version_at_least(control_codec_string(req->args, "version"), 0, 10)) {
         session->can_transcribe = session->can_summarise = 1;
@@ -224,6 +225,7 @@ static void hello(ControlServer *s, ControlSession *session, const ControlReques
     cJSON *features = cJSON_AddArrayToObject(r, "features");
     if (s->deps.transcripts) cJSON_AddItemToArray(features, cJSON_CreateString("transcripts"));
     if (s->deps.summaries) cJSON_AddItemToArray(features, cJSON_CreateString("summaries"));
+    if (s->deps.owner) cJSON_AddItemToArray(features, cJSON_CreateString("owner_chat"));
     if (s->deps.directory && s->deps.roster) {              /* this tawk serves each request from the account it names */
         cJSON_AddBoolToObject(r, "multi_account", 1);
         cJSON_AddItemToObject(r, "accounts", control_accounts_json(s));
@@ -402,6 +404,7 @@ int control_server_tick(ControlServer *s) {
         if (check) s->next_check_ms = now + CHECK_MS;
         control_live_tick(s, check);
         control_summaries_tick(s, now);
+        control_owner_tick(s, now);
         control_transcripts_tick(s);
     }
     control_writes_tick(s, now);

@@ -32,6 +32,7 @@ typedef struct ControlSession {
     int           summariser;              /* you chose it to write TL;DR summaries */
     int           can_transcribe;          /* it said it transcribes voice notes tawk asks about */
     int           can_summarise;           /* it said it writes summaries tawk asks for */
+    int           can_owner;               /* it said it takes what you write in the owner's chat */
     char          version[24];             /* the client's own version, as it said in hello */
     /* The summaries it was asked for and has not handed back, how many it ever handed back, and how
      * many it let go unanswered: one that answers none is not asked again. */
