@@ -1103,7 +1103,7 @@ static void test_transcripts(void) {
     add_voice_note("VH", HIDDEN, 1790000230);
     int conn = next_conn++;
     inbox[inbox_count++] = (ControlInbound){ CONTROL_INBOUND_OPENED, conn, NULL };
-    say(conn, "{\"id\":\"h\",\"op\":\"hello\",\"args\":{\"client\":\"tawk-mcp\",\"protocol\":1,\"origin\":\"mcp\"}}");
+    say(conn, "{\"id\":\"h\",\"op\":\"hello\",\"args\":{\"client\":\"tawk-mcp\",\"protocol\":1,\"origin\":\"mcp\",\"features\":[\"transcripts\"]}}");
     cJSON *r = reply("h");
     CHECK(r && has_feature(result(r), "transcripts"), "hello names transcripts among what this tawk can do");
     cJSON_Delete(r);
@@ -1234,9 +1234,20 @@ static void test_tldr(void) {
     for (int c = 1; c < next_conn; c++) inbox[inbox_count++] = (ControlInbound){ CONTROL_INBOUND_CLOSED, c, NULL };
     tick();
     clear_outbox();
+    Settings length = *settings_manager_current(settings_mgr);
+    length.tldr_min_chars = 300;                            /* most checks here are about a length you set */
+    settings_manager_apply(settings_mgr, &length);
+    /* An agent from before summaries connects first: it is never asked, and does not count as a second agent. */
+    int older = next_conn++;
+    inbox[inbox_count++] = (ControlInbound){ CONTROL_INBOUND_OPENED, older, NULL };
+    say(older, "{\"id\":\"h0\",\"op\":\"hello\",\"args\":{\"client\":\"tawk-mcp\",\"protocol\":1,\"origin\":\"mcp\",\"version\":\"0.8.1\",\"label\":\"old (stdio, pid 7)\"}}");
+    summary_manager_set_tldr(summaries, MOM, 1);
+    arrives("LX", MOM, LONG_TEXT, 0);
+    CHECK(!asked_for("LX"), "an agent that cannot write summaries is not asked for one");
+    summary_manager_set_tldr(summaries, MOM, 0);
     int first = next_conn++;
     inbox[inbox_count++] = (ControlInbound){ CONTROL_INBOUND_OPENED, first, NULL };
-    say(first, "{\"id\":\"h\",\"op\":\"hello\",\"args\":{\"client\":\"tawk-mcp\",\"protocol\":1,\"origin\":\"mcp\",\"label\":\"dev (stdio, pid 11)\"}}");
+    say(first, "{\"id\":\"h\",\"op\":\"hello\",\"args\":{\"client\":\"tawk-mcp\",\"protocol\":1,\"origin\":\"mcp\",\"label\":\"dev (stdio, pid 11)\",\"features\":[\"transcripts\",\"summaries\"]}}");
     cJSON *r = reply("h");
     CHECK(r && has_feature(result(r), "summaries"), "hello names summaries among what this tawk can do");
     cJSON_Delete(r);
@@ -1256,7 +1267,13 @@ static void test_tldr(void) {
     clear_outbox();
     arrives("L1", MOM, LONG_TEXT, 0);
     arrives("N1", MOM, "See you at 6", 0);
-    CHECK(asked_for("L1") && !asked_for("N1"), "the only agent connected is asked to summarise a long message, not a short one");
+    CHECK(asked_for("L1") && !asked_for("N1"), "the only agent that can is asked to summarise a long message, not a short one");
+    length.tldr_min_chars = 0;
+    settings_manager_apply(settings_mgr, &length);
+    arrives("N2", MOM, "Running late, there in ten", 0);
+    CHECK(asked_for("N2"), "with the length at 0, every message is asked for");
+    length.tldr_min_chars = 300;
+    settings_manager_apply(settings_mgr, &length);
     CHECK(writes_tldr(first) == 0, "without having been chosen");
     say(first, "{\"id\":\"s1\",\"op\":\"set_summary\",\"args\":{\"message_id\":\"L1\",\"text\":\"School evening moved to Thursday.\",\"model\":\"sonnet\"}}");
     r = reply("s1");
@@ -1275,7 +1292,7 @@ static void test_tldr(void) {
     /* A second agent connects: with none chosen, tawk asks you which one. */
     int second = next_conn++;
     inbox[inbox_count++] = (ControlInbound){ CONTROL_INBOUND_OPENED, second, NULL };
-    say(second, "{\"id\":\"h2\",\"op\":\"hello\",\"args\":{\"client\":\"tawk-mcp\",\"protocol\":1,\"origin\":\"mcp\",\"label\":\"home (http)\"}}");
+    say(second, "{\"id\":\"h2\",\"op\":\"hello\",\"args\":{\"client\":\"tawk-mcp\",\"protocol\":1,\"origin\":\"mcp\",\"label\":\"home (http)\",\"version\":\"0.10.0\"}}");
     clear_outbox();
     last_text[0] = '\0';
     int sent_before = texts;

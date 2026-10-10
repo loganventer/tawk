@@ -379,6 +379,8 @@ Older messages: a long message that comes onto the screen without a summary is a
 
 The asking is a first, small piece of [the owner's chat](#the-owners-chat): tawk sends to your own chat and reads one kind of answer there. It tells its own messages from yours by what they are (a bare number is yours), which is the inference that section relies on.
 
+Changed in 0.14.1, the same day, after the first try on real chats: every message is summarised by default (`tldr_min_chars` 0), a summary shows only when it is shorter than its message, and tawk asks only an agent that says it can do the work (`features` in the client's hello), since a session still running an older tawk-mcp had been handed the requests and ignored them. The question goes to the "message yourself" chat of the account the chat is in.
+
 ### Parts by layer
 
 | Layer | Type | Job |

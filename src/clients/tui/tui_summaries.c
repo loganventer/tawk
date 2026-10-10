@@ -2,6 +2,7 @@
  * folding one message open and shut, and a chat's own switch on its
  * contact card. */
 #include "tui_app_state.h"
+#include "engines/summary_policy.h"
 #include "utilities/str_util.h"
 
 #include <stdio.h>
@@ -22,7 +23,11 @@ static int find_summary(void *ctx, const Message *message, AccountId owner, Summ
     TuiApp *app = ctx;
     SummaryManager *mgr = manager_of(app, owner);
     if (!mgr || message->from_me) return -1;
-    if (summary_manager_find(mgr, message->id, out) == 0) return 0;
+    if (summary_manager_find(mgr, message->id, out) == 0) {
+        if (summary_policy_shorter(message->text, out->text)) return 0;
+        summary_dispose(out);                               /* no shorter than the message: the message shows as it is */
+        return -1;
+    }
     summary_manager_want(mgr, message, messaging_manager_open_chat_info(app->deps.messaging));
     return -1;
 }

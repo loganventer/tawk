@@ -11,5 +11,9 @@ int summary_policy_allows(const Chat *chat, const ChatPrefs *prefs);
 /* Whether this message is one to summarise: text that was not deleted and is
  * at least `min_chars` long, in a chat that allows it. */
 int summary_policy_wants(const Chat *chat, const ChatPrefs *prefs, const Message *message, int min_chars);
+/* Whether a summary is worth showing in place of its message: only when it
+ * is shorter. One that is as long as the message, or longer, saves nothing,
+ * so the message shows as it is. */
+int summary_policy_shorter(const char *original, const char *summary);
 
 #endif

@@ -39,7 +39,7 @@ static const SettingField FIELDS[] = {
     B(SETTING_CATEGORY_CHATS, "show_online", "Show online status", "Show \"online\" or \"last seen\" under the name of the open chat, for people who share it with you (needs Appear online)", show_online),
     B(SETTING_CATEGORY_CHATS, "show_transcripts", "Voice note transcripts", "Show the words of a voice note under it when it has been transcribed; a chat can say otherwise on its contact card", show_transcripts),
     I(SETTING_CATEGORY_CHATS, "transcript_lines", "Transcript lines", "Lines of a transcript shown in the conversation; the message menu shows the rest", transcript_lines, 1, 40, 1, 0),
-    I(SETTING_CATEGORY_CHATS, "tldr_min_chars", "TL;DR from (characters)", "In a chat with TL;DR switched on (its contact card), a message at least this long shows as a summary", tldr_min_chars, 100, 5000, 50, 0),
+    I(SETTING_CATEGORY_CHATS, "tldr_min_chars", "TL;DR from (characters)", "In a chat with TL;DR switched on (its contact card), a message at least this long is summarised; 0 summarises every message", tldr_min_chars, 0, 5000, 50, 0),
     I(SETTING_CATEGORY_CHATS, "tldr_back_days", "TL;DR back (days)", "How many days back a TL;DR chat's older long messages are summarised by themselves, newest first; 0 summarises only what you look at", tldr_back_days, 0, 365, 1, 0),
     B(SETTING_CATEGORY_CHATS, "reopen_last_chat", "Reopen last chat", "Open the chat you had open when tawk last quit", reopen_last_chat),
     B(SETTING_CATEGORY_CHATS, "merge_accounts", "Merge the same contact across my numbers", "Someone who writes to several of your accounts shows as one chat; a contact can be set apart on its contact card", merge_accounts),

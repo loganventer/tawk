@@ -37,7 +37,7 @@ typedef struct Settings {
     int  show_online;           /* show "online" or "last seen" under the name of the open chat */
     int  show_transcripts;      /* show a voice note's transcript under it, unless the chat says otherwise */
     int  transcript_lines;      /* lines of a transcript shown in the conversation before "more" */
-    int  tldr_min_chars;        /* a message at least this long is summarised in a chat in TL;DR mode */
+    int  tldr_min_chars;        /* a message at least this long is summarised in a chat in TL;DR mode; 0: every message */
     int  tldr_back_days;        /* how far back a TL;DR chat's older messages are summarised without being looked at; 0: not at all */
     char recent_emoji[256];
     int  status_keep_days;      /* how long statuses stay viewable here (WhatsApp shows them for one) */     /* space-separated, most recent first (kept by the picker) */

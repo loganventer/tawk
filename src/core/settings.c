@@ -42,7 +42,7 @@ void settings_set_defaults(Settings *s) {
     s->show_online = 1;
     s->show_transcripts = 1;
     s->transcript_lines = 6;
-    s->tldr_min_chars = 300;
+    s->tldr_min_chars = 0;
     s->tldr_back_days = 30;
     str_copy(s->recent_emoji, sizeof(s->recent_emoji), "\xF0\x9F\x91\x8D \xE2\x9D\xA4\xEF\xB8\x8F \xF0\x9F\x98\x82 \xF0\x9F\x98\xAE \xF0\x9F\x98\xA2 \xF0\x9F\x99\x8F");
 

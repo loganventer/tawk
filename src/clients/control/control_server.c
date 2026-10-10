@@ -1,5 +1,6 @@
 #include "control_server_state.h"
 #include "clients/control/control_op_entry.h"
+#include "engines/client_version.h"
 #include "utilities/app_info.h"
 #include "utilities/clock_util.h"
 #include "utilities/log.h"
@@ -186,6 +187,19 @@ static void hello(ControlServer *s, ControlSession *session, const ControlReques
     const char *label = control_codec_string(req->args, "label");
     str_copy(session->label, sizeof(session->label), label ? label : "");
     str_strip_controls(session->label);
+    /* What the client can do for tawk when tawk asks: named in "features", or known from the version of a tawk-mcp that did not say. */
+    const cJSON *can = cJSON_GetObjectItemCaseSensitive(req->args, "features");
+    session->can_transcribe = session->can_summarise = 0;
+    if (cJSON_IsArray(can)) {
+        const cJSON *f;
+        cJSON_ArrayForEach(f, can) {
+            if (!cJSON_IsString(f)) continue;
+            if (strcmp(f->valuestring, "transcripts") == 0) session->can_transcribe = 1;
+            if (strcmp(f->valuestring, "summaries") == 0) session->can_summarise = 1;
+        }
+    } else if (strcmp(session->client, "tawk-mcp") == 0 && client_version_at_least(control_codec_string(req->args, "version"), 0, 10)) {
+        session->can_transcribe = session->can_summarise = 1;
+    }
     session->greeted = 1;
     s->changed = 1;
     if (parsed == CONTROL_ORIGIN_MCP) {

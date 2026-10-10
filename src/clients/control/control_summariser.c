@@ -25,7 +25,7 @@ static int label_chosen(ControlServer *s, const ControlSession *session) {
 }
 
 static int eligible(const ControlSession *session) {
-    return session->greeted && session->origin == CONTROL_ORIGIN_MCP && !session->paused;
+    return session->greeted && session->origin == CONTROL_ORIGIN_MCP && !session->paused && session->can_summarise;
 }
 
 int control_summariser_is(ControlServer *s, const ControlSession *session) {
@@ -80,20 +80,18 @@ void control_summariser_choose(ControlServer *s, int conn) {
     choose(s, session);
 }
 
-/* Says something to you in your own "message yourself" chat, from the account that is served by default. */
+/* Says something to you in your own "message yourself" chat of the account being served: the number
+ * the chat in question is on, which is the one you are reading. */
 static int tell_yourself(ControlServer *s, const char *text) {
-    AccountId back = s->account;
-    int rc = -1;
-    if (control_serve_account(s, control_default_account(s)) == 0 && control_connected(s)) {
-        const char *self = messaging_manager_user_jid(s->deps.messaging);
-        OutgoingText out;
-        memset(&out, 0, sizeof(out));
-        out.text = text;
-        if (self && self[0]) rc = messaging_manager_send_text_to(s->deps.messaging, self, &out);
-        if (rc == 0) s->summary_ask_account = s->account;
-    }
-    control_serve_account(s, back);
-    return rc;
+    if (!control_connected(s)) return -1;
+    const char *self = messaging_manager_user_jid(s->deps.messaging);
+    if (!self || !self[0]) return -1;
+    OutgoingText out;
+    memset(&out, 0, sizeof(out));
+    out.text = text;
+    if (messaging_manager_send_text_to(s->deps.messaging, self, &out) != 0) return -1;
+    s->summary_ask_account = s->account;
+    return 0;
 }
 
 static void ask(ControlServer *s, const SummariserCandidate *c, int count, int64_t now) {

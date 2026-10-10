@@ -125,6 +125,8 @@ Must be the first request on a connection.
 {"id":"1","op":"hello","args":{"client":"tawk-mcp","version":"0.1.0","protocol":1,"origin":"mcp","label":"wats (stdio, pid 3002)"}}
 ```
 
+`features` in the arguments is optional: the names of what the client can do when tawk asks, `transcripts` (it transcribes a voice note named in `transcript_wanted`) and `summaries` (it writes the summary asked for in `summary_wanted`). tawk sends those two events only to a client that named the feature. A client called `tawk-mcp` that sends no list is taken to do both from version 0.10.0, and neither before that.
+
 `origin` is `mcp` for a program acting for a language model, or `cli` for a person's own command. Writes from `mcp` always ask you first; writes from `cli` ask only when `confirm_cli` is on. The origin is the client's own statement: it lets tawk treat a model more carefully than your own shell, and is no defence against other programs of your user, which can read tawk's files anyway.
 
 Result:
@@ -132,7 +134,7 @@ Result:
 ```json
 {
   "protocol": 1,
-  "tawk": "0.14.0",
+  "tawk": "0.14.1",
   "access": "read",
   "account": {"jid": "27830000000@s.whatsapp.net", "name": "Logan"},
   "connected": true,
@@ -181,9 +183,9 @@ In a chat you put in TL;DR mode, tawk shows a long message as a short summary. t
 
 tawk asks with an event, sent to one client only whether or not it subscribed:
 
-- `{"evt":"summary_wanted","chat":{"jid","name"},"message":message,"max_chars":400}` for a text message of at least `tldr_min_chars` characters, from someone else, in a chat in TL;DR mode that the client may see. It is sent when the message arrives, for the chat's long messages of the last `tldr_back_days` days when its TL;DR is switched on or it is first shown, and for an older one when you look at it in tawk; once for each message while tawk runs, four at once and then one every second and a half.
+- `{"evt":"summary_wanted","chat":{"jid","name"},"message":message,"max_chars":400}` for a text message from someone else (every one while `tldr_min_chars` is 0, else those at least that many characters long), in a chat in TL;DR mode that the client may see. It is sent when the message arrives, for the chat's long messages of the last `tldr_back_days` days when its TL;DR is switched on or it is first shown, and for an older one when you look at it in tawk; once for each message while tawk runs, four at once and then one every second and a half.
 
-Which client that is: the one you made your default agent in the Agents list while it is connected; else the only client connected with origin `mcp` that is not paused; else, with several and none chosen, nobody until you choose. tawk then asks you in your own "message yourself" chat on WhatsApp, and the number you answer with chooses. The choice is kept in `default_agent` under `[automation]`, as the client's `label` with any ", pid N" taken out, so a client that wants to be recognised again keeps its label the same.
+Which client that is: the one you made your default agent in the Agents list while it is connected; else the only client connected with origin `mcp` that named `summaries` and is not paused; else, with several such and none chosen, nobody until you choose. A client that did not name the feature is never asked and does not count. tawk then asks you in the "message yourself" chat of the account the chat is in, and the number you answer with chooses. The choice is kept in `default_agent` under `[automation]`, as the client's `label` with any ", pid N" taken out, so a client that wants to be recognised again keeps its label the same.
 
 ### Writing
 
@@ -318,7 +320,7 @@ After `subscribe`, tawk sends:
 - `{"evt":"scheduled_sent","chat":{…},"message_id":"<the scheduled message's id>","at":ts}` when a message you scheduled goes out. Origin `mcp` with `push_scheduled` on.
 - `{"evt":"media_ready","chat":{…},"message_id":"…","path":"…","type":"audio","at":ts}` when a message's photo, voice note or file has finished downloading, whoever asked for it. `path` is the file in tawk's media folder and `type` the message's type. Origin `mcp`.
 - `{"evt":"presence","chat":{…},"who":{"jid","name"},"state":"online","last_seen":ts,"at":ts}` when the person in a subscribed one-to-one chat comes online or leaves. `state` is `online` or `offline`; `last_seen` is present only when they share it; there is no `message_id`. It is sent on a change, not on every notice. tawk only knows this for a chat the user has opened since connecting, or one a client asked about with `presence`. Origin `mcp` with `push_presence` on.
-- `{"evt":"transcript_wanted","chat":{"jid","name"},"message_id":"…"}` for an older voice note you looked at in tawk that has no transcript, sent to one client with origin `mcp`, whether or not it subscribed, and once for each voice note while tawk runs. Only while `transcribe_auto` is on, only for someone else's voice note, and only in a chat that is transcribed and shows transcripts. The client transcribes it as it does one that arrives.
+- `{"evt":"transcript_wanted","chat":{"jid","name"},"message_id":"…"}` for an older voice note you looked at in tawk that has no transcript, sent to one client with origin `mcp` that named `transcripts`, whether or not it subscribed, and once for each voice note while tawk runs. Only while `transcribe_auto` is on, only for someone else's voice note, and only in a chat that is transcribed and shows transcripts. The client transcribes it as it does one that arrives.
 - A `message` event for a voice note, and a `media_ready` event for audio, carry `"transcribe":false` when the chat's voice notes are not to be transcribed, so a transcriber knows before it starts.
 - `{"evt":"chat","chat":chat}` when a subscribed chat's unread count changes.
 - `{"evt":"bye"}` just before tawk quits.
@@ -328,8 +330,8 @@ Chats that are locked, hidden or outside `chats` never produce notifications.
 ## Example
 
 ```text
-→ {"id":"1","op":"hello","args":{"client":"tawk","version":"0.14.0","protocol":1,"origin":"cli"}}
-← {"id":"1","ok":true,"result":{"protocol":1,"tawk":"0.14.0","access":"send","account":{"jid":"27830000000@s.whatsapp.net","name":"Logan"},"connected":true}}
+→ {"id":"1","op":"hello","args":{"client":"tawk","version":"0.14.1","protocol":1,"origin":"cli"}}
+← {"id":"1","ok":true,"result":{"protocol":1,"tawk":"0.14.1","access":"send","account":{"jid":"27830000000@s.whatsapp.net","name":"Logan"},"connected":true}}
 → {"id":"2","op":"unread_summary"}
 ← {"id":"2","ok":true,"result":{"total":2,"mentions":0,"chats":[{"jid":"27820000000@s.whatsapp.net","name":"Mom","is_group":false,"unread":2,"unread_mention":false,"muted":false,"pinned":true,"archived":false,"last_ts":1790000000,"preview":"See you at 6"}]}}
 → {"id":"3","op":"send_message","args":{"chat":"Mom","text":"On my way"}}

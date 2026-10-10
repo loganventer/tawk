@@ -4,6 +4,13 @@ What changed in each version of tawk, newest first. `tawk --update` shows every 
 
 Each version has a section headed `## <version> (<date>)`, with one line for each change you would notice.
 
+## 0.14.1 (2026-10-10)
+
+- In a chat with TL;DR on, every message from someone else is now summarised, not only long ones. "TL;DR from (characters)" under Settings, Chats is 0 by default, which means every message; raise it to summarise only longer ones. If you ran 0.14.0, your settings file still says 300: set it to 0 there.
+- A summary shows in place of its message only when it is shorter than the message. One that is no shorter saves nothing, so the message shows as it is.
+- Fixed: nothing was transcribed or summarised when an agent running an older tawk-mcp was connected too. tawk handed the request to the first agent connected, and an older one ignored it. tawk now asks only an agent that says it can do the work (tawk-mcp 0.10.1 says so when it connects, and 0.10.0 is recognised by its version), and an older one no longer counts when tawk decides whether to ask you which agent to use.
+- tawk's question about which agent writes summaries now goes to the "message yourself" chat of the number the chat is on, which is the one you are reading, where before it went to the primary account's.
+
 ## 0.14.0 (2026-10-10)
 
 - TL;DR mode, for one chat at a time. Switch **TL;DR** on on a chat's contact card and its long messages show as a short summary, so a paragraph need not be read to know what it says. Off for every chat until you switch it on.

@@ -28,6 +28,8 @@ typedef struct ControlSession {
     int           requests;
     int           paused;                  /* you paused it in the Agents tab */
     int           summariser;              /* you chose it to write TL;DR summaries */
+    int           can_transcribe;          /* it said it transcribes voice notes tawk asks about */
+    int           can_summarise;           /* it said it writes summaries tawk asks for */
     ControlAllowance allowances[CONTROL_SESSION_ALLOWANCES];
     int           allowance_count;
 } ControlSession;

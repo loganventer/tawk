@@ -63,6 +63,10 @@ static void test_engines(void) {
     CHECK(summary_policy_allows(&chat, &prefs) && summary_policy_wants(&chat, &prefs, &longer, 300), "switched on, a long message is one to summarise");
     CHECK(!summary_policy_wants(&chat, &prefs, &shorter, 300) && !summary_policy_wants(&chat, &prefs, &voice, 300), "a short one and a voice note are not");
     CHECK(!summary_policy_wants(&chat, &prefs, &longer, 5000), "the length is yours to set");
+    CHECK(summary_policy_wants(&chat, &prefs, &shorter, 0) && summary_policy_wants(&chat, &prefs, &longer, 0) &&
+          !summary_policy_wants(&chat, &prefs, &voice, 0), "set to 0, every text message is one to summarise");
+    CHECK(summary_policy_shorter(LONG_TEXT, "Evening moved to Thursday.") && !summary_policy_shorter("See you at 6", "She will see you at six o'clock") &&
+          !summary_policy_shorter("ok", "ok") && !summary_policy_shorter("ok", ""), "a summary is worth showing only when it is shorter than the message");
     longer.deleted = 1;
     CHECK(!summary_policy_wants(&chat, &prefs, &longer, 300), "nor a deleted message");
     longer.deleted = 0;
@@ -132,6 +136,8 @@ static void test_store_and_manager(sqlite3 *db) {
     IChatPrefsStore *prefs = sqlite_chat_prefs_store_create(db);
     Settings settings;
     settings_set_defaults(&settings);
+    CHECK(settings.tldr_min_chars == 0, "out of the box, every message of a TL;DR chat is summarised");
+    settings.tldr_min_chars = 300;                          /* the checks below are about a length you set */
     SummaryManagerDeps deps = { store, prefs, sqlite_chat_prefs_store_summaries(prefs), &settings };
     SummaryManager *mgr = summary_manager_create(&deps);
     SummaryManagerDeps missing = { store, prefs, NULL, &settings };

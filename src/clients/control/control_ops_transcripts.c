@@ -56,7 +56,7 @@ void control_op_set_transcript(ControlServer *s, ControlSession *session, const 
 static int transcriber(ControlServer *s) {
     for (int i = 0; i < s->session_count; i++) {
         const ControlSession *c = &s->sessions[i];
-        if (c->greeted && c->origin == CONTROL_ORIGIN_MCP && !c->paused) return c->conn;
+        if (c->greeted && c->origin == CONTROL_ORIGIN_MCP && !c->paused && c->can_transcribe) return c->conn;
     }
     return -1;
 }
