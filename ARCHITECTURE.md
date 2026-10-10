@@ -153,6 +153,9 @@ flowchart TD
 | `IChatTranscriptPrefs` | Handed out by `sqlite_chat_prefs_store` (`sqlite_chat_prefs_store_transcripts`) and owned by it: `set_show` and `set_transcribe_off` for one chat. They are read with the rest of `ChatPrefs` through `IChatPrefsStore`, which is not widened for them |
 | `ISummaryStore` | `sqlite_summary_store` (TL;DR summaries an agent hands over, in the `summaries` table: one per message, bound to an account; `save`, `find` and `remove`) |
 | `IChatAgentPrefs` | Handed out by `sqlite_chat_prefs_store` (`sqlite_chat_prefs_store_agents`): sets and lists the rule for agents in a chat, which `AutomationManager` reads once and keeps in step |
+| `ILabelStore` | `sqlite_label_store` (your labels on chats, in `chat_labels`) |
+| `IReminderStore` | `sqlite_reminder_store` (chats put aside, in `chat_reminders`) |
+| `IAwaitingReplies` | `sqlite_awaiting_replies` (the one-to-one chats of an account whose newest message is yours and old enough: one query over `messages`, nothing stored) |
 | `ISentIdLog` | `sqlite_sent_id_log` (the ids of the messages tawk itself put into the owner's chat, in the `sent_ids` table, so that what is left there is known to be yours after a restart too) |
 | `IChatSummaryPrefs` | Handed out by `sqlite_chat_prefs_store` (`sqlite_chat_prefs_store_summaries`) and owned by it: `set_tldr` for one chat |
 | `IChatExporter` | `text_chat_exporter` (a chat in WhatsApp's own export format, optionally with copies of its media) |
@@ -498,8 +501,9 @@ The schema is versioned with `PRAGMA user_version`. `sqlite_database.c` creates 
 | 22 | The `sent_ids` table: `account_id`, `message_id`, `kind` (an agent's answer, a request's card, a line of tawk's own), `ref` (the request a card is for) and `at`; the ids of what tawk itself sent into the owner's chat |
 | 23 | `agent_rule` on `chat_prefs` (what agents may do in one chat: as the account says, always ask, read only, hidden) |
 | 24 | `alerts` on `chat_prefs` (which of a chat's messages alert you: all, or only a mention) |
+| 25 | The `chat_labels` table (`jid`, `label`) and the `chat_reminders` table (`jid`, `due_at`, `created_at`): your own labels on chats, and the chats put aside until a time or until their person writes |
 
-Before the first migration of an upgrade runs, the database is copied to `tawk.db.pre-v<N>` (once, 0600), so a failed upgrade can be rolled back by hand. The schema after version 24 is below (the account column that version 17 put in every key is left out of the older tables for room). The tables declare no foreign keys; the relationships are by value (a message's `chat_jid` matches a chat's `jid`, a reaction's or receipt's `message_id` matches a message's `id`, a status's `author_jid` matches a contact's `jid`, a profile's `jid` matches a chat's or contact's `jid`, and an alias maps a LID to the phone number JID used everywhere else). `messages_fts` is an external-content FTS5 table over `messages.text`, keyed by the message `rowid` and kept in step by the triggers `messages_fts_ai`, `messages_fts_ad` and `messages_fts_au`.
+Before the first migration of an upgrade runs, the database is copied to `tawk.db.pre-v<N>` (once, 0600), so a failed upgrade can be rolled back by hand. The schema after version 25 is below (the account column that version 17 put in every key is left out of the older tables for room). The tables declare no foreign keys; the relationships are by value (a message's `chat_jid` matches a chat's `jid`, a reaction's or receipt's `message_id` matches a message's `id`, a status's `author_jid` matches a contact's `jid`, a profile's `jid` matches a chat's or contact's `jid`, and an alias maps a LID to the phone number JID used everywhere else). `messages_fts` is an external-content FTS5 table over `messages.text`, keyed by the message `rowid` and kept in step by the triggers `messages_fts_ai`, `messages_fts_ad` and `messages_fts_au`.
 
 ```mermaid
 erDiagram

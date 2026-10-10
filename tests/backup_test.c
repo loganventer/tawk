@@ -41,8 +41,10 @@ static int file_has(const char *path, const char *text) {
     if (!f) return 0;
     size_t n = fread(buf, 1, sizeof(buf) - 1, f);
     fclose(f);
-    buf[n] = '\0';
-    return strstr(buf, text) != NULL;
+    /* A backup starts with bytes that may hold a zero, so the text is looked for by length, not up to the first zero. */
+    size_t want = strlen(text);
+    for (size_t i = 0; want > 0 && i + want <= n; i++) if (memcmp(buf + i, text, want) == 0) return 1;
+    return 0;
 }
 
 static int message_count(void) {

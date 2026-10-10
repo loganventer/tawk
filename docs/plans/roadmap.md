@@ -206,6 +206,8 @@ Built on 2026-10-10 in tawk 0.17.0: system notifications, quiet hours, and menti
 
 ## 4. Sorting out the chat list
 
+Built on 2026-10-10 in tawk 0.19.0: snooze and remind, labels and filters, and the awaiting reply view. The filter is a command and a first row in the list, not an entry in the header bar, and there is no label picker: `/label NAME` toggles one. Snoozed chats are a filter, not a folder. Repeating scheduled messages, starred and pinned messages, search in one chat and jumping to a date are not built.
+
 | Feature | What the user gets | New parts | Notes |
 |---|---|---|---|
 | Snooze and remind | `/remind 9:00`, `/remind tomorrow` or `/remind reply` puts a chat aside and brings it back with a mark at the time, or sooner if they answer | Core: `ChatReminder`. Contracts: `IReminderStore`. Resource access: `sqlite_reminder_store`. Engines: `reminder_due` (reuses `schedule_time_parser`). Managers: `ReminderManager` | A snoozed chat sits in a Snoozed folder entry beside Archived. The card shows the chat's reminder and can move or cancel it |

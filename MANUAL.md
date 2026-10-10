@@ -9,6 +9,7 @@ The screenshots in this manual were taken from tawk running on a demo account wi
 - [Slash commands](#slash-commands)
 - [Mouse](#mouse)
 - [Chats](#chats)
+- [Finding your way in a long list](#finding-your-way-in-a-long-list)
 - [Chat options](#chat-options)
 - [Soft lock](#soft-lock)
 - [Contact details](#contact-details)
@@ -203,6 +204,10 @@ Type a command at the start of the input. Suggestions appear above the input as 
 | `/statuses` | | See your own and your contacts' statuses (the same as ⭕ in the header) |
 | `/later` | `<when> <text>` | Send a message to this chat later, for example `/later 18:00 Dinner at ours` (see [Scheduled messages](#scheduled-messages)) |
 | `/scheduled` | | Messages waiting to be sent later, to send now, move or cancel |
+| `/filter` | `[unread\|groups\|direct\|awaiting\|snoozed\|label NAME\|off]` | Narrow the chat list (see [Finding your way in a long list](#finding-your-way-in-a-long-list)) |
+| `/label` | `<name>` | Put a label of yours on this chat, or take it off |
+| `/labels` | | List your labels |
+| `/remind` | `<when>\|reply\|off` | Put this chat aside until a time, or until its person writes |
 | `/agents` | | The [Agentic tab](#the-agentic-tab) (the same as F3 or clicking 🤖 Agentic in the header) |
 | `/voice` | | Record a voice note (the same as Ctrl+R) |
 | `/mute` | `[8h\|1w\|always]` | Mute this chat for 8 hours, a week, or until you unmute it (the default) |
@@ -300,6 +305,36 @@ Agents are not told who is online unless you switch on "Push online status" unde
 
 An agent cannot ask whether someone is online unless you switch on "Look up online status" under Settings, Automation. With it on, it may ask about one person at a time, in a chat it may use; tawk then has WhatsApp tell it about that person, exactly as opening their chat does, and answers with what it knows. It learns nothing while tawk shows you as offline, nothing about groups or locked chats, and only what the person shares with you.
 
+## Finding your way in a long list
+
+**Narrowing the list.** `/filter` followed by one word shows only some of your chats:
+
+| Command | Shows |
+|---|---|
+| `/filter unread` | Chats with unread messages |
+| `/filter groups` | Groups |
+| `/filter direct` | One-to-one chats |
+| `/filter awaiting` | One-to-one chats where the last message is yours and nobody has answered it for 3 days. Settings, Chats, **Awaiting a reply after (days)** changes the 3; chats quiet for more than two months are left out |
+| `/filter snoozed` | Chats you put aside with `/remind` |
+| `/filter label work` | Chats carrying your label *work* |
+| `/filter off` | Every chat again |
+
+A narrowed list starts with a row that says what it shows. Enter on that row shows every chat again. Typing in the search box (Ctrl+F) always looks through all of them.
+
+**Labels.** Open a chat and type `/label work`: the chat now carries the label *work*. Type it again to take it off. A chat can carry several, `/labels` lists the ones in use, and a chat's labels show on its [contact card](#contact-details). A label is up to 24 characters, is kept in lower case, and exists for as long as some chat carries it. Labels are yours alone: they are kept on this computer, are not WhatsApp Business labels, and hold for a person or group on all your numbers.
+
+**Putting a chat aside.** `/remind` with a time takes the open chat out of the list until then:
+
+```
+/remind 9:00
+/remind tomorrow
+/remind +2h
+/remind fri 17:30
+/remind reply
+```
+
+The times are the ones `/later` understands. The chat comes back at that time with a notice, a sound and a banner as your settings allow, or sooner if its person writes. `/remind reply` sets no time: the chat stays aside until they write. `/filter snoozed` shows what is put aside, the contact card's **Put aside** row says until when (Enter there brings the chat back), and `/remind off` does the same from the chat.
+
 ## Chat options
 
 Press Alt+O on a chat in the list or in the conversation, or right-click a chat. The menu shows what applies to that chat:
@@ -384,6 +419,8 @@ Above the actions the card lists the chat's own settings. Enter on one steps it 
 | Transcribe voice notes | On or off. Off leaves this chat's voice notes untranscribed from now on and keeps the transcripts it has |
 | Voice note languages… | Opens a list of languages with a switch for each: the ones this chat's voice notes are spoken in |
 | TL;DR | On or off. On, this chat's long messages show as a summary that unfolds to the original (see [TL;DR mode](#tldr-mode)) |
+| Labels | Your labels on this chat. `/label NAME` in the chat adds or removes one |
+| Put aside | Whether the chat is put aside with `/remind`, and until when. Enter brings it back |
 | Notify me | *For every message*, or *only when mentioned*: see [Notifications](#notifications) |
 | Agents here | What agents may do in this chat, on top of what the account allows. Enter steps through: *as the account says*; *always ask me* (every send is yours to answer, each time, with no "for this session" and no agent answering its own); *read only* (agents read the chat and are refused any write, without you being asked); *hidden from agents* (the chat is not listed, read, searched or named, as if it did not exist). It holds for that person or group on all your numbers, and can only tighten what the account's level allows |
 | This is my chat with the agent | Only on your own "message yourself" chat. See [The owner's chat](#the-owners-chat) |
