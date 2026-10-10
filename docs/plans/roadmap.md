@@ -28,6 +28,33 @@ Status: section 1 (transcripts in the conversation) and TL;DR mode are built and
 - [How it is checked](#how-it-is-checked)
 - [Not in this plan](#not-in-this-plan)
 
+## Where it stands
+
+As of 2026-10-10, with tawk 0.20.0 and tawk-mcp 0.12.0. Work stopped here for the week with the two programs in step: every tawk feature below that an agent should reach has its control operation and its tool.
+
+| Built | In |
+|---|---|
+| Transcripts in the conversation, per-chat show and transcribe, per-chat and default languages | tawk 0.13.0 to 0.14.3, tawk-mcp 0.9.0 to 0.10.2 |
+| TL;DR mode | tawk 0.14.0 to 0.14.5, tawk-mcp 0.10.0 to 0.10.3 |
+| The owner's chat, with approving from WhatsApp | tawk 0.15.0, tawk-mcp 0.11.0 |
+| A rule per chat for agents (always ask, read only, hidden), and codes and card numbers masked for models | tawk 0.16.0 |
+| System notifications, quiet hours, mentions only per chat | tawk 0.17.0 |
+| Backups that detect tampering, and the passphrase lock | tawk 0.18.0 |
+| Labels, reminders, narrowing the chat list, awaiting a reply | tawk 0.19.0 and 0.20.0, tawk-mcp 0.12.0 |
+
+Not built, in the order they would be taken:
+
+1. Section 4, the rest: repeating scheduled messages, starred and pinned messages, search in one chat and jumping to a date.
+2. Section 3: the headless tawk and requests kept while nobody is there.
+3. Section 7: strict mode for strangers, security code changes, the guard against restrictions, a proxy, the "what left this computer" page.
+4. Section 8: hooks and the daily digest.
+5. Section 6: your own keys and a vim set, the chat switcher, split view, undo send, selecting several messages, your editor, plain mode.
+6. Section 5: polls, events, locations, contact cards, view once, disappearing messages, stickers, usernames. Each needs protocol work in both bridges, proved against a real account.
+7. Section 2, the rest: the login in the keychain, the encrypted media cache, signed releases (which need a signing key kept outside the repository), sandboxed parsers.
+8. Section 9, tawk-mcp's own steps: the 2026-07-28 protocol revision, tasks, structured results, resource links, MCP Apps, tool sets, `doctor`, the leak check, the hidden text rule, the read budget, tokens per client and in the keychain, reviewed memory with a history, catch-up marks and the new prompts.
+
+Not yet tried by hand: the owner's chat against a real phone, the lock screen against an encrypted database, the terminal escape codes for banners in each terminal, and the new chat list commands in the terminal.
+
 ## Why
 
 tawk was compared with WhatsApp's own apps, Telegram, Signal, Beeper and the other terminal clients in October 2026. It already covers everyday messaging and has something none of them have, an approval queue between an agent and your account. What it lacks falls into seven groups: transcripts you can read, protection of the files beside the database, running while no terminal is open, tools for a busy chat list, the newer kinds of message, keyboard comfort, and defences against strangers and against WhatsApp's own restrictions.
