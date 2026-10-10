@@ -117,7 +117,9 @@ int automation_policy_setting_changeable(const SettingField *f) {
     static const char *const FIXED[] = {
         "command", "image_viewer", "video_player", "node_binary", "sidecar_dir",       /* run programs */
         "data_dir", "media_dir", "download_dir", "attach_dir", "sound_file",          /* folders and files */
-        "backend", "log_level", "last_chat", "recent_emoji", NULL
+        "backend", "log_level", "last_chat", "recent_emoji",
+        "lock_minutes",                                                               /* an agent does not unlock your screen */
+        NULL
     };
     if (!f || f->category == SETTING_CATEGORY_AUTOMATION || f->category == SETTING_CATEGORY_ADVANCED) return 0;
     for (int i = 0; FIXED[i]; i++) if (strcmp(f->key, FIXED[i]) == 0) return 0;

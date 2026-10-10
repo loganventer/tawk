@@ -35,6 +35,7 @@
 #include "infrastructure/sound_notifier.h"
 #include "infrastructure/system_clipboard_image.h"
 #include "infrastructure/system_media_opener.h"
+#include "infrastructure/authenticated_file_cipher.h"
 #include "infrastructure/openssl_file_cipher.h"
 #include "infrastructure/tar_archive.h"
 #include "infrastructure/unix_control_client.h"
@@ -292,7 +293,7 @@ static int run_backup_or_restore(const Options *opt, const Settings *s, const ch
                                  const char *db_path, const char *auth_dir, IPassphrasePrompt *prompt) {
     IDatabaseSnapshot *snapshot = sqlite_file_snapshot_create();
     IArchive *archive = tar_archive_create();
-    IFileCipher *file_cipher = openssl_file_cipher_create();
+    IFileCipher *file_cipher = authenticated_file_cipher_create(openssl_file_cipher_create());
     BackupManagerDeps deps = { snapshot, archive, file_cipher, sqlite_database_is_encrypted(db_path) };
     BackupManager *backups = backup_manager_create(&deps);
     char accounts_dir[600];
@@ -509,6 +510,7 @@ int main(int argc, char **argv) {
         .automation = automation, .approvals = approvals, .frame_hook = control ? control_server_frame_hook(control) : NULL,
         .directory = directory, .roster = roster, .active_account = active->id,
         .transcripts = active->transcripts, .summaries = active->summaries,
+        .crypt = crypt,
     };
     TuiApp *tui = tui_app_create(&tdeps);
     int exit_code = tui ? tui_app_run(tui) : 1;

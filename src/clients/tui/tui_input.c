@@ -577,7 +577,7 @@ static int handle_global(TuiApp *app, int is_key, int ch) {
     if (!is_key && ch == CTRL('r')) { tui_app_toggle_recording(app); return 1; }
     if (!is_key && ch == CTRL('o')) { tui_app_open_file_picker(app, FILE_PICKER_FOR_ATTACHMENT); return 1; }
     if (!is_key && ch == CTRL('k')) { tui_app_open_search(app, ""); return 1; }
-    if (!is_key && ch == CTRL('l')) { tui_app_start_screensaver(app); return 1; }
+    if (!is_key && ch == CTRL('l')) { if (!tui_app_lock(app)) tui_app_start_screensaver(app); return 1; }
     if (!is_key && ch == CTRL('e')) { tui_app_open_emoji(app, EMOJI_PICKER_FOR_INPUT, NULL, ""); return 1; }
     if (!is_key && ch == CTRL('f')) { app->focus = TUI_FOCUS_CHATS; app->chat_list.filtering = 1; return 1; }
     if (!is_key && ch == CTRL('n')) {
@@ -875,6 +875,16 @@ static void handle_login(TuiApp *app, int is_key, int ch) {
 void tui_input_dispatch(TuiApp *app, int is_key, int ch) {
     int alt = 0, shift = 0;
     if (is_key && ch == KEY_RESIZE) return;              /* layout is recomputed every frame */
+    if (tui_app_locked(app)) {
+        /* Locked: every key goes to the lock, and what the mouse or a paste sends is thrown away unread. */
+        if (is_key && ch == KEY_MOUSE) { MEVENT gone; getmouse(&gone); return; }
+        if (!is_key && ch == 27) {
+            if (escape_sequence_read().kind == ESCAPE_SEQUENCE_PASTE) free(read_paste_body());
+            return;
+        }
+        tui_app_lock_key(app, is_key, ch);
+        return;
+    }
     if (is_key && ch == KEY_MOUSE) { handle_mouse(app); return; }
     if (!is_key && ch == 27) {
         EscapeSequence seq = escape_sequence_read();

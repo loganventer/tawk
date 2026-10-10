@@ -79,6 +79,12 @@ static void composer_chip(TuiApp *app, char *out, size_t size) {
 }
 
 void tui_render_frame(TuiApp *app, int64_t now) {
+    if (tui_app_locked(app)) {                              /* nothing of tawk is drawn behind the lock */
+        int lock_rows, lock_cols;
+        getmaxyx(stdscr, lock_rows, lock_cols);
+        lock_screen_draw(&app->lock, lock_rows, lock_cols, now);
+        return;
+    }
     const Settings *s = settings_manager_current(app->deps.settings);
     MessagingManager *mm = app->deps.messaging;
     int rows, cols;

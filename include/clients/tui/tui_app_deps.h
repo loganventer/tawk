@@ -19,6 +19,7 @@
 #include "contracts/i_video_poster.h"
 #include "managers/account_manager.h"
 #include "managers/automation_manager.h"
+#include "managers/database_crypt_manager.h"
 #include "managers/media_manager.h"
 #include "managers/messaging_manager.h"
 #include "managers/call_manager.h"
@@ -38,6 +39,7 @@ typedef struct TuiAppDeps {
     MediaManager          *media;
     SettingsManager       *settings;
     IIdleAction           *screensaver;
+    DatabaseCryptManager  *crypt;                 /* whether your chats are encrypted, and what opens them; may be NULL */
     IAudioPlayer          *sound_player;
     IEmojiCatalog         *emoji;
     IClipboard            *clipboard;

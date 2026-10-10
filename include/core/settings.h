@@ -45,6 +45,7 @@ typedef struct Settings {
     int  notifications;
     int  do_not_disturb;
     int  group_notifications;
+    int  lock_minutes;                /* minutes without a key before tawk locks itself; 0: only when you lock it */
     char system_notifications[12];    /* a banner outside tawk: off, terminal (escape codes), desktop (a program), both */
     char quiet_hours[16];             /* "22:00-07:00": nothing alerts you then but a mention; "": none */
     char quiet_hours_weekend[16];     /* the same for Saturday and Sunday; "": as on weekdays */

@@ -78,6 +78,7 @@ static const SettingField FIELDS[] = {
     S(SETTING_CATEGORY_MEDIA, "mic_device", "Microphone", "Capture device for the audio system; \"default\" uses the system default", mic_device, 0),
     I(SETTING_CATEGORY_MEDIA, "voice_max_seconds", "Max voice note length (s)", "Recording stops and sends at this length", voice_max_seconds, 10, 900, 10, 0),
     B(SETTING_CATEGORY_SCREENSAVER, "enabled", "Screensaver", "Run a command after a period of inactivity", screensaver),
+    I(SETTING_CATEGORY_SCREENSAVER, "lock_minutes", "Lock after (minutes)", "With encrypted chats: tawk shows nothing until their passphrase is typed, after this many minutes without a key. 0 locks only when you press Ctrl+L or type /lock", lock_minutes, 0, 240, 1, 0),
     I(SETTING_CATEGORY_SCREENSAVER, "idle_minutes", "Idle minutes", "Inactivity before the screensaver starts", idle_minutes, 1, 240, 1, 0),
     S(SETTING_CATEGORY_SCREENSAVER, "command", "Command", "Shell command to run; any key stops it", screensaver_command, 0),
     B(SETTING_CATEGORY_SCREENSAVER, "wake_on_message", "Wake on message", "Stop the screensaver when a message arrives", wake_on_message),

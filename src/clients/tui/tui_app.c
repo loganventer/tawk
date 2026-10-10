@@ -1559,6 +1559,7 @@ static void update_tab(TuiApp *app, int64_t now) {
         snprintf(activity, sizeof(activity), "Preparing previews");
         busy = 1;
     }
+    if (tui_app_locked(app)) { hidden = 1; activity[0] = '\0'; typing = 0; }     /* the tab says nothing about a locked tawk's chats */
     TabStatus st = {
         .chat_name = chat ? (hidden ? "\xF0\x9F\x99\x88" : chat->name) : "",
         .activity = activity,
@@ -1765,7 +1766,8 @@ int tui_app_run(TuiApp *app) {
         if (app->toast[0] && now > app->toast_until_ms) { app->toast[0] = '\0'; app->dirty = 1; }
         if (idle_tracker_is_idle(&app->idle, 2)) set_active(app, 0);
         update_tab(app, now);
-        maybe_screensaver(app);
+        tui_app_lock_tick(app, now);
+        if (!tui_app_locked(app)) maybe_screensaver(app);
         follow_camera(app, now);
         if (app->splash.active) {
             if (splash_view_active(&app->splash, now)) { run_splash_frame(app, now); continue; }

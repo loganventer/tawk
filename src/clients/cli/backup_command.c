@@ -84,6 +84,10 @@ int restore_command_run(BackupManager *mgr, IPassphrasePrompt *prompt, const Bac
     restored("your themes", report.manifest.has_themes);
     restored("media", report.manifest.has_media);
     restored("WhatsApp login", report.manifest.has_login);
+    if (report.unchecked) {
+        printf("This backup was made by an older tawk and carries no check against changes, so tawk could not tell whether it was altered. "
+               "Make a new backup to have one that can.\n");
+    }
     if (report.moved_aside) {
         printf("Your previous data was kept with the suffix %s; delete it once you are happy.\n", report.aside_suffix);
     }

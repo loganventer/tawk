@@ -8,6 +8,7 @@ typedef struct RestoreReport {
     BackupManifest manifest;     /* what the backup held */
     char           aside_suffix[64];   /* replaced data was renamed with this suffix */
     int            moved_aside;  /* how many existing items were moved aside */
+    int            unchecked;    /* the backup was made before backups could detect a change to them */
 } RestoreReport;
 
 #endif

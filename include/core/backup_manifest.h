@@ -3,8 +3,10 @@
 
 #include <stdint.h>
 
-/* 2 added the logins of further accounts. A backup of format 1 still restores: it holds the one account. */
-#define BACKUP_FORMAT 2
+/* 2 added the logins of further accounts. A backup of format 1 still restores: it holds the one account.
+ * 3 is a file whose every byte is checked before it is decrypted; 1 and 2 still restore, with a warning. */
+#define BACKUP_FORMAT 3
+#define BACKUP_FORMAT_CHECKED 3
 #define BACKUP_FORMAT_OLDEST 1
 
 /* What a backup holds, written into it as manifest.txt. */

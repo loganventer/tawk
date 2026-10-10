@@ -4,6 +4,13 @@ What changed in each version of tawk, newest first. `tawk --update` shows every 
 
 Each version has a section headed `## <version> (<date>)`, with one line for each change you would notice.
 
+## 0.18.0 (2026-10-10)
+
+Safer at rest.
+
+- **Backups detect tampering.** A backup now carries a check over every byte (HMAC-SHA256, under a key derived from your passphrase apart from the encryption key). A backup that was changed or damaged after it was made is refused before any of it is decrypted or unpacked, and so is one whose check was cut off. Backups made by earlier versions still restore, with a line saying they carry no such check; make a new backup to have one that does. An older tawk cannot read the new format.
+- **A lock that asks for your passphrase.** With encrypted chats (`tawk --encrypt`), Ctrl+L or `/lock` blanks the screen until the passphrase of your chats is typed, and Settings, Screensaver, "Lock after (minutes)" does it by itself after that long without a key (0, the default, never does). Nothing of tawk is drawn behind the lock and the tab title names no chat. Three wrong tries are free; after that each one waits, from a second up to a minute. tawk keeps running behind it: messages arrive and agents are served. An agent cannot change the setting. With plain chats there is no secret to ask for, so Ctrl+L and `/lock` start the screensaver as before; `/screensaver` always does.
+
 ## 0.17.0 (2026-10-10)
 
 Notifications that reach you outside tawk, and stay quiet when you want them to.

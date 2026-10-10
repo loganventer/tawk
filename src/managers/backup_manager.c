@@ -250,15 +250,20 @@ int backup_manager_restore(BackupManager *m, const BackupPaths *p, const char *i
 
     int rc = -1;
     char text[1024];
+    int checked = m->deps.cipher->checked && m->deps.cipher->checked(m->deps.cipher, input);
     if (m->deps.cipher->decrypt(m->deps.cipher, input, archive, passphrase) != 0) {
-        refuse(why, size, "the passphrase is wrong, or this is not a tawk backup");
+        refuse(why, size, "the passphrase is wrong, or the backup was changed or damaged, or this is not a tawk backup");
     } else if (check_members(m, archive, why, size) != 0) {
         /* why is set */
     } else if (mkdir(content, 0700) != 0 || m->deps.archive->extract(m->deps.archive, archive, content) != 0) {
         refuse(why, size, "tar could not unpack the backup");
     } else if (read_small_file(manifest_path, text, sizeof(text)) != 0 || backup_manifest_parse(text, &report->manifest) != 0) {
         refuse(why, size, "the backup was made by a version of tawk this one cannot read");
+    } else if (report->manifest.format >= BACKUP_FORMAT_CHECKED && !checked) {
+        /* It says it was written with the check, and the check is not on it: someone took it off. */
+        refuse(why, size, "the check that guards this backup against changes was removed from it; nothing was restored");
     } else {
+        report->unchecked = !checked;
         time_t now = time(NULL);
         struct tm tm_now;
         localtime_r(&now, &tm_now);

@@ -32,7 +32,8 @@ static void cmd_settings(TuiApp *app, const char *args)  { (void)args; settings_
 static void cmd_quit(TuiApp *app, const char *args)      { (void)args; tui_app_quit(app); }
 static void cmd_dnd(TuiApp *app, const char *args)       { (void)args; tui_app_toggle_dnd(app); }
 static void cmd_voice(TuiApp *app, const char *args)     { (void)args; tui_app_toggle_recording(app); }
-static void cmd_lock(TuiApp *app, const char *args)      { (void)args; tui_app_start_screensaver(app); }
+static void cmd_screensaver(TuiApp *app, const char *args) { (void)args; tui_app_start_screensaver(app); }
+static void cmd_lock(TuiApp *app, const char *args)      { (void)args; if (!tui_app_lock(app)) tui_app_start_screensaver(app); }
 static void cmd_profile(TuiApp *app, const char *args)   { (void)args; tui_app_open_profile(app); }
 static void cmd_status(TuiApp *app, const char *args)    { (void)args; tui_app_open_status(app); }
 static void cmd_statuses(TuiApp *app, const char *args)  { (void)args; tui_app_open_statuses(app); }
@@ -195,8 +196,8 @@ static const SlashCommand COMMANDS[] = {
     { "theme",       "[id|default]",         "theme for this chat",             cmd_theme },
     { "tone",        "[file|none|default]",  "notification sound for this chat", cmd_tone },
     { "dnd",         "",                     "toggle do not disturb",           cmd_dnd },
-    { "screensaver", "",                     "start the screensaver now",       cmd_lock },
-    { "lock",        "",                     "start the screensaver now",       cmd_lock },
+    { "screensaver", "",                     "start the screensaver now",       cmd_screensaver },
+    { "lock",        "",                     "lock until the passphrase is typed (encrypted chats), else the screensaver", cmd_lock },
     { "softlock",    "",                     "blur this chat, or show it again", cmd_softlock },
     { "transcripts", "",                     "show voice note transcripts in this chat: as the setting says, always, never", cmd_transcripts },
     { "info",        "",                     "contact or group details",        cmd_info },

@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "clients/tui/lock_screen.h"
 #include "clients/tui/chat_list_view.h"
 #include "clients/tui/unified_chat_list.h"
 #include "clients/tui/accounts_dialog.h"
@@ -150,6 +151,7 @@ struct TuiApp {
 
     /* Loop, idle and presence */
     IdleTracker         idle;
+    LockScreen          lock;                 /* everything is hidden until the passphrase is typed */
     int                 running;
     int                 active;
     int                 dragging_divider;
@@ -229,6 +231,11 @@ void tui_app_run_search(TuiApp *app);
 void tui_app_choose_search_result(TuiApp *app);
 void tui_app_open_help(TuiApp *app);
 void tui_app_start_screensaver(TuiApp *app);
+/* tui_lock.c: locks tawk until the passphrase of your chats is typed. tui_app_lock returns 0 where there is no lock (the chats are not encrypted). */
+int  tui_app_locked(const TuiApp *app);
+int  tui_app_lock(TuiApp *app);
+void tui_app_lock_tick(TuiApp *app, int64_t now_ms);
+void tui_app_lock_key(TuiApp *app, int is_key, int ch);
 void tui_app_toggle_dnd(TuiApp *app);
 void tui_app_quit(TuiApp *app);
 const NameResolver *tui_app_names(TuiApp *app);
