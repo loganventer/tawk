@@ -192,6 +192,8 @@ tawk-mcp still writes no transcript to disk and none to a log.
 
 ## 3. Running without a window
 
+Built on 2026-10-10 in tawk 0.17.0: system notifications, quiet hours, and mentions only per chat. The Windows toast through WSL was left out. The headless tawk and stored requests are not built.
+
 | Feature | What the user gets | New parts | Notes |
 |---|---|---|---|
 | A headless tawk | `tawk --daemon` keeps accounts connected, sends what was scheduled and serves agents with no terminal open | Clients: `clients/headless` (`headless_app`), a third client beside `tui` and `control` that runs the managers' ticks and the frame hook. Contracts: `IInstanceHandover`. Infrastructure: `socket_instance_handover` | One tawk still owns the data folder at a time. Starting the terminal client asks the daemon to hand over and stop, and quitting can start it again. A terminal client that attaches to a running daemon would need a protocol for the whole screen and is not planned |

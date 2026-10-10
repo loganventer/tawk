@@ -13,7 +13,7 @@ In scope:
 - Editing your own profile: name, about text and photo.
 - Statuses: viewing your own and your contacts' statuses for the day they last and in a local archive after that (`status_keep_days`), posting text, photo, video and link statuses, and answering other people's statuses with an emoji, a reply or a like.
 - Media: receiving photos, videos, documents, stickers and voice notes, opening them in the system viewer, sending files and voice notes, and taking photos and videos with the computer's camera.
-- Notifications inside the terminal: sound, blinking, the terminal tab title, the Windows Terminal progress ring.
+- Notifications inside the terminal: sound, blinking, the terminal tab title, the Windows Terminal progress ring. When you turn it on, a banner outside it too, asked of the terminal or of the desktop's own notification program.
 - Personalisation: themes, layout, notification rules, a screensaver command.
 - Resilience against network drops, network changes (Wi-Fi, Ethernet, a hotspot) and backend crashes.
 - Protecting your data at rest: encrypting the local database with a passphrase, and encrypted backups you can restore.

@@ -383,6 +383,7 @@ Above the actions the card lists the chat's own settings. Enter on one steps it 
 | Transcribe voice notes | On or off. Off leaves this chat's voice notes untranscribed from now on and keeps the transcripts it has |
 | Voice note languages… | Opens a list of languages with a switch for each: the ones this chat's voice notes are spoken in |
 | TL;DR | On or off. On, this chat's long messages show as a summary that unfolds to the original (see [TL;DR mode](#tldr-mode)) |
+| Notify me | *For every message*, or *only when mentioned*: see [Notifications](#notifications) |
 | Agents here | What agents may do in this chat, on top of what the account allows. Enter steps through: *as the account says*; *always ask me* (every send is yours to answer, each time, with no "for this session" and no agent answering its own); *read only* (agents read the chat and are refused any write, without you being asked); *hidden from agents* (the chat is not listed, read, searched or named, as if it did not exist). It holds for that person or group on all your numbers, and can only tighten what the account's level allows |
 | This is my chat with the agent | Only on your own "message yourself" chat. See [The owner's chat](#the-owners-chat) |
 
@@ -748,6 +749,12 @@ When a message arrives in a chat that is not open, tawk can:
 The tab title follows what is going on, like `🟢 tawk · Mom · 💬 3  📷 1`. It names the open chat and, while something is happening, says what with a spinning braille glyph in front: `⠼ Loading older messages · Dev team`, `⠹ Connecting…`, `Recording 0:07`. While someone types to you the tab moves like the typing dots in a chat: ✍️ and 💬 take turns in front and the dots after `Jan is typing` count up and start again. It follows the open chat first and otherwise any chat where someone is typing (`Mom is typing`, or `Dev team: Jan is typing` for a group); soft-locked chats are left out. Unread counts per type follow at the end and alternate with `✉ 3 new` while new messages wait. The leading symbol shows the status: 🟢 online, 🟡 connecting, 🔴 unavailable, 🔗 not linked, 🔕 do not disturb, 🔴REC recording, 🎧 playing. In Windows Terminal the tab also shows a spinning progress ring while reconnecting and a red one while retries are paused.
 
 Each of these can be turned on or off in Settings, Notifications. Do not disturb (Ctrl+D or `/dnd`) silences all of them. Group chats can be silenced separately, muted chats never notify, and a chat whose tone is set to none alerts without sound.
+
+**Outside tawk.** With tawk's tab out of view you can have a banner from the system as well. Settings, Notifications, **System notifications** has four choices: *off* (the default); *terminal*, which asks the terminal itself (iTerm2, kitty, WezTerm, Ghostty, foot and urxvt understand it, and most show the banner only when their window is not in front); *desktop*, which runs `terminal-notifier` or `osascript` on macOS and `notify-send` on Linux; and *both*. The banner shows the message when **Show preview** is on and says only "New message" when it is off. Inside tmux or screen the terminal kind usually does not get through, so choose *desktop* there.
+
+**Quiet hours.** Type a stretch such as `22:00-07:00` into **Quiet hours** and nothing alerts you inside it: no sound, no blinking, no banner. Unread counts still go up. A message that mentions you still gets through while **Mentions always notify** is on. **Quiet hours at weekends** takes other hours for Saturday and Sunday; left empty, the weekdays' hours apply every day.
+
+**One chat at a time.** A chat's [contact card](#contact-details) has **Notify me**: *for every message*, or *only when mentioned*. A busy group set to mentions only stays silent until someone names you, on all your numbers. Muting a chat is still there for silence altogether.
 
 ## Incoming calls
 

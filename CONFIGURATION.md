@@ -113,7 +113,10 @@ Some preferences are set per chat: mutes, pins, archiving, the notification tone
 | `do_not_disturb` | `false` | Silence everything, a ringing call included; Ctrl+D toggles it |
 | `group_notifications` | `true` | Alert for group messages |
 | `mention_notifications` | `true` | Being @mentioned alerts you even in a muted chat or with group alerts off (never during do not disturb) |
-| `show_preview` | `true` | Include message text in the title bar |
+| `show_preview` | `true` | Include message text in the title bar, and in a system notification |
+| `system_notifications` | `off` | A banner outside tawk for a new message: `terminal` (an escape code the terminal understands), `desktop` (`terminal-notifier` or `osascript` on macOS, `notify-send` elsewhere), `both`, or `off` |
+| `quiet_hours` | (empty) | A stretch of the day with no alerts, such as `22:00-07:00` (it may run over midnight). A mention still gets through when `mention_notifications` is on. Empty: none |
+| `quiet_hours_weekend` | (empty) | Other quiet hours for Saturday and Sunday. Empty: the same as on weekdays |
 | `sound` | `true` | Play a sound for new messages, and every 3 seconds while a call rings |
 | `sound_file` | `/usr/local/share/tawk/sounds/notify.wav` | WAV/OGG file to play |
 | `blink` | `true` | Blink the chat in the list and the status bar |
